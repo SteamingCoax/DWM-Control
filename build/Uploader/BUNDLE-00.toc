@@ -1,0 +1,3 @@
+([('Uploader',
+   '/Users/robertcecere/Desktop/DWM/App/dist/Uploader',
+   'EXECUTABLE')],)

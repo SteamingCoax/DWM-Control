@@ -1,0 +1,12 @@
+Once built, the application can be found in dist/
+
+MacOs:
+source dfu_env/bin/activate
+
+pyinstaller --onefile --windowed --add-binary "/usr/local/bin/dfu-util:." --hidden-import=tkinter --hidden-import=ttk --hidden-import=threading --hidden-import=intelhex --clean Uploader.py
+
+
+Windows:
+dfu_venv\Scripts\activate.bat
+
+pyinstaller --onefile --windowed --add-binary "dfu-util.exe;." --hidden-import=tkinter --hidden-import=ttk --hidden-import=threading --hidden-import=intelhex --clean Uploader.py
