@@ -80,67 +80,163 @@ class FirmwareUploaderTab(QWidget):
     def create_widgets(self):
         # Set up layout for parent
         layout = QVBoxLayout(self.parent)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
 
-        # Title
-        title_label = QLabel("Firmware Uploader")
+        # Title with icon
+        title_label = QLabel("🔧 Firmware Uploader")
         title_font = QFont()
-        title_font.setPointSize(14)
+        title_font.setPointSize(16)
         title_font.setBold(True)
         title_label.setFont(title_font)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title_label)
+        title_label.setStyleSheet("""
+            QLabel {
+                color: #ffffff;
+                background-color: #0078d4;
+                padding: 15px;
+                border-radius: 10px;
+                margin-bottom: 10px;
+            }
+        """)
+        #layout.addWidget(title_label)
 
-        # Device selection group
-        device_group = QGroupBox("DFU Device Selection")
+        # Device selection group with enhanced styling
+        device_group = QGroupBox("📡 DFU Device Selection")
         device_layout = QVBoxLayout(device_group)
+        device_layout.setSpacing(10)
         
-        device_layout.addWidget(QLabel("Select DFU Device:"))
+        # Device info label
+        info_label = QLabel("Select your DFU-compatible device from the list below:")
+        info_label.setStyleSheet("color: #cccccc; font-style: italic; margin-bottom: 5px;")
+        device_layout.addWidget(info_label)
+        
         self.device_combo = QComboBox()
+        self.device_combo.setMinimumHeight(40)
         self.device_combo.currentIndexChanged.connect(self.on_device_select)
         device_layout.addWidget(self.device_combo)
         
-        refresh_btn = QPushButton("Refresh Devices")
+        refresh_btn = QPushButton("🔄 Refresh Devices")
+        refresh_btn.setMinimumHeight(40)
         refresh_btn.clicked.connect(self.refresh_devices)
+        refresh_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #28a745;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #218838;
+            }
+        """)
         device_layout.addWidget(refresh_btn)
         
         layout.addWidget(device_group)
 
-        # File selection group
-        file_group = QGroupBox("Firmware File")
+        # File selection group with drag-drop area simulation
+        file_group = QGroupBox("📁 Firmware File Selection")
         file_layout = QVBoxLayout(file_group)
+        file_layout.setSpacing(10)
         
-        select_file_btn = QPushButton("Select .hex File")
+        # File drop area
+        file_area = QWidget()
+        file_area.setMinimumHeight(100)
+        file_area.setStyleSheet("""
+            QWidget {
+                border: 3px dashed #555555;
+                border-radius: 10px;
+                background-color: #383838;
+            }
+        """)
+        file_area_layout = QVBoxLayout(file_area)
+        
+        select_file_btn = QPushButton("📂 Select .hex File")
+        select_file_btn.setMinimumHeight(50)
         select_file_btn.clicked.connect(self.select_file)
-        file_layout.addWidget(select_file_btn)
+        select_file_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #17a2b8;
+                font-size: 14px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #138496;
+            }
+        """)
+        file_area_layout.addWidget(select_file_btn)
         
         self.file_label = QLabel("No file selected")
-        file_layout.addWidget(self.file_label)
+        self.file_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.file_label.setStyleSheet("""
+            QLabel {
+                color: #cccccc;
+                font-style: italic;
+                font-size: 11px;
+                background: none;
+                border: none;
+            }
+        """)
+        file_area_layout.addWidget(self.file_label)
         
+        file_layout.addWidget(file_area)
         layout.addWidget(file_group)
 
-        # Upload group
-        upload_group = QGroupBox("Upload")
+        # Upload group with progress animation
+        upload_group = QGroupBox("🚀 Upload Firmware")
         upload_layout = QVBoxLayout(upload_group)
+        upload_layout.setSpacing(10)
         
-        upload_btn = QPushButton("Upload Firmware")
+        upload_btn = QPushButton("⬆️ Upload Firmware")
+        upload_btn.setMinimumHeight(50)
         upload_btn.clicked.connect(self.upload_firmware)
+        upload_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #c82333;
+            }
+        """)
         upload_layout.addWidget(upload_btn)
         
         self.progress = QProgressBar()
         self.progress.setVisible(False)
+        self.progress.setMinimumHeight(25)
+        self.progress.setStyleSheet("""
+            QProgressBar {
+                border-radius: 10px;
+                text-align: center;
+                font-weight: bold;
+            }
+            QProgressBar::chunk {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #28a745, stop:1 #20c997);
+                border-radius: 8px;
+            }
+        """)
         upload_layout.addWidget(self.progress)
         
         layout.addWidget(upload_group)
 
-        # Output group
-        output_group = QGroupBox("Output")
+        # Output group with console styling
+        output_group = QGroupBox("📊 Output Console")
         output_layout = QVBoxLayout(output_group)
         
         self.output_text = QTextEdit()
         self.output_text.setReadOnly(True)
-        self.output_text.setMinimumHeight(200)
+        self.output_text.setMinimumHeight(250)
+        self.output_text.setStyleSheet("""
+            QTextEdit {
+                background-color: #000000;
+                color: #00ff00;
+                font-family: 'Courier New', 'Monaco', monospace;
+                font-size: 11px;
+                border: 2px solid #333333;
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
         output_layout.addWidget(self.output_text)
         
         layout.addWidget(output_group)

@@ -89,15 +89,15 @@ class SerialGUITab(QWidget):
             }
         }
         
-        # Action commands
+        # Action commands with icons
         self.action_commands = {
-            'reset': {'label': 'Reset', 'command': 'START:A:RESET'},
-            'reboot': {'label': 'Reboot', 'command': 'START:A:REBOOT'},
-            'save': {'label': 'Save', 'command': 'START:A:SAVE'},
-            'update': {'label': 'Update', 'command': 'START:A:UPDATE'},
-            'return_loss': {'label': 'Return Loss', 'command': 'START:A:RETURN_LOSS'},
-            'cal': {'label': 'Calibrate', 'command': 'START:A:CAL'},
-            'de_embed': {'label': 'De-Embed', 'command': 'START:A:DE_EMBED'},
+            'reset': {'label': '🔄 Reset', 'command': 'START:A:RESET', 'color': '#ffc107'},
+            'reboot': {'label': '⏻ Reboot', 'command': 'START:A:REBOOT', 'color': '#fd7e14'},
+            'save': {'label': '💾 Save', 'command': 'START:A:SAVE', 'color': '#28a745'},
+            'update': {'label': '🔄 Update', 'command': 'START:A:UPDATE', 'color': '#17a2b8'},
+            'return_loss': {'label': '📊 Return Loss', 'command': 'START:A:RETURN_LOSS', 'color': '#6610f2'},
+            'cal': {'label': '🎯 Calibrate', 'command': 'START:A:CAL', 'color': '#e83e8c'},
+            'de_embed': {'label': '🔧 De-Embed', 'command': 'START:A:DE_EMBED', 'color': '#20c997'},
         }
         
         self.create_widgets()
@@ -105,31 +105,50 @@ class SerialGUITab(QWidget):
     def create_widgets(self):
         # Set up layout for parent
         layout = QVBoxLayout(self.parent)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(15)
 
-        # Title
-        title_label = QLabel("Serial Control Panel")
+        # Title with control panel icon
+        title_label = QLabel("🎛️ Device Control Panel")
         title_font = QFont()
-        title_font.setPointSize(14)
+        title_font.setPointSize(16)
         title_font.setBold(True)
         title_label.setFont(title_font)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title_label)
+        title_label.setStyleSheet("""
+            QLabel {
+                color: #ffffff;
+                background-color: #6f42c1;
+                padding: 15px;
+                border-radius: 10px;
+                margin-bottom: 10px;
+            }
+        """)
+        #layout.addWidget(title_label)
 
         # Connection group
-        connection_group = QGroupBox("Serial Connection")
+        connection_group = QGroupBox("🔗 Serial Connection")
         connection_layout = QVBoxLayout(connection_group)
         
         # Port selection
         port_layout = QHBoxLayout()
         port_layout.addWidget(QLabel("Port:"))
         self.port_combo = QComboBox()
+        self.port_combo.setMinimumHeight(35)
         port_layout.addWidget(self.port_combo)
-        refresh_ports_btn = QPushButton("Refresh Ports")
+        refresh_ports_btn = QPushButton("🔄 Refresh")
+        refresh_ports_btn.setMinimumHeight(35)
         refresh_ports_btn.clicked.connect(self.refresh_ports)
+        refresh_ports_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #28a745;
+                max-width: 100px;
+            }
+            QPushButton:hover {
+                background-color: #218838;
+            }
+        """)
         port_layout.addWidget(refresh_ports_btn)
-        port_layout.addStretch()
         connection_layout.addLayout(port_layout)
 
         # Baud rate selection
@@ -138,56 +157,152 @@ class SerialGUITab(QWidget):
         self.baud_combo = QComboBox()
         self.baud_combo.addItems(["9600", "19200", "38400", "57600", "115200", "230400", "460800", "921600"])
         self.baud_combo.setCurrentText("115200")
+        self.baud_combo.setMinimumHeight(35)
         baud_layout.addWidget(self.baud_combo)
         
-        self.connect_btn = QPushButton("Connect")
+        self.connect_btn = QPushButton("🔗 Connect")
+        self.connect_btn.setMinimumHeight(35)
         self.connect_btn.clicked.connect(self.toggle_connection)
+        self.connect_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #007bff;
+                min-width: 120px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #0056b3;
+            }
+        """)
         baud_layout.addWidget(self.connect_btn)
-        baud_layout.addStretch()
         connection_layout.addLayout(baud_layout)
         
         layout.addWidget(connection_group)
 
-        # Control group with tabs
-        control_group = QGroupBox("Device Control")
+        # Control group with enhanced tabs
+        control_group = QGroupBox("⚙️ Device Parameters")
         control_layout = QVBoxLayout(control_group)
         
-        # Parameter tabs
+        # Parameter tabs with modern styling
         self.param_tabs = QTabWidget()
+        self.param_tabs.setStyleSheet("""
+            QTabWidget::pane {
+                border: 2px solid #444444;
+                border-radius: 6px;
+                background-color: #2e2e2e;
+            }
+            
+            QTabBar::tab {
+                background-color: #404040;
+                color: #ffffff;
+                border: 1px solid #555555;
+                border-bottom: none;
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
+                min-width: 100px;
+                padding: 8px 16px;
+                margin: 1px;
+                font-size: 10px;
+                font-weight: bold;
+            }
+            
+            QTabBar::tab:selected {
+                background-color: #0078d4;
+                border-color: #0078d4;
+            }
+            
+            QTabBar::tab:hover:!selected {
+                background-color: #505050;
+            }
+        """)
         control_layout.addWidget(self.param_tabs)
         
-        # Create tabs for each parameter group
+        # Create tabs for each parameter group with icons
+        tab_icons = {
+            'Device': '🖥️',
+            'Measurement': '📏',
+            'Trigger': '⚡',
+            'Termination': '🔌',
+            'Element': '⚛️',
+            'Display': '🖥️',
+            'Supply': '🔋',
+            'Logging': '📝'
+        }
+        
         self.param_widgets = {}
         for group_name, params in self.parameter_groups.items():
             tab_widget = QWidget()
             tab_layout = QGridLayout(tab_widget)
+            tab_layout.setSpacing(10)
             
             row = 0
             for param_name, param_info in params.items():
-                # Label
-                tab_layout.addWidget(QLabel(param_name + ":"), row, 0)
+                # Label with better formatting
+                label = QLabel(param_name.replace('_', ' ') + ":")
+                label.setStyleSheet("""
+                    QLabel {
+                        font-weight: bold;
+                        color: #cccccc;
+                        min-width: 120px;
+                    }
+                """)
+                tab_layout.addWidget(label, row, 0)
                 
-                # Input widget based on type
+                # Input widget based on type with enhanced styling
                 if param_info['type'] == 'bool':
                     widget = QCheckBox()
                     widget.setChecked(bool(param_info['default']))
+                    widget.setStyleSheet("""
+                        QCheckBox::indicator {
+                            width: 20px;
+                            height: 20px;
+                        }
+                        QCheckBox::indicator:checked {
+                            background-color: #28a745;
+                            border: 2px solid #28a745;
+                        }
+                    """)
                 elif param_info['type'] == 'float':
                     widget = QDoubleSpinBox()
                     widget.setRange(-999999.0, 999999.0)
                     widget.setValue(param_info['default'])
+                    widget.setMinimumHeight(30)
                 elif param_info['type'] == 'int':
                     widget = QSpinBox()
                     widget.setRange(-999999, 999999)
                     widget.setValue(param_info['default'])
+                    widget.setMinimumHeight(30)
                 else:  # string
                     widget = QLineEdit()
                     widget.setText(str(param_info['default']))
+                    widget.setMinimumHeight(30)
                 
                 tab_layout.addWidget(widget, row, 1)
                 
-                # Set/Get buttons
-                set_btn = QPushButton("Set")
-                get_btn = QPushButton("Get")
+                # Set/Get buttons with color coding
+                set_btn = QPushButton("📤 Set")
+                set_btn.setMinimumHeight(30)
+                set_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #dc3545;
+                        font-size: 10px;
+                        max-width: 60px;
+                    }
+                    QPushButton:hover {
+                        background-color: #c82333;
+                    }
+                """)
+                get_btn = QPushButton("📥 Get")
+                get_btn.setMinimumHeight(30)
+                get_btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: #28a745;
+                        font-size: 10px;
+                        max-width: 60px;
+                    }
+                    QPushButton:hover {
+                        background-color: #218838;
+                    }
+                """)
                 set_btn.clicked.connect(lambda checked, p=param_name, w=widget: self.set_parameter(p, w))
                 get_btn.clicked.connect(lambda checked, p=param_name: self.get_parameter(p))
                 tab_layout.addWidget(set_btn, row, 2)
@@ -196,28 +311,64 @@ class SerialGUITab(QWidget):
                 self.param_widgets[param_name] = widget
                 row += 1
             
-            self.param_tabs.addTab(tab_widget, group_name)
+            # Add the tab with icon
+            icon = tab_icons.get(group_name, '⚙️')
+            self.param_tabs.addTab(tab_widget, f"{icon} {group_name}")
         
         layout.addWidget(control_group)
 
-        # Actions group
-        actions_group = QGroupBox("Actions")
-        actions_layout = QHBoxLayout(actions_group)
+        # Actions group with colorful buttons
+        actions_group = QGroupBox("🚀 Quick Actions")
+        actions_layout = QGridLayout(actions_group)
+        actions_layout.setSpacing(10)
         
+        col = 0
+        row = 0
         for action_key, action_info in self.action_commands.items():
             btn = QPushButton(action_info['label'])
+            btn.setMinimumHeight(40)
+            btn.setMinimumWidth(120)
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {action_info['color']};
+                    color: #ffffff;
+                    font-weight: bold;
+                    font-size: 11px;
+                    border-radius: 8px;
+                }}
+                QPushButton:hover {{
+                    background-color: {action_info['color']}dd;
+                    transform: scale(1.05);
+                }}
+            """)
             btn.clicked.connect(lambda checked, cmd=action_info['command']: self.send_command(cmd))
-            actions_layout.addWidget(btn)
+            actions_layout.addWidget(btn, row, col)
+            
+            col += 1
+            if col >= 3:  # 3 buttons per row
+                col = 0
+                row += 1
         
         layout.addWidget(actions_group)
 
-        # Status output
-        status_group = QGroupBox("Status")
+        # Status output with enhanced console look
+        status_group = QGroupBox("📊 Communication Status")
         status_layout = QVBoxLayout(status_group)
         
         self.status_text = QTextEdit()
         self.status_text.setReadOnly(True)
-        self.status_text.setMaximumHeight(150)
+        self.status_text.setMaximumHeight(120)
+        self.status_text.setStyleSheet("""
+            QTextEdit {
+                background-color: #1a1a1a;
+                color: #00ff00;
+                font-family: 'Courier New', 'Monaco', monospace;
+                font-size: 10px;
+                border: 2px solid #333333;
+                border-radius: 6px;
+                padding: 8px;
+            }
+        """)
         status_layout.addWidget(self.status_text)
         
         layout.addWidget(status_group)
