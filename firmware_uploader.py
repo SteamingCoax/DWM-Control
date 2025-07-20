@@ -12,6 +12,13 @@ import tempfile
 import platform
 from typing import Optional, Dict, Any
 
+# Import Windows driver manager
+try:
+    from windows_driver_manager import check_and_install_windows_driver
+    WINDOWS_DRIVER_SUPPORT = True
+except ImportError:
+    WINDOWS_DRIVER_SUPPORT = False
+
 class UploadWorker(QThread):
     output_signal = pyqtSignal(str)
     finished_signal = pyqtSignal(bool, str)
@@ -67,13 +74,25 @@ class FirmwareUploaderTab(QWidget):
 
         # Determine dfu-util path based on platform
         if getattr(sys, 'frozen', False):
+            # Running as a compiled executable
             base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
             if platform.system() == "Windows":
-                self.dfu_util_path = os.path.join(base_path, "dfu-util.exe")
+                self.dfu_util_path = os.path.join(base_path, "Programs", "dfu-util", "dfu-util.exe")
             else:
-                self.dfu_util_path = os.path.join(base_path, "dfu-util")
+                self.dfu_util_path = os.path.join(base_path, "Programs", "dfu-util", "dfu-util")
         else:
-            self.dfu_util_path = "dfu-util"  # For development, assume dfu-util is in PATH
+            # Running in development mode
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            if platform.system() == "Windows":
+                dfu_util_local = os.path.join(script_dir, "Programs", "dfu-util", "dfu-util.exe")
+            else:
+                dfu_util_local = os.path.join(script_dir, "Programs", "dfu-util", "dfu-util")
+            
+            # Check if dfu-util exists in Programs folder, otherwise use system PATH
+            if os.path.exists(dfu_util_local):
+                self.dfu_util_path = dfu_util_local
+            else:
+                self.dfu_util_path = "dfu-util"  # Fallback to system PATH
 
         self.create_widgets()
 
@@ -116,6 +135,9 @@ class FirmwareUploaderTab(QWidget):
         self.device_combo.currentIndexChanged.connect(self.on_device_select)
         device_layout.addWidget(self.device_combo)
         
+        # Button layout for refresh and driver installation
+        button_layout = QHBoxLayout()
+        
         refresh_btn = QPushButton("🔄 Refresh Devices")
         refresh_btn.setMinimumHeight(40)
         refresh_btn.clicked.connect(self.refresh_devices)
@@ -128,7 +150,26 @@ class FirmwareUploaderTab(QWidget):
                 background-color: #218838;
             }
         """)
-        device_layout.addWidget(refresh_btn)
+        button_layout.addWidget(refresh_btn)
+        
+        # Windows driver button (only show on Windows)
+        if platform.system().lower() == "windows" and WINDOWS_DRIVER_SUPPORT:
+            driver_btn = QPushButton("🔧 Install Driver")
+            driver_btn.setMinimumHeight(40)
+            driver_btn.clicked.connect(self._install_windows_driver)
+            driver_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #6f42c1;
+                    font-size: 12px;
+                }
+                QPushButton:hover {
+                    background-color: #5a2d91;
+                }
+            """)
+            driver_btn.setToolTip("Install WinUSB driver for DFU devices (automatic with libwdi, or Zadig fallback)")
+            button_layout.addWidget(driver_btn)
+        
+        device_layout.addLayout(button_layout)
         
         layout.addWidget(device_group)
 
@@ -251,7 +292,12 @@ class FirmwareUploaderTab(QWidget):
                 [self.dfu_util_path, "-l"], capture_output=True, text=True, check=True)
             devices = self.parse_dfu_devices(result.stdout)
             if not devices:
-                self.device_combo.addItem("No DFU devices found")
+                # Check if this might be a Windows driver issue
+                if platform.system().lower() == "windows" and WINDOWS_DRIVER_SUPPORT:
+                    self._handle_no_devices_windows()
+                else:
+                    self.device_combo.addItem("No DFU devices found")
+                    self.append_output("No DFU devices found. Ensure device is in DFU mode and connected.")
             else:
                 device_strings = [
                     f"DFU Device {idx + 1}: VID={d['vid']}, PID={d['pid']}, Serial={d['serial']}"
@@ -259,6 +305,7 @@ class FirmwareUploaderTab(QWidget):
                 ]
                 self.device_combo.addItems(device_strings)
                 self.selected_device = devices[0]
+                self.append_output(f"Found {len(devices)} DFU device(s)")
         except subprocess.CalledProcessError as e:
             self.append_output(f"Error listing devices: {e.stderr}")
             QMessageBox.critical(self, "Error", f"Failed to list devices: {e.stderr}")
@@ -270,6 +317,59 @@ class FirmwareUploaderTab(QWidget):
             self.device_combo.addItem("Error listing devices")
             self.selected_device = None
 
+    def _handle_no_devices_windows(self):
+        """Handle no devices found on Windows - might be driver issue"""
+        self.device_combo.addItem("No DFU devices found - Driver may be needed")
+        self.append_output("No DFU devices found on Windows.")
+        self.append_output("This might be due to missing WinUSB driver.")
+        
+        # Show driver installation option
+        reply = QMessageBox.question(
+            self, 
+            "Driver Installation", 
+            "No DFU devices found. This might be due to missing WinUSB driver.\n\n"
+            "Would you like to install the required driver using Zadig?\n"
+            "(This is a one-time setup)",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            self._install_windows_driver()
+
+    def _install_windows_driver(self):
+        """Install Windows DFU driver"""
+        try:
+            self.append_output("Starting Windows driver installation...")
+            success, message = check_and_install_windows_driver(self)
+            
+            if success:
+                self.append_output("Driver installation completed!")
+                self.append_output("Please reconnect your DFU device and refresh the device list.")
+                QMessageBox.information(
+                    self,
+                    "Driver Installation Complete",
+                    "Driver installation completed successfully!\n\n"
+                    "Please:\n"
+                    "1. Reconnect your DFU device\n"
+                    "2. Click 'Refresh Devices' to detect it"
+                )
+            else:
+                self.append_output(f"Driver installation failed: {message}")
+                QMessageBox.warning(
+                    self,
+                    "Driver Installation Failed", 
+                    f"Driver installation failed: {message}\n\n"
+                    "You may need to install the WinUSB driver manually using Zadig."
+                )
+        except Exception as e:
+            self.append_output(f"Error during driver installation: {str(e)}")
+            QMessageBox.critical(
+                self,
+                "Driver Installation Error",
+                f"An error occurred during driver installation: {str(e)}"
+            )
+
     def parse_dfu_devices(self, output):
         pattern = r"Found DFU: \[([0-9a-f]{4}):([0-9a-f]{4})\].*?serial=\"([^\"]+)\""
         devices = [{"vid": m[0], "pid": m[1], "serial": m[2]}
@@ -278,18 +378,40 @@ class FirmwareUploaderTab(QWidget):
         return list(unique_devices.values())
 
     def on_device_select(self, index):
-        if self.device_combo.currentText() == "No DFU devices found" or "Error" in self.device_combo.currentText():
+        # Check if the current selection is an error message
+        current_text = self.device_combo.currentText()
+        if (current_text == "No DFU devices found" or 
+            "Error" in current_text or 
+            self.device_combo.count() == 0):
             self.selected_device = None
             return
+            
         try:
-            devices = self.parse_dfu_devices(subprocess.run(
-                [self.dfu_util_path, "-l"], capture_output=True, text=True, check=True).stdout)
-            if index < len(devices):
-                self.selected_device = devices[index]
-                self.append_output(f"Selected device: VID={self.selected_device['vid']}, PID={self.selected_device['pid']}, Serial={self.selected_device['serial']}")
+            # Get fresh device list
+            result = subprocess.run(
+                [self.dfu_util_path, "-l"], capture_output=True, text=True, check=True)
+            devices = self.parse_dfu_devices(result.stdout)
+            
+            # Validate index and device list
+            if not devices or index < 0 or index >= len(devices):
+                self.selected_device = None
+                self.append_output("No valid device selected")
+                return
+                
+            # Set selected device
+            self.selected_device = devices[index]
+            self.append_output(f"Selected device: VID={self.selected_device['vid']}, PID={self.selected_device['pid']}, Serial={self.selected_device['serial']}")
+            
         except subprocess.CalledProcessError as e:
             self.append_output(f"Error selecting device: {e.stderr}")
             QMessageBox.critical(self, "Error", f"Failed to select device: {e.stderr}")
+            self.selected_device = None
+        except FileNotFoundError:
+            self.append_output("Error: dfu-util binary not found")
+            QMessageBox.critical(self, "Error", "dfu-util binary not found")
+            self.selected_device = None
+        except Exception as e:
+            self.append_output(f"Unexpected error selecting device: {str(e)}")
             self.selected_device = None
 
     def select_file(self):
@@ -393,4 +515,4 @@ class FirmwareUploaderTab(QWidget):
         # Clean up temporary file
         if self.bin_file and os.path.exists(self.bin_file):
             os.unlink(self.bin_file)
-            self.append_output("Cleaned up temporary .bin file") 
+            self.append_output("Cleaned up temporary .bin file")

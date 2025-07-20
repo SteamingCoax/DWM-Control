@@ -1,3 +1,4 @@
-intelhex>=2.3.1
+intelhex>=2.3.0
 pyserial>=3.5
-PyQt6>=6.0.0 
+PyQt6>=6.0.0
+requests>=2.25.0 

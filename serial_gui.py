@@ -338,7 +338,7 @@ class SerialGUITab(QWidget):
                 }}
                 QPushButton:hover {{
                     background-color: {action_info['color']}dd;
-                    transform: scale(1.05);
+                    border: 2px solid #ffffff;
                 }}
             """)
             btn.clicked.connect(lambda checked, cmd=action_info['command']: self.send_command(cmd))
