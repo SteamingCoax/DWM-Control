@@ -26,6 +26,12 @@
 - Installed PyInstaller in `dwm_env` virtual environment to resolve PyQt6 import issues
 - Build scripts now properly activate the virtual environment before running PyInstaller
 
+### 5. dfu-util Binary Path Fix
+- **Issue**: Packaged application couldn't find dfu-util binary, showing "dfu-util binary not found" error
+- **Root Cause**: Code was looking for dfu-util in `Programs/dfu-util/` subfolder, but PyInstaller bundles it directly in the app bundle
+- **Solution**: Modified `firmware_uploader.py` to check for bundled binary first, then fallback to original paths
+- **Files Modified**: `firmware_uploader.py` - Updated path detection logic for packaged applications
+
 ## How to Build
 
 ### macOS
@@ -56,12 +62,14 @@ Both scripts will:
 - **Windows**: Uses `--onefile` mode for single executable
 - **PyQt6**: Uses specific hidden imports instead of `--collect-all=PyQt6` to avoid framework symlink conflicts
 - **Code Signing**: macOS build may show signing warnings - safe to ignore for development/testing
+- **Binary Bundling**: dfu-util binary is automatically included and found by the application at runtime
 
 ## Files Created/Modified
 - `serial_terminal.py` - UI improvements (white text, no echo)
 - `serial_gui.py` - Status indicator addition
 - `build_macos.py` - macOS build script
 - `build_windows.py` - Windows build script
+- `firmware_uploader.py` - Fixed dfu-util binary path detection for packaged applications
 
 ## Testing
-The built application has been tested and launches successfully with all PyQt6 dependencies properly included. All UI improvements (white terminal text, no echo, connectivity status) work correctly in the packaged application.
+The built application has been tested and launches successfully with all PyQt6 dependencies properly included. All UI improvements (white terminal text, no echo, connectivity status) work correctly in the packaged application. The dfu-util binary is correctly bundled and found by the firmware uploader module.

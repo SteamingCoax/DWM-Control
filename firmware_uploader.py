@@ -70,9 +70,21 @@ class FirmwareUploaderTab(QWidget):
             # Running as a compiled executable
             base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
             if platform.system() == "Windows":
-                self.dfu_util_path = os.path.join(base_path, "Programs", "dfu-util", "dfu-util.exe")
+                # First try the bundled binary in the root of the bundle
+                bundled_dfu_util = os.path.join(base_path, "dfu-util.exe")
+                if os.path.exists(bundled_dfu_util):
+                    self.dfu_util_path = bundled_dfu_util
+                else:
+                    # Fallback to Programs folder structure
+                    self.dfu_util_path = os.path.join(base_path, "Programs", "dfu-util", "dfu-util.exe")
             else:
-                self.dfu_util_path = os.path.join(base_path, "Programs", "dfu-util", "dfu-util")
+                # First try the bundled binary in the root of the bundle
+                bundled_dfu_util = os.path.join(base_path, "dfu-util")
+                if os.path.exists(bundled_dfu_util):
+                    self.dfu_util_path = bundled_dfu_util
+                else:
+                    # Fallback to Programs folder structure
+                    self.dfu_util_path = os.path.join(base_path, "Programs", "dfu-util", "dfu-util")
         else:
             # Running in development mode
             script_dir = os.path.dirname(os.path.abspath(__file__))
