@@ -34,6 +34,25 @@
 
 ## How to Build
 
+### Prerequisites
+Both platforms require a virtual environment with the necessary dependencies:
+
+**Windows:**
+```bash
+# Create virtual environment (use 'venv' as the folder name for Windows)
+python -m venv venv
+venv\Scripts\activate.bat
+pip install pyinstaller PyQt6 pyserial intelhex
+```
+
+**macOS/Linux:**
+```bash
+# Create virtual environment (can use 'dwm_env', 'venv', or '.venv')
+python -m venv dwm_env  # or python -m venv venv
+source dwm_env/bin/activate  # or source venv/bin/activate
+pip install pyinstaller PyQt6 pyserial intelhex
+```
+
 ### macOS
 ```bash
 python build_macos.py
@@ -53,7 +72,7 @@ Both scripts will:
 4. Output will be in the `dist/` folder
 
 ## Requirements
-- Virtual environment `dwm_env` must be activated
+- Virtual environment must be activated (supports: `venv`, `dwm_env`, `.venv`)
 - PyInstaller must be installed in the virtual environment: `pip install pyinstaller`
 - All dependencies (PyQt6, pyserial, etc.) in the virtual environment
 
@@ -63,12 +82,13 @@ Both scripts will:
 - **PyQt6**: Uses specific hidden imports instead of `--collect-all=PyQt6` to avoid framework symlink conflicts
 - **Code Signing**: macOS build may show signing warnings - safe to ignore for development/testing
 - **Binary Bundling**: dfu-util binary is automatically included and found by the application at runtime
+- **Virtual Environment**: Build scripts automatically detect common virtual environment names (`venv`, `dwm_env`, `.venv`)
 
 ## Files Created/Modified
 - `serial_terminal.py` - UI improvements (white text, no echo)
 - `serial_gui.py` - Status indicator addition
-- `build_macos.py` - macOS build script
-- `build_windows.py` - Windows build script
+- `build_macos.py` - macOS build script with flexible virtual environment detection
+- `build_windows.py` - Windows build script with flexible virtual environment detection  
 - `firmware_uploader.py` - Fixed dfu-util binary path detection for packaged applications
 
 ## Testing

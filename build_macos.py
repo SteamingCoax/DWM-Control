@@ -11,16 +11,26 @@ import shutil
 
 def check_environment():
     """Check if we're in the correct environment"""
-    if not os.path.exists("dwm_env"):
-        print("❌ Error: dwm_env virtual environment not found!")
-        print("Please create the virtual environment first.")
-        return False
+    # Check for different possible virtual environment names
+    venv_names = ["dwm_env", "venv", ".venv"]
+    found_venv = None
+    
+    for venv_name in venv_names:
+        if os.path.exists(venv_name):
+            found_venv = venv_name
+            print(f"✅ Found virtual environment: {venv_name}")
+            break
+    
+    if not found_venv:
+        print("❌ Error: No virtual environment found!")
+        print(f"Please create a virtual environment with one of these names: {', '.join(venv_names)}")
+        return False, None
     
     if not os.path.exists("DWM-Control.py"):
         print("❌ Error: DWM-Control.py not found!")
-        return False
+        return False, None
     
-    return True
+    return True, found_venv
 
 def find_icon():
     """Find icon file with fallback"""
@@ -63,7 +73,8 @@ def build_app():
     print("🔨 Building DWM-Control for macOS...")
     
     # Check environment
-    if not check_environment():
+    env_check, venv_name = check_environment()
+    if not env_check:
         return False
     
     # Find icon
@@ -87,6 +98,7 @@ def build_app():
             "--hidden-import=PyQt6.QtGui",
             "--hidden-import=PyQt6.QtSerialPort",
             "--clean",
+            "--noconfirm",
             "--name=DWM-Control"
         ]
         
@@ -99,7 +111,7 @@ def build_app():
         
         print(f"📋 Command: {' '.join(cmd)}")
         
-        activate_script = "dwm_env/bin/activate"
+        activate_script = f"{venv_name}/bin/activate"
         full_cmd = f"source {activate_script} && {' '.join(cmd)}"
         
         result = subprocess.run(full_cmd, shell=True, check=True)
