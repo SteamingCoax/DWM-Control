@@ -154,7 +154,7 @@ class SerialTerminalTab(QWidget):
         self.terminal_text.setStyleSheet("""
             QTextEdit {
                 background-color: #0c0c0c;
-                color: #00ff41;
+                color: #ffffff;
                 font-family: 'Courier New', 'Monaco', 'Consolas', monospace;
                 font-size: 12px;
                 border: 3px solid #333333;
@@ -318,15 +318,16 @@ class SerialTerminalTab(QWidget):
                 self.append_terminal(f"Send error: {e}\n")
             return
         
-        # Handle other keys normally
-        QTextEdit.keyPressEvent(self.terminal_text, event)
-        
-        # Send individual characters for real-time input
+        # Send individual characters for real-time input without echoing
         if event.text() and len(event.text()) == 1:
             try:
                 self.serial_connection.write(event.text().encode('utf-8'))
+                # Don't call QTextEdit.keyPressEvent to prevent local echoing
             except Exception as e:
                 self.append_terminal(f"Send error: {e}\n")
+        else:
+            # Handle other keys normally (navigation, etc.)
+            QTextEdit.keyPressEvent(self.terminal_text, event)
 
     def append_terminal(self, text):
         """Append text to terminal"""

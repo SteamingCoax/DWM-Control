@@ -2,11 +2,11 @@
 
 
 a = Analysis(
-    ['Uploader.py'],
+    ['DWM-Control.py'],
     pathex=[],
     binaries=[('/usr/local/bin/dfu-util', '.')],
     datas=[],
-    hiddenimports=['tkinter', 'ttk', 'threading', 'intelhex'],
+    hiddenimports=['PyQt6.QtWidgets', 'PyQt6.QtCore', 'PyQt6.QtGui', 'PyQt6.QtSerialPort'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -19,16 +19,13 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
-    name='Uploader',
+    exclude_binaries=True,
+    name='DWM-Control',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -36,9 +33,18 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
 )
-app = BUNDLE(
+coll = COLLECT(
     exe,
-    name='Uploader.app',
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='DWM-Control',
+)
+app = BUNDLE(
+    coll,
+    name='DWM-Control.app',
     icon=None,
     bundle_identifier=None,
 )

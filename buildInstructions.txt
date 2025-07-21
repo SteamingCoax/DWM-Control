@@ -1,12 +1,46 @@
+Build Instructions for DWM-Control
+======================================
+
 Once built, the application can be found in dist/
 
-MacOs:
-source dfu_env/bin/activate
+EASY METHOD - Use Build Scripts:
+===============================
 
-pyinstaller --onefile --windowed --add-binary "/usr/local/bin/dfu-util:." --hidden-import=tkinter --hidden-import=ttk --hidden-import=threading --hidden-import=intelhex --clean Uploader.py
-
+macOS:
+------
+python build_macos.py
 
 Windows:
-dfu_venv\Scripts\activate.bat
+--------
+python build_windows.py
 
-pyinstaller --onefile --windowed --add-binary "dfu-util.exe;." --hidden-import=tkinter --hidden-import=ttk --hidden-import=threading --hidden-import=intelhex --clean Uploader.py
+The build scripts will:
+- Automatically find your virtual environment
+- Look for icon files (icon.icns, icon.ico) with fallback if none found
+- Locate dfu-util binary in Programs folder or system paths
+- Handle all PyInstaller flags and dependencies
+
+MANUAL METHOD - PyInstaller Commands:
+====================================
+
+macOS:
+------
+source dwm_env/bin/activate
+
+pyinstaller --onefile --windowed --add-binary "Programs/dfu-util/dfu-util:." --hidden-import=intelhex --hidden-import=serial --collect-submodules=PyQt6 --clean DWM-Control.py
+
+Windows:
+--------
+dwm_env\Scripts\activate.bat
+
+pyinstaller --onefile --windowed --add-binary "Programs/dfu-util/dfu-util.exe;." --hidden-import=intelhex --hidden-import=serial --collect-submodules=PyQt6 --clean DWM-Control.py
+
+ICON SUPPORT:
+=============
+To include an application icon, place one of these files in your project:
+- build/icon.ico (Windows)
+- build/icon.icns (macOS)
+- icon.ico (Windows, root directory)
+- icon.icns (macOS, root directory)
+
+The build scripts will automatically detect and include the icon if present.

@@ -130,6 +130,20 @@ class SerialGUITab(QWidget):
         connection_group = QGroupBox("🔗 Serial Connection")
         connection_layout = QVBoxLayout(connection_group)
         
+        # Connection status indicator
+        self.status_indicator = QLabel("● Disconnected")
+        self.status_indicator.setStyleSheet("""
+            QLabel {
+                color: #dc3545;
+                font-weight: bold;
+                font-size: 12px;
+                background: none;
+                border: none;
+                padding: 5px;
+            }
+        """)
+        connection_layout.addWidget(self.status_indicator)
+        
         # Port selection
         port_layout = QHBoxLayout()
         port_layout.addWidget(QLabel("Port:"))
@@ -409,6 +423,19 @@ class SerialGUITab(QWidget):
             self.port_combo.setEnabled(False)
             self.baud_combo.setEnabled(False)
             
+            # Update status indicator
+            self.status_indicator.setText("● Connected")
+            self.status_indicator.setStyleSheet("""
+                QLabel {
+                    color: #28a745;
+                    font-weight: bold;
+                    font-size: 12px;
+                    background: none;
+                    border: none;
+                    padding: 5px;
+                }
+            """)
+            
             self.append_status(f"Connected to {port} at {baud_rate} baud\n")
             
             # Start reading thread
@@ -433,6 +460,19 @@ class SerialGUITab(QWidget):
         self.connect_btn.setText("Connect")
         self.port_combo.setEnabled(True)
         self.baud_combo.setEnabled(True)
+        
+        # Update status indicator
+        self.status_indicator.setText("● Disconnected")
+        self.status_indicator.setStyleSheet("""
+            QLabel {
+                color: #dc3545;
+                font-weight: bold;
+                font-size: 12px;
+                background: none;
+                border: none;
+                padding: 5px;
+            }
+        """)
         
         self.append_status("Disconnected\n")
 

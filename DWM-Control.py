@@ -35,13 +35,13 @@ class DWMApp(QMainWindow):
         
         # Add tabs to tab widget with icons
         self.tab_widget.addTab(self.firmware_tab, "🔧 Firmware Uploader")
-        self.tab_widget.addTab(self.serial_terminal_tab, "💻 Serial Terminal")
-        self.tab_widget.addTab(self.serial_gui_tab, "🎛️ Control Panel")
+        #self.tab_widget.addTab(self.serial_terminal_tab, "💻 Serial Terminal")
+        #self.tab_widget.addTab(self.serial_gui_tab, "🎛️ Control Panel")
         
         # Initialize tab contents
         self.firmware_uploader = FirmwareUploaderTab(self.firmware_tab)
-        self.serial_terminal = SerialTerminalTab(self.serial_terminal_tab)
-        self.serial_gui = SerialGUITab(self.serial_gui_tab)
+        #self.serial_terminal = SerialTerminalTab(self.serial_terminal_tab)
+        #self.serial_gui = SerialGUITab(self.serial_gui_tab)
 
     def setup_modern_style(self):
         """Apply modern dark theme styling"""

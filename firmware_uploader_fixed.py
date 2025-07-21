@@ -14,9 +14,10 @@ from typing import Optional, Dict, Any
 
 # Import Windows driver manager
 try:
-    from windows_driver_manager import check_and_install_windows_driver
-    WINDOWS_DRIVER_SUPPORT = True
+    # Platform-specific imports - only available on Windows
+    WINDOWS_DRIVER_SUPPORT = False
 except ImportError:
+    # Windows driver support not available
     WINDOWS_DRIVER_SUPPORT = False
 
 class UploadWorker(QThread):
@@ -77,18 +78,18 @@ class FirmwareUploaderTab(QWidget):
             # Running as a compiled executable
             base_path = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
             if platform.system() == "Windows":
-                self.dfu_util_path = os.path.join(base_path, "dfu-util", "dfu-util.exe")
+                self.dfu_util_path = os.path.join(base_path, "Programs", "dfu-util", "dfu-util.exe")
             else:
-                self.dfu_util_path = os.path.join(base_path, "dfu-util", "dfu-util")
+                self.dfu_util_path = os.path.join(base_path, "Programs", "dfu-util", "dfu-util")
         else:
             # Running in development mode
             script_dir = os.path.dirname(os.path.abspath(__file__))
             if platform.system() == "Windows":
-                dfu_util_local = os.path.join(script_dir, "dfu-util", "dfu-util.exe")
+                dfu_util_local = os.path.join(script_dir, "Programs", "dfu-util", "dfu-util.exe")
             else:
-                dfu_util_local = os.path.join(script_dir, "dfu-util", "dfu-util")
+                dfu_util_local = os.path.join(script_dir, "Programs", "dfu-util", "dfu-util")
             
-            # Check if dfu-util exists in local folder, otherwise use system PATH
+            # Check if dfu-util exists in Programs folder, otherwise use system PATH
             if os.path.exists(dfu_util_local):
                 self.dfu_util_path = dfu_util_local
             else:
@@ -135,7 +136,7 @@ class FirmwareUploaderTab(QWidget):
         self.device_combo.currentIndexChanged.connect(self.on_device_select)
         device_layout.addWidget(self.device_combo)
         
-        # Button layout for refresh and driver installation
+        # Button layout for refresh only
         button_layout = QHBoxLayout()
         
         refresh_btn = QPushButton("🔄 Refresh Devices")
@@ -151,23 +152,6 @@ class FirmwareUploaderTab(QWidget):
             }
         """)
         button_layout.addWidget(refresh_btn)
-        
-        # Windows driver button (only show on Windows)
-        if platform.system().lower() == "windows" and WINDOWS_DRIVER_SUPPORT:
-            driver_btn = QPushButton("🔧 Install Driver")
-            driver_btn.setMinimumHeight(40)
-            driver_btn.clicked.connect(self._install_windows_driver)
-            driver_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #6f42c1;
-                    font-size: 12px;
-                }
-                QPushButton:hover {
-                    background-color: #5a2d91;
-                }
-            """)
-            driver_btn.setToolTip("Install WinUSB driver for DFU devices using Zadig")
-            button_layout.addWidget(driver_btn)
         
         device_layout.addLayout(button_layout)
         
@@ -282,7 +266,9 @@ class FirmwareUploaderTab(QWidget):
         
         layout.addWidget(output_group)
 
-        self.refresh_devices()
+        # Initialize with empty device list - user must click refresh to scan
+        self.device_combo.addItem("Click 'Refresh Devices' to scan for DFU devices")
+        self.append_output("Ready. Click 'Refresh Devices' to scan for DFU devices.")
 
     def refresh_devices(self):
         try:
@@ -318,57 +304,28 @@ class FirmwareUploaderTab(QWidget):
             self.selected_device = None
 
     def _handle_no_devices_windows(self):
-        """Handle no devices found on Windows - might be driver issue"""
+        """Handle no devices found on Windows with manual driver installation instructions"""
         self.device_combo.addItem("No DFU devices found - Driver may be needed")
         self.append_output("No DFU devices found on Windows.")
         self.append_output("This might be due to missing WinUSB driver.")
         
-        # Show driver installation option
-        reply = QMessageBox.question(
-            self, 
-            "Driver Installation", 
-            "No DFU devices found. This might be due to missing WinUSB driver.\n\n"
-            "Would you like to install the required driver using Zadig?\n"
-            "(This is a one-time setup)",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.Yes
-        )
-        
-        if reply == QMessageBox.StandardButton.Yes:
-            self._install_windows_driver()
+        # Show manual installation instructions
+        msg = QMessageBox()
+        msg.setWindowTitle("No DFU Devices Found")
+        msg.setIcon(QMessageBox.Icon.Information)
+        msg.setText("No DFU devices were detected.\n\nTo install the necessary WinUSB drivers:")
+        msg.setDetailedText("""1. Put your device into DFU mode first
+2. Go to the Programs folder in this application's directory
+3. Run 'zadig-2.9.exe' as Administrator
+4. In Zadig:
+   - Select 'Options' > 'List All Devices'
+   - Find your DFU device in the dropdown
+   - Select 'WinUSB' as the driver
+   - Click 'Install Driver'
+5. Click 'Refresh Devices' in this application after driver installation
 
-    def _install_windows_driver(self):
-        """Install Windows DFU driver"""
-        try:
-            self.append_output("Starting Windows driver installation...")
-            success, message = check_and_install_windows_driver(self)
-            
-            if success:
-                self.append_output("Driver installation completed!")
-                self.append_output("Please reconnect your DFU device and refresh the device list.")
-                QMessageBox.information(
-                    self,
-                    "Driver Installation Complete",
-                    "Driver installation completed successfully!\n\n"
-                    "Please:\n"
-                    "1. Reconnect your DFU device\n"
-                    "2. Click 'Refresh Devices' to detect it"
-                )
-            else:
-                self.append_output(f"Driver installation failed: {message}")
-                QMessageBox.warning(
-                    self,
-                    "Driver Installation Failed", 
-                    f"Driver installation failed: {message}\n\n"
-                    "You may need to install the WinUSB driver manually using Zadig."
-                )
-        except Exception as e:
-            self.append_output(f"Error during driver installation: {str(e)}")
-            QMessageBox.critical(
-                self,
-                "Driver Installation Error",
-                f"An error occurred during driver installation: {str(e)}"
-            )
+Note: You may need to repeat this process for each DFU device type you use.""")
+        msg.exec()
 
     def parse_dfu_devices(self, output):
         pattern = r"Found DFU: \[([0-9a-f]{4}):([0-9a-f]{4})\].*?serial=\"([^\"]+)\""
