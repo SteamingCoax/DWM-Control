@@ -122,7 +122,6 @@ python3 DWM-Control.py
 ## Control Panel Features
 
 - **Button Controls**: Easy-to-use buttons for common commands
-- **Toggle Switches**: Visual switches for LED and motor control
 - **Real-time Data**: Live display of sensor readings and device status
 - **Command Log**: Timestamped log of all sent commands and received data
 - **Status Monitoring**: Visual connection status and device information
@@ -131,24 +130,14 @@ python3 DWM-Control.py
 
 The Control Panel expects data in the format:
 ```
-temperature: 25.6
-humidity: 45.2
-pressure: 1013.25
 voltage: 3.3
-current: 0.15
 status: OK
-uptime: 3600
 ```
 
 Commands sent to the device:
 - `RESET` - Reset the device
 - `REBOOT` - Reboot the device
 - `VERSION` - Get device version
-- `LED_ON` / `LED_OFF` - Control LED
-- `MOTOR_ON` / `MOTOR_OFF` - Control motor
-- `TEMP` - Read temperature
-- `HUMIDITY` - Read humidity
-- `PRESSURE` - Read pressure
 - `START_STREAM` / `STOP_STREAM` - Control data streaming
 
 ## Notes
