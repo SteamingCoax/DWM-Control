@@ -122,7 +122,8 @@ def build_app():
             "--hidden-import=PyQt6.QtSerialPort",
             "--clean",
             "--noconfirm",
-            "--name=DWM-Control"
+            "--name=DWM-Control",
+            "--noconsole"
         ]
         
         # Add icon if found
