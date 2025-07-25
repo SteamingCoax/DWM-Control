@@ -4,7 +4,7 @@
 a = Analysis(
     ['DWM-Control.py'],
     pathex=[],
-    binaries=[('Programs/dfu-util/dfu-util.exe', '.'), ('Programs/zadig-2.9.exe', '.')],
+    binaries=[('/usr/local/bin/dfu-util', '.')],
     datas=[],
     hiddenimports=['PyQt6.QtWidgets', 'PyQt6.QtCore', 'PyQt6.QtGui', 'PyQt6.QtSerialPort'],
     hookspath=[],
@@ -19,21 +19,33 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='DWM-Control',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['icon.ico'],
+    icon=['icon.icns'],
+)
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=False,
+    upx=True,
+    upx_exclude=[],
+    name='DWM-Control',
+)
+app = BUNDLE(
+    coll,
+    name='DWM-Control.app',
+    icon='icon.icns',
+    bundle_identifier=None,
 )

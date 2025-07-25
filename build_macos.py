@@ -68,6 +68,31 @@ def find_dfu_util():
         print(f"  - {path}")
     return None
 
+def sign_application(app_path):
+    """Provide instructions for manual code signing"""
+    print("🔏 Code signing skipped - manual signing required")
+    print("📝 Use the provided script for easy signing:")
+    print("   ./clean_and_sign.sh")
+    print("")
+    print("📝 Or run these commands manually:")
+    print(f"   dot_clean '{app_path}'")
+    print(f"   xattr -cr '{app_path}'")
+    print(f"   find '{app_path}' -name '.DS_Store' -delete")
+    print(f"   find '{app_path}' -name '._*' -delete")
+    print(f"   codesign --sign 'SteamingCoax' --force --timestamp --options runtime '{app_path}'")
+    print("")
+    print("💡 First create a self-signed certificate:")
+    print("   1. Open Keychain Access")
+    print("   2. Certificate Assistant → Create a Certificate")
+    print("   3. Name: 'SteamingCoax'")
+    print("   4. Identity Type: Self Signed Root")
+    print("   5. Certificate Type: Code Signing")
+    print("   6. Let me override defaults: Yes")
+    print("   7. Set validity period and save to login keychain")
+    print("")
+    print("✅ Application built successfully - ready for manual signing")
+    return True
+
 def build_app():
     """Build the application with PyInstaller"""
     print("🔨 Building DWM-Control for macOS...")
@@ -87,10 +112,10 @@ def build_app():
     
     try:
         # Activate virtual environment and run PyInstaller
-        # Use the simple command approach with specific PyQt6 modules
+        # Use onedir for better macOS compatibility and signing
         cmd = [
             "pyinstaller",
-            "--onedir",  # Use onedir instead of onefile for macOS .app bundles 
+            "--onedir",  # Use onedir for better macOS compatibility
             "--windowed",
             f"--add-binary={dfu_util_path}:.",
             "--hidden-import=PyQt6.QtWidgets",
@@ -118,7 +143,12 @@ def build_app():
         
         if result.returncode == 0:
             print("✅ Build completed successfully!")
-            print("📁 Application can be found in: dist/DWM-Control.app")
+            app_path = "dist/DWM-Control.app"
+            print(f"📁 Application can be found in: {app_path}")
+            
+            # Provide signing instructions
+            sign_application(app_path)
+            
             return True
         else:
             print("❌ Build failed!")
