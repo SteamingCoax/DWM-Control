@@ -4,6 +4,19 @@ const { spawn, exec } = require('child_process');
 const fs = require('fs');
 const { SerialPort } = require('serialport');
 
+// Disable GPU acceleration IMMEDIATELY if safe-mode flag is present
+// This must be done before app.whenReady()
+if (process.argv.includes('--safe-mode') || process.argv.includes('--disable-gpu')) {
+  console.log('GPU acceleration disabled via command line flag');
+  app.disableHardwareAcceleration();
+  // Also set additional Chromium flags for complete GPU disable
+  app.commandLine.appendSwitch('--disable-gpu');
+  app.commandLine.appendSwitch('--disable-gpu-compositing');
+  app.commandLine.appendSwitch('--disable-gpu-rasterization');
+  app.commandLine.appendSwitch('--disable-gpu-sandbox');
+  app.commandLine.appendSwitch('--disable-software-rasterizer');
+}
+
 // Keep a global reference of the window object
 let mainWindow;
 

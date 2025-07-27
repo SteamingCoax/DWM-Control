@@ -82,6 +82,34 @@ npm run dev
 - Try: `npm install electron --save-dev`
 - Check if antivirus is blocking Electron
 
+### "SerialPort/Native Module Errors" ⚠️ COMMON ISSUE
+If you see errors like:
+```
+Error: bindings.node is not a valid Win32 application
+```
+
+**Quick Fix:**
+1. Run the fix script: `quick-fix.bat`
+2. Or manually: `npm run rebuild`
+
+**Alternative Solutions:**
+```bash
+# Method 1: Use the comprehensive fix script
+fix-and-test.bat
+
+# Method 2: Manual rebuild
+npm install --save-dev electron-rebuild
+npx electron-rebuild
+
+# Method 3: Clean reinstall
+npm cache clean --force
+rmdir /s /q node_modules
+del package-lock.json
+npm install
+```
+
+**Why this happens:** Native modules (like serialport) are compiled for specific Node.js versions. Electron uses a different Node.js version than your system, so these modules need to be rebuilt for Electron compatibility.
+
 ## Features Available in Development Mode
 
 - **Hot reload** - Changes to HTML/CSS/JS are reflected immediately

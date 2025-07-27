@@ -9,6 +9,10 @@
   "scripts": {
     "start": "electron-forge start",
     "dev": "electron .",
+    "dev:safe": "electron . --safe-mode --disable-gpu --no-sandbox",
+    "dev:no-gpu": "electron . --disable-gpu",
+    "rebuild": "electron-rebuild",
+    "postinstall": "electron-rebuild",
     "test": "echo \"Error: no test specified\" && exit 1",
     "package": "electron-forge package",
     "make": "electron-forge make",
@@ -19,7 +23,7 @@
     "build:linux": "electron-builder --linux --publish=never",
     "build:all": "electron-builder --mac --win --linux --publish=never",
     "dist:mac": "npm run build:mac",
-    "dist:win": "npm run build:win", 
+    "dist:win": "npm run build:win",
     "dist:linux": "npm run build:linux",
     "dist:all": "npm run build:all",
     "pack": "electron-builder --dir"
@@ -49,7 +53,7 @@
       "node_modules/intel-hex/**/*",
       "node_modules/intelhex/**/*",
       "!node_modules/**/test/**",
-      "!node_modules/**/tests/**", 
+      "!node_modules/**/tests/**",
       "!node_modules/**/__tests__/**",
       "!node_modules/**/spec/**",
       "!node_modules/**/docs/**",
@@ -84,7 +88,9 @@
       {
         "from": "Programs",
         "to": "Programs",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "mac": {
@@ -95,11 +101,15 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
@@ -128,11 +138,17 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64", "ia32"]
+          "arch": [
+            "x64",
+            "ia32"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64", "ia32"]
+          "arch": [
+            "x64",
+            "ia32"
+          ]
         }
       ],
       "icon": "assets/icon.ico",
@@ -157,15 +173,21 @@
       "target": [
         {
           "target": "AppImage",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "deb",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "rpm",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "assets/icon.png",
@@ -180,10 +202,16 @@
       "category": "Development"
     },
     "deb": {
-      "depends": ["libusb-1.0-0", "dfu-util"]
+      "depends": [
+        "libusb-1.0-0",
+        "dfu-util"
+      ]
     },
     "rpm": {
-      "depends": ["libusb1", "dfu-util"]
+      "depends": [
+        "libusb1",
+        "dfu-util"
+      ]
     },
     "publish": null
   },
@@ -197,7 +225,8 @@
     "@electron-forge/plugin-fuses": "^7.8.1",
     "@electron/fuses": "^1.8.0",
     "electron": "^37.2.4",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "electron-rebuild": "^3.2.9"
   },
   "dependencies": {
     "electron-squirrel-startup": "^1.0.1",

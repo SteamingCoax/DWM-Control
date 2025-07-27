@@ -8,10 +8,32 @@ REM Install dependencies if needed
 if not exist "node_modules" (
     echo Installing dependencies...
     npm install
+    if errorlevel 1 (
+        echo ERROR: Failed to install dependencies!
+        pause
+        exit /b 1
+    )
 )
 
-REM Start the app directly with Electron
+REM Check if Electron is installed
+if not exist "node_modules\.bin\electron.cmd" (
+    echo Installing Electron...
+    npm install electron --save-dev
+    if errorlevel 1 (
+        echo ERROR: Failed to install Electron!
+        pause
+        exit /b 1
+    )
+)
+
+REM Start the app using npm script (safer than direct electron call)
 echo Launching application...
-npx electron .
+npm run dev
+
+if errorlevel 1 (
+    echo.
+    echo Application failed to start.
+    echo Try running: test-app.bat for a more comprehensive setup
+)
 
 pause
