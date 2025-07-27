@@ -268,27 +268,65 @@ function parseDfuDevices(output) {
   
   for (const line of lines) {
     if (line.includes('Found DFU')) {
-      // Match the pattern to extract VID, PID, and serial number
-      const match = line.match(/Found DFU: \[([0-9a-f]{4}):([0-9a-f]{4})\].*?serial="([^"]+)"/);
+      // More flexible regex to match different dfu-util output formats
+      const match = line.match(/Found DFU: \[([0-9a-f]{4}):([0-9a-f]{4})\]/i);
       if (match) {
+        const vid = match[1];
+        const pid = match[2];
+        
+        // Extract serial number - try multiple patterns
+        let serial = 'unknown';
+        const serialMatch = line.match(/serial="([^"]+)"/);
+        if (serialMatch) {
+          serial = serialMatch[1];
+        } else {
+          // Alternative pattern if serial is at the end without quotes
+          const altSerialMatch = line.match(/serial=([^\s,]+)/);
+          if (altSerialMatch) {
+            serial = altSerialMatch[1];
+          }
+        }
+        
+        // Extract alt interface number for better identification
+        let altInterface = 0;
+        const altMatch = line.match(/alt=(\d+)/);
+        if (altMatch) {
+          altInterface = parseInt(altMatch[1]);
+        }
+        
+        // Extract interface name if available
+        let interfaceName = '';
+        const nameMatch = line.match(/name="([^"]+)"/);
+        if (nameMatch) {
+          interfaceName = nameMatch[1];
+        }
+        
         devices.push({
-          vid: match[1],
-          pid: match[2],
-          serial: match[3],
+          vid: vid,
+          pid: pid,
+          serial: serial,
+          alt: altInterface,
+          name: interfaceName,
           description: line.trim()
         });
       }
     }
   }
   
-  // Remove duplicates based on vid:pid:serial combination
-  const uniqueDevices = {};
+  // Group by device (same VID:PID:Serial) and keep only the main flash interface (usually alt=0)
+  const deviceMap = {};
   for (const device of devices) {
     const key = `${device.vid}:${device.pid}:${device.serial}`;
-    uniqueDevices[key] = device;
+    
+    // Prefer the main flash interface (alt=0) or "Internal Flash" interface
+    if (!deviceMap[key] || 
+        device.alt === 0 || 
+        device.name.toLowerCase().includes('internal flash')) {
+      deviceMap[key] = device;
+    }
   }
   
-  return Object.values(uniqueDevices);
+  return Object.values(deviceMap);
 }
 
 function convertHexToBin(hexFilePath) {

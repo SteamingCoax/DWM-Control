@@ -1450,7 +1450,17 @@ class DWMControl {
                 result.devices.forEach((device, index) => {
                     const option = document.createElement('option');
                     option.value = index;
-                    option.textContent = `DFU Device ${index + 1}: VID=${device.vid}, PID=${device.pid}, Serial=${device.serial}`;
+                    
+                    // Create more descriptive device text
+                    let deviceText = `DFU Device ${index + 1}: ${device.vid}:${device.pid}`;
+                    if (device.serial && device.serial !== 'unknown') {
+                        deviceText += ` (Serial: ${device.serial})`;
+                    }
+                    if (device.name) {
+                        deviceText += ` - ${device.name}`;
+                    }
+                    
+                    option.textContent = deviceText;
                     combo.appendChild(option);
                 });
                 
