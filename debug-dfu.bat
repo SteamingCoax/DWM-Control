@@ -67,39 +67,37 @@ echo 5. Testing Node.js parsing...
 where node > nul 2>&1
 if %errorlevel% == 0 (
     echo Creating parsing test...
-    (
-        echo function parseDfuDevices^(output^) {
-        echo   const devices = [];
-        echo   const lines = output.split^('\n'^);
-        echo   for ^(const line of lines^) {
-        echo     if ^(line.includes^('Found DFU'^)^) {
-        echo       console.log^('Processing line:', line^);
-        echo       const match = line.match^(/Found DFU: \[^([0-9a-f]{4}^):^([0-9a-f]{4}^)\]/i^);
-        echo       if ^(match^) {
-        echo         const vid = match[1];
-        echo         const pid = match[2];
-        echo         let serial = 'unknown';
-        echo         const serialMatch = line.match^(/serial="^([^"]+^)"/^);
-        echo         if ^(serialMatch^) {
-        echo           serial = serialMatch[1];
-        echo         } else {
-        echo           const altSerialMatch = line.match^(/serial=^([^\s,]+^)/^);
-        echo           if ^(altSerialMatch^) {
-        echo             serial = altSerialMatch[1];
-        echo           }
-        echo         }
-        echo         devices.push^({vid, pid, serial, description: line.trim^(^)^}^);
-        echo       }
-        echo     }
-        echo   }
-        echo   return devices;
-        echo }
-        echo const fs = require^('fs'^);
-        echo const output = fs.readFileSync^('temp_dfu_output.txt', 'utf8'^);
-        echo const devices = parseDfuDevices^(output^);
-        echo console.log^('Parsed devices:', JSON.stringify^(devices, null, 2^)^);
-        echo console.log^('Device count:', devices.length^);
-    ) > temp_parse_test.js
+    echo function parseDfuDevices(output) { > temp_parse_test.js
+    echo   const devices = []; >> temp_parse_test.js
+    echo   const lines = output.split('\n'); >> temp_parse_test.js
+    echo   for (const line of lines) { >> temp_parse_test.js
+    echo     if (line.includes('Found DFU')) { >> temp_parse_test.js
+    echo       console.log('Processing line:', line); >> temp_parse_test.js
+    echo       const match = line.match(/Found DFU: \[([0-9a-f]{4}):([0-9a-f]{4})\]/i); >> temp_parse_test.js
+    echo       if (match) { >> temp_parse_test.js
+    echo         const vid = match[1]; >> temp_parse_test.js
+    echo         const pid = match[2]; >> temp_parse_test.js
+    echo         let serial = 'unknown'; >> temp_parse_test.js
+    echo         const serialMatch = line.match(/serial="([^"]+)"/); >> temp_parse_test.js
+    echo         if (serialMatch) { >> temp_parse_test.js
+    echo           serial = serialMatch[1]; >> temp_parse_test.js
+    echo         } else { >> temp_parse_test.js
+    echo           const altSerialMatch = line.match(/serial=([^\s,]+)/); >> temp_parse_test.js
+    echo           if (altSerialMatch) { >> temp_parse_test.js
+    echo             serial = altSerialMatch[1]; >> temp_parse_test.js
+    echo           } >> temp_parse_test.js
+    echo         } >> temp_parse_test.js
+    echo         devices.push({vid, pid, serial, description: line.trim()}); >> temp_parse_test.js
+    echo       } >> temp_parse_test.js
+    echo     } >> temp_parse_test.js
+    echo   } >> temp_parse_test.js
+    echo   return devices; >> temp_parse_test.js
+    echo } >> temp_parse_test.js
+    echo const fs = require('fs'); >> temp_parse_test.js
+    echo const output = fs.readFileSync('temp_dfu_output.txt', 'utf8'); >> temp_parse_test.js
+    echo const devices = parseDfuDevices(output); >> temp_parse_test.js
+    echo console.log('Parsed devices:', JSON.stringify(devices, null, 2)); >> temp_parse_test.js
+    echo console.log('Device count:', devices.length); >> temp_parse_test.js
     
     node temp_parse_test.js
     del temp_parse_test.js
