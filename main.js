@@ -90,20 +90,33 @@ ipcMain.handle('get-dfu-devices', async () => {
   return new Promise((resolve, reject) => {
     const dfuUtilPath = getDfuUtilPath();
     
+    console.log('DFU Debug - Platform:', process.platform);
+    console.log('DFU Debug - Path:', dfuUtilPath);
+    console.log('DFU Debug - __dirname:', __dirname);
+    console.log('DFU Debug - NODE_ENV:', process.env.NODE_ENV);
+    
     // Check if dfu-util exists (skip check for system commands on macOS/Linux)
     const isSystemCommand = process.platform !== 'win32' && dfuUtilPath === 'dfu-util';
-    if (!isSystemCommand && !fs.existsSync(dfuUtilPath)) {
-      const errorMsg = process.platform === 'win32' 
-        ? 'dfu-util.exe not found. Please ensure Programs/dfu-util/dfu-util.exe exists.'
-        : 'dfu-util not found. Please install dfu-util or ensure it\'s in your PATH.';
+    console.log('DFU Debug - Is system command:', isSystemCommand);
+    
+    if (!isSystemCommand) {
+      const fileExists = fs.existsSync(dfuUtilPath);
+      console.log('DFU Debug - File exists:', fileExists);
+      console.log('DFU Debug - Full path check:', dfuUtilPath);
       
-      resolve({ 
-        success: false, 
-        error: errorMsg, 
-        output: '',
-        needsSetup: true 
-      });
-      return;
+      if (!fileExists) {
+        const errorMsg = process.platform === 'win32' 
+          ? `dfu-util.exe not found at: ${dfuUtilPath}. Please ensure Programs/dfu-util/dfu-util.exe exists.`
+          : 'dfu-util not found. Please install dfu-util or ensure it\'s in your PATH.';
+        
+        resolve({ 
+          success: false, 
+          error: errorMsg, 
+          output: '',
+          needsSetup: true 
+        });
+        return;
+      }
     }
     
     const child = spawn(dfuUtilPath, ['-l']);
