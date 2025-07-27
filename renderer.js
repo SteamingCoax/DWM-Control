@@ -7,6 +7,10 @@
  * - Set to true to show the tab
  * - Set to false to hide the tab
  * - Restart the app for changes to take effect
+ * 
+ * To enable/disable UI components, modify the uiSettings object in the constructor:
+ * - headerConnection: Set to true to show the Serial Communication dropdown, false to hide it
+ * - Restart the app for changes to take effect
  */
 class DWMControl {
     constructor() {
@@ -25,6 +29,13 @@ class DWMControl {
             firmware: true,   // Firmware Upload tab
             terminal: false,   // Serial Terminal tab  
             control: false     // Control panel tab
+        };
+        
+        // UI Component Configuration - Set to false to hide components
+        // To enable/disable UI components, change these values and restart the app
+        // Example: To hide the Serial Communication dropdown, set headerConnection: false
+        this.uiSettings = {
+            headerConnection: false   // Serial Communication Setup dropdown in header
         };
         
         this.initializeApp();
@@ -66,6 +77,9 @@ class DWMControl {
         // Configure tab visibility based on settings
         this.configureTabVisibility();
         
+        // Configure UI component visibility
+        this.configureUIComponentVisibility();
+        
         const tabButtons = document.querySelectorAll('.tab-button');
         const tabPanels = document.querySelectorAll('.tab-panel');
 
@@ -99,6 +113,23 @@ class DWMControl {
                 } else {
                     tabButton.style.display = 'none';
                     tabPanel.classList.remove('active');
+                }
+            }
+        });
+    }
+
+    configureUIComponentVisibility() {
+        // Hide/show UI components based on uiSettings configuration
+        Object.entries(this.uiSettings).forEach(([componentKey, enabled]) => {
+            if (componentKey === 'headerConnection') {
+                const connectionPanel = document.querySelector('.connection-panel');
+                
+                if (connectionPanel) {
+                    if (enabled) {
+                        connectionPanel.style.display = 'flex';
+                    } else {
+                        connectionPanel.style.display = 'none';
+                    }
                 }
             }
         });
@@ -1272,7 +1303,7 @@ class DWMControl {
                     this.appendOutput('1. Put device in DFU mode (hold BOOT button while connecting USB)');
                     this.appendOutput('2. Install DFU drivers with Zadig (Programs/zadig-2.9.exe)');
                     this.appendOutput('3. Try different USB cable/port');
-                    this.appendOutput('4. Run windows-dfu-diagnostics.bat for detailed help');
+                    this.appendOutput('4. Check device manager for unrecognized devices');
                     this.appendOutput('5. Try running app as Administrator');
                 } else {
                     this.appendOutput('No DFU devices found. Ensure device is in DFU mode and connected.');
@@ -1509,10 +1540,9 @@ class DWMControl {
         // Serial Terminal Management
     connectSerial() {
         const portSelect = document.getElementById('port-select');
-        const baudSelect = document.getElementById('baud-select');
         
         const selectedPort = portSelect.value;
-        const selectedBaud = parseInt(baudSelect.value);
+        const selectedBaud = 115200; // Fixed baud rate
         
         if (!selectedPort) {
             this.appendOutput('Please select a serial port first.');
@@ -1527,7 +1557,6 @@ class DWMControl {
         
         // Sync header selection
         document.getElementById('header-port-select').value = selectedPort;
-        document.getElementById('header-baud-select').value = selectedBaud;
     }
 
     disconnectSerial() {
@@ -1690,6 +1719,12 @@ class DWMControl {
 
     // Header Connection Panel Setup
     setupHeaderConnection() {
+        // Check if header connection is enabled
+        if (!this.uiSettings.headerConnection) {
+            console.log('Header connection panel disabled via uiSettings');
+            return;
+        }
+        
         const connectionToggle = document.getElementById('connection-toggle');
         const connectionDropdown = document.getElementById('connection-dropdown');
         const connectionPanel = document.querySelector('.connection-panel');
@@ -1777,10 +1812,9 @@ class DWMControl {
 
     connectHeaderSerial() {
         const portSelect = document.getElementById('header-port-select');
-        const baudSelect = document.getElementById('header-baud-select');
         
         const selectedPort = portSelect.value;
-        const selectedBaud = parseInt(baudSelect.value);
+        const selectedBaud = 115200; // Fixed baud rate
         
         if (!selectedPort) {
             this.appendOutput('Please select a serial port first.');

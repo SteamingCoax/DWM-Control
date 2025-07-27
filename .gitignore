@@ -33,6 +33,23 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Temporary files and troubleshooting artifacts
+*.tmp
+*.temp
+*.bak
+*.backup
+*-fix.bat
+*-debug.bat
+*-test.js
+debug-*.js
+test-*.js
+windows-*-debug.*
+troubleshoot-*.*
+fix-*.*
+ultimate-*.*
+nuclear-*.*
+quick-*.*
+
 # Runtime data
 pids
 *.pid
