@@ -258,11 +258,19 @@ ipcMain.handle('select-hex-file', async () => {
 
 // Helper functions
 function getDfuUtilPath() {
-  const isDev = process.env.NODE_ENV === 'development';
+  const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
   const basePath = isDev ? __dirname : process.resourcesPath;
   
+  console.log('getDfuUtilPath - isDev:', isDev);
+  console.log('getDfuUtilPath - basePath:', basePath);
+  console.log('getDfuUtilPath - __dirname:', __dirname);
+  console.log('getDfuUtilPath - process.resourcesPath:', process.resourcesPath);
+  console.log('getDfuUtilPath - app.isPackaged:', app.isPackaged);
+  
   if (process.platform === 'win32') {
-    return path.join(basePath, 'Programs', 'dfu-util', 'dfu-util.exe');
+    const fullPath = path.join(basePath, 'Programs', 'dfu-util', 'dfu-util.exe');
+    console.log('getDfuUtilPath - Windows full path:', fullPath);
+    return fullPath;
   } else if (process.platform === 'darwin') {
     // On macOS, first try to use the system dfu-util if available
     return 'dfu-util';
