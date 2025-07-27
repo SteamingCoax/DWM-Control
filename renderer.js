@@ -1,4 +1,13 @@
 // DWM Control Electron Renderer
+
+/**
+ * DWM Control Application
+ * 
+ * To enable/disable tabs, modify the tabSettings object in the constructor:
+ * - Set to true to show the tab
+ * - Set to false to hide the tab
+ * - Restart the app for changes to take effect
+ */
 class DWMControl {
     constructor() {
         this.selectedHexFile = null;
@@ -9,26 +18,13 @@ class DWMControl {
         this.outputVisible = false; // Start with output hidden
         this.config = this.loadConfig(); // Load user configuration
         
-        // Tab Configuration - Set to false to hide tabs that aren't ready
-        this.tabConfig = {
-            firmware: {
-                enabled: true,
-                label: 'Firmware Upload',
-                icon: '🔧',
-                description: 'Upload firmware to DFU devices'
-            },
-            terminal: {
-                enabled: true,
-                label: 'Serial Terminal',
-                icon: '💻',
-                description: 'Serial communication with devices'
-            },
-            control: {
-                enabled: true,
-                label: 'Control',
-                icon: '🎛️',
-                description: 'Device control and power monitoring'
-            }
+        // Tab Configuration - Set to false to hide tabs
+        // To enable/disable tabs, change these values and restart the app
+        // Example: To hide the terminal tab, set terminal: false
+        this.tabSettings = {
+            firmware: true,   // Firmware Upload tab
+            terminal: true,   // Serial Terminal tab  
+            control: true     // Control panel tab
         };
         
         this.initializeApp();
@@ -67,6 +63,7 @@ class DWMControl {
 
     // Tab Switching Logic
     setupTabSwitching() {
+        // Configure tab visibility based on settings
         this.configureTabVisibility();
         
         const tabButtons = document.querySelectorAll('.tab-button');
@@ -86,21 +83,19 @@ class DWMControl {
             });
         });
         
-        // Ensure at least one enabled tab is active
+        // Set first visible tab as active if none are active
         this.ensureActiveTab();
     }
 
     configureTabVisibility() {
-        // Hide/show tabs based on configuration
-        Object.entries(this.tabConfig).forEach(([tabKey, config]) => {
+        // Hide/show tabs based on tabSettings configuration
+        Object.entries(this.tabSettings).forEach(([tabKey, enabled]) => {
             const tabButton = document.querySelector(`[data-tab="${tabKey}"]`);
             const tabPanel = document.getElementById(`${tabKey}-panel`);
             
             if (tabButton && tabPanel) {
-                if (config.enabled) {
+                if (enabled) {
                     tabButton.style.display = 'flex';
-                    // Update tab content if needed
-                    this.updateTabContent(tabKey, config);
                 } else {
                     tabButton.style.display = 'none';
                     tabPanel.classList.remove('active');
@@ -109,48 +104,26 @@ class DWMControl {
         });
     }
 
-    updateTabContent(tabKey, config) {
-        const tabButton = document.querySelector(`[data-tab="${tabKey}"]`);
-        if (!tabButton) return;
-        
-        // Update tab icon and label if they've changed
-        const iconElement = tabButton.querySelector('.tab-icon');
-        const labelElement = tabButton.querySelector('.tab-label');
-        
-        if (iconElement && config.icon) {
-            iconElement.textContent = config.icon;
-        }
-        
-        if (labelElement && config.label) {
-            labelElement.textContent = config.label;
-        }
-        
-        // Update title attribute for better UX
-        if (config.description) {
-            tabButton.title = config.description;
-        }
-    }
-
     ensureActiveTab() {
-        // Check if any tab is currently active
+        // Check if any tab is currently active and visible
         const activeTab = document.querySelector('.tab-button.active');
         const activePanel = document.querySelector('.tab-panel.active');
         
         // If no active tab or the active tab is hidden, activate the first enabled tab
         if (!activeTab || activeTab.style.display === 'none' || !activePanel) {
             // Find first enabled tab
-            const firstEnabledTab = Object.keys(this.tabConfig).find(tabKey => 
-                this.tabConfig[tabKey].enabled
+            const firstEnabledTabKey = Object.keys(this.tabSettings).find(tabKey => 
+                this.tabSettings[tabKey]
             );
             
-            if (firstEnabledTab) {
+            if (firstEnabledTabKey) {
                 // Remove all active states
                 document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
                 document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
                 
                 // Activate first enabled tab
-                const tabButton = document.querySelector(`[data-tab="${firstEnabledTab}"]`);
-                const tabPanel = document.getElementById(`${firstEnabledTab}-panel`);
+                const tabButton = document.querySelector(`[data-tab="${firstEnabledTabKey}"]`);
+                const tabPanel = document.getElementById(`${firstEnabledTabKey}-panel`);
                 
                 if (tabButton && tabPanel) {
                     tabButton.classList.add('active');
@@ -158,72 +131,6 @@ class DWMControl {
                 }
             }
         }
-    }
-
-    // Tab Management Helper Methods
-    enableTab(tabKey) {
-        if (this.tabConfig[tabKey]) {
-            this.tabConfig[tabKey].enabled = true;
-            this.configureTabVisibility();
-            this.ensureActiveTab();
-            this.appendOutput(`✅ Tab "${this.tabConfig[tabKey].label}" enabled`);
-        }
-    }
-
-    disableTab(tabKey) {
-        if (this.tabConfig[tabKey]) {
-            this.tabConfig[tabKey].enabled = false;
-            this.configureTabVisibility();
-            this.ensureActiveTab();
-            this.appendOutput(`⚠️ Tab "${this.tabConfig[tabKey].label}" disabled`);
-        }
-    }
-
-    toggleTab(tabKey) {
-        if (this.tabConfig[tabKey]) {
-            this.tabConfig[tabKey].enabled = !this.tabConfig[tabKey].enabled;
-            this.configureTabVisibility();
-            this.ensureActiveTab();
-            const status = this.tabConfig[tabKey].enabled ? 'enabled' : 'disabled';
-            this.appendOutput(`🔄 Tab "${this.tabConfig[tabKey].label}" ${status}`);
-        }
-    }
-
-    updateTabConfig(tabKey, updates) {
-        if (this.tabConfig[tabKey]) {
-            Object.assign(this.tabConfig[tabKey], updates);
-            this.configureTabVisibility();
-            this.ensureActiveTab();
-            this.appendOutput(`🔧 Tab "${tabKey}" configuration updated`);
-        }
-    }
-
-    getTabStatus() {
-        const status = {};
-        Object.entries(this.tabConfig).forEach(([key, config]) => {
-            status[key] = {
-                enabled: config.enabled,
-                label: config.label,
-                visible: config.enabled
-            };
-        });
-        return status;
-    }
-
-    updateTabManagementUI() {
-        // Update all toggle switches to reflect current state
-        Object.entries(this.tabConfig).forEach(([tabKey, config]) => {
-            const toggleInput = document.querySelector(`[data-tab-toggle="${tabKey}"]`);
-            const statusText = toggleInput?.closest('.tab-control-item')?.querySelector('.tab-status-text');
-            
-            if (toggleInput) {
-                toggleInput.checked = config.enabled;
-            }
-            
-            if (statusText) {
-                statusText.textContent = config.enabled ? 'Enabled' : 'Disabled';
-            }
-        });
     }
 
     // Firmware Uploader Setup
@@ -823,58 +730,6 @@ class DWMControl {
             </div>
         `;
 
-        // Add Tab Management Section
-        html += `
-            <div class="card">
-                <div class="card-header">
-                    <h3><span class="card-icon">📑</span>Tab Management</h3>
-                    <p class="card-subtitle">Show or hide application tabs</p>
-                </div>
-                <div class="card-content">
-                    <div class="tab-management-grid">
-        `;
-
-        Object.entries(this.tabConfig).forEach(([tabKey, config]) => {
-            html += `
-                <div class="tab-control-item">
-                    <div class="tab-info">
-                        <span class="tab-control-icon">${config.icon}</span>
-                        <div class="tab-details">
-                            <span class="tab-control-label">${config.label}</span>
-                            <span class="tab-control-desc">${config.description}</span>
-                        </div>
-                    </div>
-                    <div class="tab-toggle-controls">
-                        <label class="toggle-switch">
-                            <input type="checkbox" data-tab-toggle="${tabKey}" ${config.enabled ? 'checked' : ''}>
-                            <span class="toggle-slider"></span>
-                        </label>
-                        <span class="tab-status-text">${config.enabled ? 'Enabled' : 'Disabled'}</span>
-                    </div>
-                </div>
-            `;
-        });
-
-        html += `
-                    </div>
-                    <div class="tab-management-actions">
-                        <button class="btn btn-secondary btn-small" id="show-all-tabs">
-                            <span class="btn-icon">👁️</span>
-                            Show All
-                        </button>
-                        <button class="btn btn-secondary btn-small" id="hide-all-tabs">
-                            <span class="btn-icon">🙈</span>
-                            Hide All
-                        </button>
-                        <button class="btn btn-text btn-small" id="reset-tab-config">
-                            <span class="btn-icon">🔄</span>
-                            Reset
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `;
-
         controlPanel.innerHTML = html;
     }
 
@@ -1007,67 +862,6 @@ class DWMControl {
                     icon.textContent = '▼';
                     header.classList.remove('expanded');
                 }
-            }
-        });
-
-        // Tab management controls
-        document.addEventListener('change', (e) => {
-            if (e.target.hasAttribute('data-tab-toggle')) {
-                const tabKey = e.target.getAttribute('data-tab-toggle');
-                const isEnabled = e.target.checked;
-                
-                if (isEnabled) {
-                    this.enableTab(tabKey);
-                } else {
-                    this.disableTab(tabKey);
-                }
-                
-                // Update status text
-                const statusText = e.target.closest('.tab-control-item').querySelector('.tab-status-text');
-                if (statusText) {
-                    statusText.textContent = isEnabled ? 'Enabled' : 'Disabled';
-                }
-                
-                // Save configuration
-                this.saveConfig();
-            }
-        });
-
-        // Tab management action buttons
-        document.addEventListener('click', (e) => {
-            if (e.target.id === 'show-all-tabs' || e.target.closest('#show-all-tabs')) {
-                Object.keys(this.tabConfig).forEach(tabKey => {
-                    this.tabConfig[tabKey].enabled = true;
-                });
-                this.configureTabVisibility();
-                this.ensureActiveTab();
-                this.updateTabManagementUI();
-                this.saveConfig();
-                this.appendOutput('✅ All tabs enabled');
-            }
-            
-            if (e.target.id === 'hide-all-tabs' || e.target.closest('#hide-all-tabs')) {
-                // Keep at least one tab enabled
-                const tabKeys = Object.keys(this.tabConfig);
-                tabKeys.forEach((tabKey, index) => {
-                    this.tabConfig[tabKey].enabled = index === 0; // Keep first tab enabled
-                });
-                this.configureTabVisibility();
-                this.ensureActiveTab();
-                this.updateTabManagementUI();
-                this.saveConfig();
-                this.appendOutput('⚠️ All tabs hidden except first tab');
-            }
-            
-            if (e.target.id === 'reset-tab-config' || e.target.closest('#reset-tab-config')) {
-                Object.keys(this.tabConfig).forEach(tabKey => {
-                    this.tabConfig[tabKey].enabled = true;
-                });
-                this.configureTabVisibility();
-                this.ensureActiveTab();
-                this.updateTabManagementUI();
-                this.saveConfig();
-                this.appendOutput('🔄 Tab configuration reset to defaults');
             }
         });
 
@@ -2113,26 +1907,10 @@ class DWMControl {
                 outputVisible: false,
                 lastDevice: null,
                 lastPort: null,
-                lastBaud: 115200,
-                tabConfiguration: {
-                    firmware: { enabled: true },
-                    terminal: { enabled: true },
-                    control: { enabled: true }
-                }
+                lastBaud: 115200
             };
             
-            const config = saved ? JSON.parse(saved) : defaultConfig;
-            
-            // Merge saved tab configuration with default tab config
-            if (config.tabConfiguration) {
-                Object.entries(config.tabConfiguration).forEach(([tabKey, savedConfig]) => {
-                    if (this.tabConfig[tabKey]) {
-                        Object.assign(this.tabConfig[tabKey], savedConfig);
-                    }
-                });
-            }
-            
-            return config;
+            return saved ? JSON.parse(saved) : defaultConfig;
         } catch (error) {
             console.warn('Failed to load config, using defaults:', error);
             return {
@@ -2140,68 +1918,23 @@ class DWMControl {
                 outputVisible: false,
                 lastDevice: null,
                 lastPort: null,
-                lastBaud: 115200,
-                tabConfiguration: {
-                    firmware: { enabled: true },
-                    terminal: { enabled: true },
-                    control: { enabled: true }
-                }
+                lastBaud: 115200
             };
         }
     }
 
     saveConfig() {
         try {
-            // Save current tab configuration
-            this.config.tabConfiguration = {};
-            Object.entries(this.tabConfig).forEach(([tabKey, config]) => {
-                this.config.tabConfiguration[tabKey] = {
-                    enabled: config.enabled
-                };
-            });
-            
             localStorage.setItem('dwm-control-config', JSON.stringify(this.config));
         } catch (error) {
             console.warn('Failed to save config:', error);
         }
     }
 
-    // Developer Console Methods for Tab Management
-    // Usage examples:
-    // dwm.tabs.hide('terminal')     - Hide the terminal tab
-    // dwm.tabs.show('control')      - Show the control tab
-    // dwm.tabs.toggle('firmware')   - Toggle firmware tab
-    // dwm.tabs.status()             - Get current tab status
-    // dwm.tabs.showAll()            - Show all tabs
-    // dwm.tabs.hideAll()            - Hide all tabs (keeps one enabled)
-    get tabs() {
-        return {
-            hide: (tabKey) => this.disableTab(tabKey),
-            show: (tabKey) => this.enableTab(tabKey),
-            toggle: (tabKey) => this.toggleTab(tabKey),
-            status: () => this.getTabStatus(),
-            showAll: () => {
-                Object.keys(this.tabConfig).forEach(key => this.enableTab(key));
-                this.saveConfig();
-            },
-            hideAll: () => {
-                const tabKeys = Object.keys(this.tabConfig);
-                tabKeys.forEach((key, index) => {
-                    this.tabConfig[key].enabled = index === 0;
-                });
-                this.configureTabVisibility();
-                this.ensureActiveTab();
-                this.updateTabManagementUI();
-                this.saveConfig();
-            },
-            list: () => Object.keys(this.tabConfig),
-            config: this.tabConfig
-        };
-    }
 }
 
 // Initialize the application when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.dwm = new DWMControl();
-    console.log('DWM Control initialized. Use window.dwm or dwm.tabs for tab management.');
+    console.log('DWM Control initialized.');
 });
