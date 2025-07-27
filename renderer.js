@@ -1460,7 +1460,19 @@ class DWMControl {
             } else {
                 combo.innerHTML = '<option>No DFU devices found</option>';
                 this.selectedDevice = null;
-                this.appendOutput('No DFU devices found. Ensure device is in DFU mode and connected.');
+                
+                if (result.needsSetup) {
+                    this.appendOutput('⚠️ dfu-util not found! Please ensure Programs/dfu-util/dfu-util.exe exists.');
+                } else if (result.windowsHelp) {
+                    this.appendOutput('No DFU devices found. Windows troubleshooting:');
+                    this.appendOutput('1. Put device in DFU mode (hold BOOT button while connecting USB)');
+                    this.appendOutput('2. Install DFU drivers with Zadig (Programs/zadig-2.9.exe)');
+                    this.appendOutput('3. Try different USB cable/port');
+                    this.appendOutput('4. Run windows-dfu-diagnostics.bat for detailed help');
+                    this.appendOutput('5. Try running app as Administrator');
+                } else {
+                    this.appendOutput('No DFU devices found. Ensure device is in DFU mode and connected.');
+                }
                 this.updateUploadButton();
             }
         } catch (error) {

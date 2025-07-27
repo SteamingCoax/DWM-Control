@@ -89,6 +89,22 @@ app.on('web-contents-created', (event, contents) => {
 ipcMain.handle('get-dfu-devices', async () => {
   return new Promise((resolve, reject) => {
     const dfuUtilPath = getDfuUtilPath();
+    
+    // Check if dfu-util exists
+    if (!fs.existsSync(dfuUtilPath)) {
+      const errorMsg = process.platform === 'win32' 
+        ? 'dfu-util.exe not found. Please ensure Programs/dfu-util/dfu-util.exe exists.'
+        : 'dfu-util not found. Please install dfu-util or ensure it\'s in your PATH.';
+      
+      resolve({ 
+        success: false, 
+        error: errorMsg, 
+        output: '',
+        needsSetup: true 
+      });
+      return;
+    }
+    
     const child = spawn(dfuUtilPath, ['-l']);
     
     let stdout = '';
@@ -105,15 +121,43 @@ ipcMain.handle('get-dfu-devices', async () => {
     child.on('close', (code) => {
       if (code === 0 || stdout.length > 0) {
         const devices = parseDfuDevices(stdout);
-        resolve({ success: true, devices, output: stdout });
+        
+        if (devices.length === 0 && process.platform === 'win32') {
+          // Provide Windows-specific guidance when no devices found
+          resolve({ 
+            success: false, 
+            error: 'No DFU devices found', 
+            output: stdout,
+            windowsHelp: true
+          });
+        } else {
+          resolve({ success: true, devices, output: stdout });
+        }
       } else {
-        resolve({ success: false, error: stderr || 'No DFU devices found', output: stderr });
+        const errorMsg = process.platform === 'win32'
+          ? 'DFU scan failed. This may indicate driver issues or permissions problems.'
+          : 'DFU scan failed';
+          
+        resolve({ 
+          success: false, 
+          error: stderr || errorMsg, 
+          output: stderr,
+          windowsHelp: process.platform === 'win32'
+        });
       }
     });
     
-    
     child.on('error', (error) => {
-      resolve({ success: false, error: error.message, output: '' });
+      const errorMsg = process.platform === 'win32'
+        ? `Failed to run dfu-util: ${error.message}. Try running as Administrator.`
+        : `Failed to run dfu-util: ${error.message}`;
+        
+      resolve({ 
+        success: false, 
+        error: errorMsg, 
+        output: '',
+        windowsHelp: process.platform === 'win32'
+      });
     });
   });
 });
