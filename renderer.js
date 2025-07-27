@@ -23,8 +23,8 @@ class DWMControl {
         // Example: To hide the terminal tab, set terminal: false
         this.tabSettings = {
             firmware: true,   // Firmware Upload tab
-            terminal: true,   // Serial Terminal tab  
-            control: true     // Control panel tab
+            terminal: false,   // Serial Terminal tab  
+            control: false     // Control panel tab
         };
         
         this.initializeApp();
