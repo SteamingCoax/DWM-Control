@@ -1,0 +1,313 @@
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const path = require('path');
+const { spawn, exec } = require('child_process');
+const fs = require('fs');
+const { SerialPort } = require('serialport');
+
+// Keep a global reference of the window object
+let mainWindow;
+
+function createWindow() {
+  // Create the browser window with modern styling
+  mainWindow = new BrowserWindow({
+    width: 1200,
+    height: 900,
+    minWidth: 800,
+    minHeight: 600,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      enableRemoteModule: false,
+      preload: path.join(__dirname, 'preload.js')
+    },
+    icon: path.join(__dirname, 'assets', 'icon.png'),
+    titleBarStyle: 'default',
+    show: false // Don't show until ready
+  });
+
+  // Load the index.html file
+  mainWindow.loadFile('index.html');
+
+  // Show window when ready to prevent visual flash
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    
+    // Bring to front on macOS
+    if (process.platform === 'darwin') {
+      mainWindow.moveTop();
+    }
+  });
+
+  // Handle window closed
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+
+  // Open DevTools in development
+  if (process.env.NODE_ENV === 'development') {
+    mainWindow.webContents.openDevTools();
+  }
+}
+
+// This method will be called when Electron has finished initialization
+app.whenReady().then(() => {
+  createWindow();
+  
+  app.on('activate', () => {
+    // On macOS, re-create a window when the dock icon is clicked
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+// Quit when all windows are closed
+app.on('window-all-closed', () => {
+  // On macOS, apps typically stay active until explicitly quit
+  if (process.platform !== 'darwin') app.quit();
+});
+
+// Security: Prevent new window creation
+app.on('web-contents-created', (event, contents) => {
+  contents.on('new-window', (event, navigationUrl) => {
+    event.preventDefault();
+  });
+});
+
+// IPC Handlers for DFU functionality
+ipcMain.handle('get-dfu-devices', async () => {
+  return new Promise((resolve, reject) => {
+    const dfuUtilPath = getDfuUtilPath();
+    const child = spawn(dfuUtilPath, ['-l']);
+    
+    let stdout = '';
+    let stderr = '';
+    
+    child.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+    
+    child.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+    
+    child.on('close', (code) => {
+      if (code === 0 || stdout.length > 0) {
+        const devices = parseDfuDevices(stdout);
+        resolve({ success: true, devices, output: stdout });
+      } else {
+        resolve({ success: false, error: stderr || 'No DFU devices found', output: stderr });
+      }
+    });
+    
+    
+    child.on('error', (error) => {
+      resolve({ success: false, error: error.message, output: '' });
+    });
+  });
+});
+
+ipcMain.handle('upload-firmware', async (event, { hexFilePath, deviceInfo }) => {
+  return new Promise((resolve, reject) => {
+    // Convert hex to bin first
+    convertHexToBin(hexFilePath)
+      .then(binFilePath => {
+        const dfuUtilPath = getDfuUtilPath();
+        const args = [
+          '-a', '0',
+          '-i', '0',
+          '-D', binFilePath,
+          '-s', '0x08000000:leave',
+          '-R'
+        ];
+        
+        const child = spawn(dfuUtilPath, args);
+        let output = '';
+        
+        child.stdout.on('data', (data) => {
+          const line = data.toString();
+          output += line;
+          event.sender.send('upload-progress', line);
+        });
+        
+        child.stderr.on('data', (data) => {
+          const line = data.toString();
+          output += line;
+          event.sender.send('upload-progress', line);
+        });
+        
+        child.on('close', (code) => {
+          // Clean up temporary bin file
+          if (fs.existsSync(binFilePath)) {
+            fs.unlinkSync(binFilePath);
+          }
+          
+          if (code === 0 || code === 74) { // 74 is success code for DFU
+            resolve({ success: true, output });
+          } else {
+            resolve({ success: false, error: `Upload failed with code ${code}`, output });
+          }
+        });
+        
+        child.on('error', (error) => {
+          resolve({ success: false, error: error.message, output });
+        });
+      })
+      .catch(error => {
+        resolve({ success: false, error: error.message, output: '' });
+      });
+  });
+});
+
+// IPC Handlers for Serial Port functionality
+ipcMain.handle('get-serial-ports', async () => {
+  try {
+    const ports = await SerialPort.list();
+    return { success: true, ports };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// File selection dialog
+ipcMain.handle('select-hex-file', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Select Firmware (.hex) File',
+    filters: [
+      { name: 'Intel Hex Files', extensions: ['hex'] },
+      { name: 'All Files', extensions: ['*'] }
+    ],
+    properties: ['openFile']
+  });
+  
+  if (!result.canceled && result.filePaths.length > 0) {
+    return { success: true, filePath: result.filePaths[0] };
+  }
+  
+  return { success: false };
+});
+
+// Helper functions
+function getDfuUtilPath() {
+  const isDev = process.env.NODE_ENV === 'development';
+  const basePath = isDev ? __dirname : process.resourcesPath;
+  
+  if (process.platform === 'win32') {
+    return path.join(basePath, 'Programs', 'dfu-util', 'dfu-util.exe');
+  } else if (process.platform === 'darwin') {
+    // On macOS, first try to use the system dfu-util if available
+    return 'dfu-util';
+  } else {
+    // For Linux, try the bundled version first, fallback to system
+    const bundledPath = path.join(basePath, 'Programs', 'dfu-util', 'dfu-util');
+    if (fs.existsSync(bundledPath)) {
+      return bundledPath;
+    }
+    return 'dfu-util';
+  }
+}
+
+function parseDfuDevices(output) {
+  const devices = [];
+  const lines = output.split('\n');
+  
+  for (const line of lines) {
+    if (line.includes('Found DFU')) {
+      // Match the pattern to extract VID, PID, and serial number
+      const match = line.match(/Found DFU: \[([0-9a-f]{4}):([0-9a-f]{4})\].*?serial="([^"]+)"/);
+      if (match) {
+        devices.push({
+          vid: match[1],
+          pid: match[2],
+          serial: match[3],
+          description: line.trim()
+        });
+      }
+    }
+  }
+  
+  // Remove duplicates based on vid:pid:serial combination
+  const uniqueDevices = {};
+  for (const device of devices) {
+    const key = `${device.vid}:${device.pid}:${device.serial}`;
+    uniqueDevices[key] = device;
+  }
+  
+  return Object.values(uniqueDevices);
+}
+
+function convertHexToBin(hexFilePath) {
+  return new Promise((resolve, reject) => {
+    try {
+      const hexData = fs.readFileSync(hexFilePath, 'utf8');
+      console.log(`Converting hex file: ${hexFilePath}`);
+      
+      // Create temporary bin file
+      const tempDir = require('os').tmpdir();
+      const binFilePath = path.join(tempDir, `firmware_temp_${Date.now()}.bin`);
+      
+      // Parse the hex file manually to avoid memory issues
+      const lines = hexData.split('\n').filter(line => line.trim().startsWith(':'));
+      console.log(`Processing ${lines.length} hex lines`);
+      
+      // Find the address range
+      let minAddr = 0x08000000; // STM32 flash start
+      let maxAddr = 0x08000000;
+      let baseAddr = 0;
+      
+      // First pass: find the actual address range
+      for (const line of lines) {
+        if (line.length < 11) continue;
+        
+        const recType = parseInt(line.substr(7, 2), 16);
+        if (recType === 0x04) { // Extended Linear Address
+          baseAddr = parseInt(line.substr(9, 4), 16) << 16;
+        } else if (recType === 0x00) { // Data record
+          const addr = baseAddr + parseInt(line.substr(3, 4), 16);
+          const dataLen = parseInt(line.substr(1, 2), 16);
+          minAddr = Math.min(minAddr, addr);
+          maxAddr = Math.max(maxAddr, addr + dataLen - 1);
+        }
+      }
+      
+      console.log(`Address range: 0x${minAddr.toString(16)} - 0x${maxAddr.toString(16)}`);
+      
+      const size = maxAddr - minAddr + 1;
+      if (size > 1024 * 1024) { // 1MB limit
+        throw new Error(`Firmware too large: ${size} bytes`);
+      }
+      
+      // Create buffer for the exact size needed
+      const buffer = Buffer.alloc(size, 0xFF);
+      baseAddr = 0;
+      
+      // Second pass: fill the buffer with data
+      for (const line of lines) {
+        if (line.length < 11) continue;
+        
+        const recType = parseInt(line.substr(7, 2), 16);
+        if (recType === 0x04) { // Extended Linear Address
+          baseAddr = parseInt(line.substr(9, 4), 16) << 16;
+        } else if (recType === 0x00) { // Data record
+          const addr = baseAddr + parseInt(line.substr(3, 4), 16);
+          const dataLen = parseInt(line.substr(1, 2), 16);
+          
+          for (let i = 0; i < dataLen; i++) {
+            const byteVal = parseInt(line.substr(9 + i * 2, 2), 16);
+            const bufferIndex = addr + i - minAddr;
+            if (bufferIndex >= 0 && bufferIndex < buffer.length) {
+              buffer[bufferIndex] = byteVal;
+            }
+          }
+        }
+      }
+      
+      console.log(`Converted to binary: ${buffer.length} bytes`);
+      
+      // Write binary data to file
+      fs.writeFileSync(binFilePath, buffer);
+      resolve(binFilePath);
+    } catch (error) {
+      console.error('Hex to bin conversion error:', error);
+      reject(error);
+    }
+  });
+}

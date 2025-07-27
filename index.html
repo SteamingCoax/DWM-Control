@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+    <title>DWM Control</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- App Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="app-logo">
+                    <span class="logo-icon">⚡</span>
+                    <div class="logo-text">
+                        <h1>DWM Control</h1>
+                        <p>Device Firmware Manager</p>
+                    </div>
+                </div>
+                        <div class="header-status">
+            <!-- Serial Connection Status/Panel -->
+            <div class="connection-panel">
+                <button id="connection-toggle" class="connection-status-btn">
+                    <div class="connection-indicator">
+                        <div class="connection-dot" id="connection-dot"></div>
+                        <span class="connection-text" id="connection-text">Disconnected</span>
+                        <span class="connection-expand">▼</span>
+                    </div>
+                </button>
+                
+                <!-- Collapsible Connection Controls -->
+                <div class="connection-dropdown" id="connection-dropdown">
+                    <div class="connection-controls">
+                        <div class="connection-row">
+                            <label for="header-port-select">Port:</label>
+                            <div class="connection-input-group">
+                                <select id="header-port-select" class="connection-select">
+                                    <option>Select port...</option>
+                                </select>
+                                <button id="header-refresh-ports-btn" class="connection-btn" title="Refresh Ports">
+                                    🔄
+                                </button>
+                            </div>
+                        </div>
+                        <div class="connection-row">
+                            <label for="header-baud-select">Baud:</label>
+                            <select id="header-baud-select" class="connection-select">
+                                <option value="9600">9600</option>
+                                <option value="19200">19200</option>
+                                <option value="38400">38400</option>
+                                <option value="57600">57600</option>
+                                <option value="115200" selected>115200</option>
+                                <option value="230400">230400</option>
+                                <option value="460800">460800</option>
+                                <option value="921600">921600</option>
+                            </select>
+                        </div>
+                        <div class="connection-actions-header">
+                            <button id="header-connect-btn" class="connection-action-btn connect">
+                                <span class="btn-icon">🔗</span> Connect
+                            </button>
+                            <button id="header-disconnect-btn" class="connection-action-btn disconnect" disabled>
+                                <span class="btn-icon">🔌</span> Disconnect
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <button id="theme-toggle" class="btn btn-text" title="Toggle Dark Mode">
+                <span class="btn-icon">🌙</span>
+            </button>
+        </div>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="tab-navigation">
+            <button class="tab-button active" data-tab="firmware">
+                <span class="tab-icon">🔧</span>
+                <span class="tab-label">Firmware Upload</span>
+            </button>
+            <button class="tab-button" data-tab="terminal">
+                <span class="tab-icon">💻</span>
+                <span class="tab-label">Serial Terminal</span>
+            </button>
+            <button class="tab-button" data-tab="control">
+                <span class="tab-icon">🎛️</span>
+                <span class="tab-label">Control</span>
+            </button>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Firmware Upload Tab -->
+            <section id="firmware-panel" class="tab-panel active">
+                <div class="panel-container">
+                    <!-- Device Selection Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><span class="card-icon">📡</span>Device Selection</h3>
+                            <p class="card-subtitle">Connect and select your DFU device</p>
+                        </div>
+                        <div class="card-content">
+                            <div class="form-group">
+                                <label for="device-combo">Available DFU Devices:</label>
+                                <div class="input-group">
+                                    <select id="device-combo" class="form-select">
+                                        <option>Click 'Refresh' to scan for devices</option>
+                                    </select>
+                                    <button id="refresh-devices-btn" class="btn btn-primary">
+                                        <span class="btn-icon">🔄</span>
+                                        Refresh
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Firmware File Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><span class="card-icon">📁</span>Firmware File</h3>
+                            <p class="card-subtitle">Select the firmware (.hex) file to upload</p>
+                        </div>
+                        <div class="card-content">
+                            <div class="file-upload-area" id="file-upload-area">
+                                <div class="upload-content">
+                                    <span class="upload-icon">📂</span>
+                                    <button id="select-file-btn" class="btn btn-secondary btn-large">
+                                        Choose Firmware File
+                                    </button>
+                                    <p class="upload-hint">or drag and drop a .hex file here</p>
+                                </div>
+                                <div class="file-info" id="file-info" style="display: none;">
+                                    <div class="file-details">
+                                        <span class="file-icon">📄</span>
+                                        <div class="file-text">
+                                            <span class="file-name" id="file-name">filename.hex</span>
+                                            <span class="file-size" id="file-size">0 KB</span>
+                                        </div>
+                                        <button class="btn btn-text" id="clear-file-btn">✕</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Upload Action Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><span class="card-icon">⚡</span>Upload Firmware</h3>
+                            <p class="card-subtitle">Flash the firmware to your device</p>
+                        </div>
+                        <div class="card-content">
+                            <div class="upload-actions">
+                                <button id="upload-btn" class="btn btn-success btn-large" disabled>
+                                    <span class="btn-icon">🚀</span>
+                                    Upload Firmware
+                                </button>
+                                <div class="upload-progress" id="upload-progress" style="display: none;">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" id="progress-fill"></div>
+                                    </div>
+                                    <span class="progress-text" id="progress-text">Ready to upload</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Upload Output Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><span class="card-icon">📟</span>Upload Output</h3>
+                            <p class="card-subtitle"></p>
+                            <div class="card-actions">
+                                <button id="clear-serial-monitor-btn" class="btn btn-text">
+                                    <span class="btn-icon">🗑️</span>
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-content">
+                            <div class="serial-monitor-container">
+                                <div id="serial-monitor-output" class="serial-monitor-output"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <!-- Serial Terminal Tab -->
+            <section id="terminal-panel" class="tab-panel">
+                <div class="panel-container">
+                    <!-- Terminal Card -->
+                    <div class="card card-expanded">
+                        <div class="card-header">
+                            <h3><span class="card-icon">�</span>Serial Terminal</h3>
+                            <p class="card-subtitle">Direct communication with your device</p>
+                            <div class="card-actions">
+                                <button id="clear-terminal-btn" class="btn btn-text">
+                                    <span class="btn-icon">�️</span>
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-content">
+                            <div class="terminal-container">
+                                <div id="terminal-output" class="terminal-output"></div>
+                                <div class="terminal-input-area">
+                                    <div class="input-group">
+                                        <input type="text" id="terminal-input" class="form-input terminal-input" 
+                                               placeholder="Type command and press Enter..." disabled>
+                                        <button id="send-btn" class="btn btn-primary" disabled>
+                                            <span class="btn-icon">📤</span>
+                                            Send
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Device Control Tab -->
+            <section id="control-panel" class="tab-panel">
+                <div class="panel-container">
+                    <!-- Device controls will be dynamically generated here -->
+                </div>
+            </section>
+        </main>
+
+        <!-- Output Console (Global) -->
+        <aside id="output-section" class="console-sidebar">
+            <div class="console-header">
+                <h4><span class="console-icon">📋</span>Output Console</h4>
+                <div class="console-actions">
+                    <button id="toggle-output-btn" class="btn btn-text">
+                        <span class="btn-icon">🙈</span> Hide Output
+                    </button>
+                    <button id="clear-console-btn" class="btn btn-text">
+                        <span class="btn-icon">🗑️</span>
+                        Clear
+                    </button>
+                </div>
+            </div>
+            <div id="output-console" class="console-content"></div>
+        </aside>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>

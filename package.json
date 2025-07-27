@@ -1,0 +1,208 @@
+{
+  "name": "dwm-control",
+  "version": "1.0.0",
+  "description": "DWM V2 Updater & Interfacing Application",
+  "license": "MIT",
+  "author": "SteamingCoax",
+  "type": "commonjs",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron-forge start",
+    "dev": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "build": "electron-builder --publish=never",
+    "dist": "npm run build",
+    "build:mac": "electron-builder --mac --publish=never",
+    "build:win": "electron-builder --win --publish=never",
+    "build:linux": "electron-builder --linux --publish=never",
+    "build:all": "electron-builder --mac --win --linux --publish=never",
+    "dist:mac": "npm run build:mac",
+    "dist:win": "npm run build:win", 
+    "dist:linux": "npm run build:linux",
+    "dist:all": "npm run build:all",
+    "pack": "electron-builder --dir"
+  },
+  "build": {
+    "appId": "com.steamingcoax.dwmcontrol",
+    "productName": "DWM Control",
+    "copyright": "Copyright © 2025 SteamingCoax",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "buildDependenciesFromSource": false,
+    "npmRebuild": false,
+    "compression": "maximum",
+    "removePackageScripts": true,
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer.js",
+      "index.html",
+      "styles.css",
+      "assets/",
+      "node_modules/serialport/**/*",
+      "node_modules/@serialport/**/*",
+      "node_modules/electron-squirrel-startup/**/*",
+      "node_modules/intel-hex/**/*",
+      "node_modules/intelhex/**/*",
+      "!node_modules/**/test/**",
+      "!node_modules/**/tests/**", 
+      "!node_modules/**/__tests__/**",
+      "!node_modules/**/spec/**",
+      "!node_modules/**/docs/**",
+      "!node_modules/**/documentation/**",
+      "!node_modules/**/examples/**",
+      "!node_modules/**/example/**",
+      "!node_modules/**/*.md",
+      "!node_modules/**/*.txt",
+      "!node_modules/**/LICENSE*",
+      "!node_modules/**/CHANGELOG*",
+      "!node_modules/**/HISTORY*",
+      "!node_modules/**/.github/**",
+      "!node_modules/**/.git/**",
+      "!node_modules/**/build/gyp/**",
+      "!node_modules/**/build/node_gyp_bins/**",
+      "!node_modules/**/build/**/*.cc",
+      "!node_modules/**/build/**/*.cpp",
+      "!node_modules/**/build/**/*.h",
+      "!node_modules/**/binding.gyp",
+      "!node_modules/**/*.node.orig",
+      "!OldPythonversion/**/*",
+      "!test-*.js",
+      "!*.log",
+      "!build/",
+      "!dist/",
+      "!.env*",
+      "!setup-*.sh",
+      "!*.bat",
+      "!BUILD_*.md"
+    ],
+    "extraResources": [
+      {
+        "from": "Programs",
+        "to": "Programs",
+        "filter": ["**/*"]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "icon": "assets/icon.icns",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "dmg": {
+      "title": "${productName} ${version}",
+      "icon": "assets/icon.icns",
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "contents": [
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        },
+        {
+          "x": 130,
+          "y": 220,
+          "type": "file"
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64", "ia32"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64", "ia32"]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "publisherName": "SteamingCoax",
+      "verifyUpdateCodeSignature": false,
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DWM Control",
+      "include": "build/installer.nsh",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerHeaderIcon": "assets/icon.ico"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        },
+        {
+          "target": "rpm",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "category": "Development",
+      "synopsis": "DWM V2 Updater & Interfacing Application",
+      "description": "A cross-platform application for managing DWM V2 firmware updates and device communication.",
+      "vendor": "SteamingCoax",
+      "maintainer": "SteamingCoax"
+    },
+    "appImage": {
+      "license": "MIT",
+      "category": "Development"
+    },
+    "deb": {
+      "depends": ["libusb-1.0-0", "dfu-util"]
+    },
+    "rpm": {
+      "depends": ["libusb1", "dfu-util"]
+    },
+    "publish": null
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.8.1",
+    "@electron-forge/maker-deb": "^7.8.1",
+    "@electron-forge/maker-rpm": "^7.8.1",
+    "@electron-forge/maker-squirrel": "^7.8.1",
+    "@electron-forge/maker-zip": "^7.8.1",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.8.1",
+    "@electron-forge/plugin-fuses": "^7.8.1",
+    "@electron/fuses": "^1.8.0",
+    "electron": "^37.2.4",
+    "electron-builder": "^25.1.8"
+  },
+  "dependencies": {
+    "electron-squirrel-startup": "^1.0.1",
+    "intel-hex": "^0.1.2",
+    "intelhex": "^0.0.2",
+    "serialport": "^12.0.0"
+  }
+}
