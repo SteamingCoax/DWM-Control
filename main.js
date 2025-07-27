@@ -90,8 +90,9 @@ ipcMain.handle('get-dfu-devices', async () => {
   return new Promise((resolve, reject) => {
     const dfuUtilPath = getDfuUtilPath();
     
-    // Check if dfu-util exists
-    if (!fs.existsSync(dfuUtilPath)) {
+    // Check if dfu-util exists (skip check for system commands on macOS/Linux)
+    const isSystemCommand = process.platform !== 'win32' && dfuUtilPath === 'dfu-util';
+    if (!isSystemCommand && !fs.existsSync(dfuUtilPath)) {
       const errorMsg = process.platform === 'win32' 
         ? 'dfu-util.exe not found. Please ensure Programs/dfu-util/dfu-util.exe exists.'
         : 'dfu-util not found. Please install dfu-util or ensure it\'s in your PATH.';
