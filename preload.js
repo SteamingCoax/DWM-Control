@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getDfuDevices: () => ipcRenderer.invoke('get-dfu-devices'),
   uploadFirmware: (data) => ipcRenderer.invoke('upload-firmware', data),
   selectHexFile: () => ipcRenderer.invoke('select-hex-file'),
+  getFileStats: (filePath) => ipcRenderer.invoke('get-file-stats', filePath),
   
   // Serial port functionality
   getSerialPorts: () => ipcRenderer.invoke('get-serial-ports'),

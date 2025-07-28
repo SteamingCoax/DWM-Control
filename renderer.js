@@ -174,36 +174,18 @@ class DWMControl {
         const fileSize = document.getElementById('file-size');
         const clearFileBtn = document.getElementById('clear-file-btn');
 
-        // Create hidden file input for file selection
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = '.hex,.bin,.dfu';
-        fileInput.style.display = 'none';
-        document.body.appendChild(fileInput);
-
-        // Select file button click
-        selectFileBtn.addEventListener('click', () => {
-            fileInput.click();
+        // Select file button click - use native Electron dialog
+        selectFileBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent bubbling to upload area
+            this.selectHexFile();
         });
 
-        // File selection handling
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                this.selectedHexFile = file;
-                this.expectedFileSize = file.size; // Store file size for progress calculation
-                fileName.textContent = file.name;
-                fileSize.textContent = `${(file.size / 1024).toFixed(1)} KB`;
-                fileInfo.style.display = 'block';
-                document.getElementById('upload-btn').disabled = false;
-            }
-        });
+        // File selection handling will be done through handleFileSelection method
 
         // Clear file button
         clearFileBtn.addEventListener('click', () => {
             this.selectedHexFile = null;
             this.expectedFileSize = null;
-            fileInput.value = '';
             fileInfo.style.display = 'none';
             document.getElementById('upload-btn').disabled = true;
         });
@@ -1330,23 +1312,43 @@ class DWMControl {
         }
     }
 
-    handleFileSelection(filePath) {
+    async handleFileSelection(filePath) {
         this.selectedHexFile = filePath;
         const fileName = filePath.split(/[\\/]/).pop();
         
-        // Update upload area to show selected file
-        const uploadArea = document.getElementById('file-upload-area');
-        const uploadContent = uploadArea.querySelector('.upload-content');
-        
-        uploadContent.innerHTML = `
-            <div class="file-details">
-                <span class="file-icon">📄</span>
-                <div class="file-text">
-                    <span class="file-name">${fileName}</span>
-                    <span class="file-size">Firmware File Selected</span>
-                </div>
-            </div>
-        `;
+        try {
+            // Get file size using the file stats
+            const stats = await window.electronAPI.getFileStats(filePath);
+            this.expectedFileSize = stats.size;
+            
+            // Update UI elements
+            const fileInfo = document.getElementById('file-info');
+            const fileNameElement = document.getElementById('file-name');
+            const fileSizeElement = document.getElementById('file-size');
+            
+            fileNameElement.textContent = fileName;
+            fileSizeElement.textContent = `${(stats.size / 1024).toFixed(1)} KB`;
+            fileInfo.style.display = 'block';
+            
+            // Enable upload button
+            document.getElementById('upload-btn').disabled = false;
+            
+        } catch (error) {
+            console.error('Error getting file stats:', error);
+            this.expectedFileSize = null;
+            
+            // Update UI with basic info
+            const fileInfo = document.getElementById('file-info');
+            const fileNameElement = document.getElementById('file-name');
+            const fileSizeElement = document.getElementById('file-size');
+            
+            fileNameElement.textContent = fileName;
+            fileSizeElement.textContent = 'Firmware File Selected';
+            fileInfo.style.display = 'block';
+            
+            // Enable upload button
+            document.getElementById('upload-btn').disabled = false;
+        }
         
         this.appendOutput(`Selected firmware file: ${fileName}`);
         this.updateUploadButton();
@@ -1372,7 +1374,8 @@ class DWMControl {
         // Clear upload output and show upload info
         this.clearSerialMonitor();
         this.appendSerialMonitor('🚀 Starting firmware upload process...');
-        this.appendSerialMonitor(`📁 File: ${this.selectedHexFile.name || this.selectedHexFile}`);
+        const fileName = this.selectedHexFile.split(/[\\/]/).pop(); // Extract filename from path
+        this.appendSerialMonitor(`📁 File: ${fileName}`);
         this.appendSerialMonitor(`📦 Size: ${(this.expectedFileSize / 1024).toFixed(1)} KB`);
         this.appendSerialMonitor(`🔌 Device: ${this.selectedDevice.name || 'Unknown Device'}`);
         this.appendSerialMonitor('⏳ Initializing dfu-util...');

@@ -256,6 +256,20 @@ ipcMain.handle('select-hex-file', async () => {
   return { success: false };
 });
 
+// Get file statistics
+ipcMain.handle('get-file-stats', async (event, filePath) => {
+  try {
+    const stats = fs.statSync(filePath);
+    return { 
+      size: stats.size,
+      mtime: stats.mtime,
+      ctime: stats.ctime
+    };
+  } catch (error) {
+    throw new Error(`Failed to get file stats: ${error.message}`);
+  }
+});
+
 // Helper functions
 function getDfuUtilPath() {
   const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
