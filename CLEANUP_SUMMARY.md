@@ -1,4 +1,56 @@
-# Project Cleanup Summary
+# Project Cleanup Summary - Updated July 28, 2025
+
+## Latest Cleanup (July 28, 2025)
+
+### Downloaded Test Files
+- `Downloads/DWM_V2_3_2.hex` - Test firmware download
+- `Downloads/DWM_V2_3_3.hex` - Test firmware download  
+- `Downloads/` directory - Entire directory removed
+
+### Build Cache Files
+- `electron-cache/` directory - Electron build cache files
+- `electron-v37.2.4-*.zip` files - Platform-specific Electron binaries
+
+### Test and Debug Files
+- `test-app.bat` - Windows test script
+- `test-app.ps1` - PowerShell test script  
+- `check-bindings.js` - Node.js bindings test
+
+### Platform-Specific Binaries (Development Artifacts)
+- `Programs/dfu-util/dfu-util` - macOS binary added during testing
+- `Programs/dfu-util/libusb-1.0.0.dylib` - macOS library added during testing
+
+## .gitignore Updates
+
+Added the following patterns to prevent future tracking of:
+
+```gitignore
+# Downloaded firmware files (from GitHub download feature)
+Downloads/
+*.hex
+
+# Electron cache and build artifacts  
+electron-cache/
+electron-v*/
+
+# Test and debugging files
+test_firmware.hex
+test-*.js
+check-*.js
+*-test.*
+*-debug.*
+
+# Platform-specific binaries that get added during development
+Programs/dfu-util/dfu-util
+Programs/dfu-util/*.dylib
+Programs/dfu-util/*.so
+
+# Batch and PowerShell test files
+test-*.bat
+test-*.ps1
+```
+
+## Previous Cleanup (Earlier Sessions)
 
 ## Files Removed
 

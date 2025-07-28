@@ -796,6 +796,36 @@ label {
    File Upload Component
    =============================================== */
 
+.firmware-options {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: var(--space-6);
+  gap: var(--space-4);
+}
+
+.option-divider {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin: var(--space-2) 0;
+}
+
+.option-divider::before,
+.option-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-medium);
+}
+
+.option-divider span {
+  padding: 0 var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  background: var(--bg-card);
+}
+
 .file-upload-area {
   border: 2px dashed var(--border-medium);
   border-radius: var(--radius-lg);

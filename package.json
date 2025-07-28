@@ -41,6 +41,9 @@
     "nodeGypRebuild": false,
     "compression": "maximum",
     "removePackageScripts": true,
+    "electronDownload": {
+      "cache": "./electron-cache"
+    },
     "files": [
       "main.js",
       "preload.js",
@@ -88,20 +91,13 @@
       "!*.bat",
       "!BUILD_*.md"
     ],
-    "extraResources": [
-      {
-        "from": "Programs",
-        "to": "Programs",
-        "filter": [
-          "**/*"
-        ]
-      }
-    ],
     "mac": {
       "category": "public.app-category.developer-tools",
       "icon": "assets/icon.icns",
-      "hardenedRuntime": false,
+      "hardenedRuntime": true,
       "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
       "target": [
         {
           "target": "dmg",
@@ -113,6 +109,15 @@
           "target": "zip",
           "arch": [
             "x64"
+          ]
+        }
+      ],
+      "extraResources": [
+        {
+          "from": "Programs",
+          "to": "Programs",
+          "filter": [
+            "**/*"
           ]
         }
       ]
@@ -158,7 +163,18 @@
       "icon": "assets/icon.ico",
       "publisherName": "SteamingCoax",
       "verifyUpdateCodeSignature": false,
-      "requestedExecutionLevel": "asInvoker"
+      "requestedExecutionLevel": "asInvoker",
+      "extraResources": [
+        {
+          "from": "Programs",
+          "to": "Programs",
+          "filter": [
+            "**/*",
+            "!**/dfu-util",
+            "!**/*.dylib"
+          ]
+        }
+      ]
     },
     "nsis": {
       "oneClick": false,
@@ -171,7 +187,11 @@
       "include": "build/installer.nsh",
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico",
-      "installerHeaderIcon": "assets/icon.ico"
+      "installerHeaderIcon": "assets/icon.ico",
+      "artifactName": "${productName} Setup ${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName} Portable ${version}.${ext}"
     },
     "linux": {
       "target": [

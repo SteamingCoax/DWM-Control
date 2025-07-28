@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const { spawn, exec } = require('child_process');
 const fs = require('fs');
+const https = require('https');
 const { SerialPort } = require('serialport');
 
 // Disable GPU acceleration IMMEDIATELY if safe-mode flag is present
@@ -15,6 +16,15 @@ if (process.argv.includes('--safe-mode') || process.argv.includes('--disable-gpu
   app.commandLine.appendSwitch('--disable-gpu-rasterization');
   app.commandLine.appendSwitch('--disable-gpu-sandbox');
   app.commandLine.appendSwitch('--disable-software-rasterizer');
+}
+
+// Add additional GPU-related safeguards for Windows builds
+if (process.platform === 'win32') {
+  // Disable problematic GPU features that might cause missing DLL issues
+  app.commandLine.appendSwitch('--disable-gpu-sandbox');
+  app.commandLine.appendSwitch('--disable-software-rasterizer');
+  app.commandLine.appendSwitch('--ignore-gpu-blacklist');
+  app.commandLine.appendSwitch('--disable-gpu-compositing');
 }
 
 // Keep a global reference of the window object
@@ -31,7 +41,11 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       enableRemoteModule: false,
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, 'preload.js'),
+      // Additional security and compatibility settings
+      webSecurity: true,
+      allowRunningInsecureContent: false,
+      experimentalFeatures: false
     },
     icon: path.join(__dirname, 'assets', 'icon.png'),
     titleBarStyle: 'default',
@@ -56,20 +70,53 @@ function createWindow() {
     mainWindow = null;
   });
 
-  // Open DevTools in development
-  if (process.env.NODE_ENV === 'development') {
+  // Open DevTools in development and for debugging packaged app
+  if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
     mainWindow.webContents.openDevTools();
   }
+  
+  // Handle any renderer process crashes gracefully
+  mainWindow.webContents.on('crashed', (event, killed) => {
+    console.error('Renderer process crashed:', { killed });
+    // Optionally restart the window or show an error dialog
+    dialog.showMessageBox(mainWindow, {
+      type: 'error',
+      title: 'Application Error',
+      message: 'The application has crashed. Please restart the application.',
+      buttons: ['OK']
+    });
+  });
 }
 
 // This method will be called when Electron has finished initialization
 app.whenReady().then(() => {
-  createWindow();
+  try {
+    createWindow();
+  } catch (error) {
+    console.error('Failed to create window:', error);
+    // Try to create a minimal window as fallback
+    try {
+      app.disableHardwareAcceleration();
+      createWindow();
+    } catch (fallbackError) {
+      console.error('Fallback window creation also failed:', fallbackError);
+      app.quit();
+    }
+  }
   
   app.on('activate', () => {
     // On macOS, re-create a window when the dock icon is clicked
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+// Handle app-level errors
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
 // Quit when all windows are closed
@@ -270,6 +317,185 @@ ipcMain.handle('get-file-stats', async (event, filePath) => {
   }
 });
 
+// Download latest firmware from GitHub
+ipcMain.handle('download-latest-firmware', async () => {
+  try {
+    console.log('Starting GitHub firmware download...');
+    
+    // First test network connectivity
+    console.log('Testing network connectivity...');
+    
+    // Fetch latest release info from GitHub API
+    const releaseInfo = await fetchLatestRelease();
+    console.log('Release info received:', releaseInfo ? releaseInfo.tag_name : 'null');
+    
+    if (!releaseInfo) {
+      throw new Error('No releases found');
+    }
+    
+    // Find .hex file in release assets
+    const hexAsset = releaseInfo.assets.find(asset => 
+      asset.name.toLowerCase().endsWith('.hex')
+    );
+    
+    console.log('Found assets:', releaseInfo.assets.map(a => a.name));
+    console.log('Selected hex asset:', hexAsset ? hexAsset.name : 'none');
+    
+    if (!hexAsset) {
+      throw new Error('No .hex file found in latest release');
+    }
+    
+    // Create downloads directory in a more accessible location
+    const os = require('os');
+    const downloadsDir = path.join(os.homedir(), 'Downloads', 'DWM-Control-Firmware');
+    console.log('Downloads directory:', downloadsDir);
+    
+    if (!fs.existsSync(downloadsDir)) {
+      fs.mkdirSync(downloadsDir, { recursive: true });
+      console.log('Created downloads directory');
+    }
+    
+    // Download the firmware file
+    const fileName = hexAsset.name;
+    const filePath = path.join(downloadsDir, fileName);
+    
+    console.log('Downloading to:', filePath);
+    await downloadFile(hexAsset.browser_download_url, filePath);
+    console.log('Download completed successfully');
+    
+    return {
+      success: true,
+      filePath: filePath,
+      fileName: fileName,
+      version: releaseInfo.tag_name,
+      size: hexAsset.size,
+      releaseDate: releaseInfo.published_at
+    };
+    
+  } catch (error) {
+    console.error('GitHub download error:', error);
+    console.error('Error stack:', error.stack);
+    throw new Error(`Failed to download firmware: ${error.message}`);
+  }
+});
+
+// Helper function to fetch latest release from GitHub
+function fetchLatestRelease() {
+  return new Promise((resolve, reject) => {
+    console.log('Fetching latest release from GitHub API...');
+    
+    const options = {
+      hostname: 'api.github.com',
+      path: '/repos/SteamingCoax/DWM-V2_Firmware/releases/latest',
+      method: 'GET',
+      headers: {
+        'User-Agent': 'DWM-Control-App',
+        'Accept': 'application/vnd.github.v3+json'
+      }
+    };
+    
+    console.log('Request options:', options);
+    
+    const req = https.request(options, (res) => {
+      let data = '';
+      
+      console.log('Response status:', res.statusCode);
+      console.log('Response headers:', res.headers);
+      
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      
+      res.on('end', () => {
+        try {
+          if (res.statusCode === 200) {
+            const releaseInfo = JSON.parse(data);
+            console.log('Successfully parsed release info');
+            resolve(releaseInfo);
+          } else {
+            console.log('GitHub API error response:', data);
+            reject(new Error(`GitHub API returned status ${res.statusCode}`));
+          }
+        } catch (error) {
+          console.error('JSON parse error:', error);
+          reject(new Error(`Failed to parse GitHub API response: ${error.message}`));
+        }
+      });
+    });
+    
+    req.on('error', (error) => {
+      console.error('Request error:', error);
+      reject(new Error(`GitHub API request failed: ${error.message}`));
+    });
+    
+    req.setTimeout(30000, () => {
+      console.log('Request timed out');
+      req.abort();
+      reject(new Error('GitHub API request timed out'));
+    });
+    
+    req.end();
+  });
+}
+
+// Helper function to download a file
+function downloadFile(url, filePath) {
+  return new Promise((resolve, reject) => {
+    console.log('Starting download from:', url);
+    console.log('Saving to:', filePath);
+    
+    const file = fs.createWriteStream(filePath);
+    
+    const request = https.get(url, (response) => {
+      console.log('Download response status:', response.statusCode);
+      console.log('Download response headers:', response.headers);
+      
+      if (response.statusCode === 200) {
+        response.pipe(file);
+        
+        file.on('finish', () => {
+          file.close();
+          console.log('File download completed successfully');
+          resolve();
+        });
+        
+        file.on('error', (error) => {
+          console.error('File write error:', error);
+          fs.unlink(filePath, () => {}); // Clean up failed download
+          reject(error);
+        });
+      } else if (response.statusCode === 302 || response.statusCode === 301) {
+        file.close();
+        fs.unlink(filePath, () => {}); // Clean up
+        console.log('Following redirect to:', response.headers.location);
+        // Handle redirect
+        downloadFile(response.headers.location, filePath)
+          .then(resolve)
+          .catch(reject);
+      } else {
+        file.close();
+        fs.unlink(filePath, () => {}); // Clean up
+        reject(new Error(`Download failed with status ${response.statusCode}`));
+      }
+    });
+    
+    request.on('error', (error) => {
+      console.error('Download request error:', error);
+      file.close();
+      fs.unlink(filePath, () => {}); // Clean up
+      reject(error);
+    });
+    
+    request.setTimeout(60000, () => {
+      console.log('Download request timed out');
+      request.abort();
+      file.close();
+      fs.unlink(filePath, () => {}); // Clean up
+      reject(new Error('Download timed out'));
+    });
+  });
+}
+
 // Helper functions
 function getDfuUtilPath() {
   const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
@@ -286,7 +512,21 @@ function getDfuUtilPath() {
     console.log('getDfuUtilPath - Windows full path:', fullPath);
     return fullPath;
   } else if (process.platform === 'darwin') {
-    // On macOS, first try to use the system dfu-util if available
+    // On macOS, try bundled version first when packaged, then system
+    if (!isDev) {
+      const bundledPath = path.join(basePath, 'Programs', 'dfu-util', 'dfu-util');
+      console.log('getDfuUtilPath - macOS bundled path:', bundledPath);
+      if (fs.existsSync(bundledPath)) {
+        // Make sure the bundled dfu-util is executable
+        try {
+          fs.chmodSync(bundledPath, 0o755);
+          return bundledPath;
+        } catch (error) {
+          console.log('Failed to set executable permissions on bundled dfu-util:', error);
+        }
+      }
+    }
+    // Fallback to system dfu-util
     return 'dfu-util';
   } else {
     // For Linux, try the bundled version first, fallback to system

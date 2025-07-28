@@ -73,3 +73,27 @@ jspm_packages/
 
 # Yarn Integrity file
 .yarn-integrity
+
+# Downloaded firmware files (from GitHub download feature)
+Downloads/
+*.hex
+
+# Electron cache and build artifacts
+electron-cache/
+electron-v*/
+
+# Test and debugging files
+test_firmware.hex
+test-*.js
+check-*.js
+*-test.*
+*-debug.*
+
+# Platform-specific binaries that get added during development
+Programs/dfu-util/dfu-util
+Programs/dfu-util/*.dylib
+Programs/dfu-util/*.so
+
+# Batch and PowerShell test files
+test-*.bat
+test-*.ps1

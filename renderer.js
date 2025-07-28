@@ -169,10 +169,16 @@ class DWMControl {
         // File upload area setup
         const uploadArea = document.getElementById('file-upload-area');
         const selectFileBtn = document.getElementById('select-file-btn');
+        const downloadLatestBtn = document.getElementById('download-latest-btn');
         const fileInfo = document.getElementById('file-info');
         const fileName = document.getElementById('file-name');
         const fileSize = document.getElementById('file-size');
         const clearFileBtn = document.getElementById('clear-file-btn');
+
+        // Download latest firmware button
+        downloadLatestBtn.addEventListener('click', async () => {
+            await this.downloadLatestFirmware();
+        });
 
         // Select file button click - use native Electron dialog
         selectFileBtn.addEventListener('click', (e) => {
@@ -1312,6 +1318,59 @@ class DWMControl {
         }
     }
 
+    async downloadLatestFirmware() {
+        const downloadBtn = document.getElementById('download-latest-btn');
+        const originalText = downloadBtn.innerHTML;
+        
+        try {
+            console.log('Download button clicked - starting firmware download');
+            
+            // Update button to show downloading state
+            downloadBtn.disabled = true;
+            downloadBtn.innerHTML = '<span class="btn-icon">⏳</span> Downloading...';
+            
+            this.appendOutput('🌐 Checking for latest firmware release...');
+            
+            // Add immediate feedback to show the function is running
+            this.appendOutput('📡 Connecting to GitHub API...');
+            
+            const result = await window.electronAPI.downloadLatestFirmware();
+            console.log('Download result:', result);
+            
+            if (result && result.success) {
+                this.appendOutput(`✅ Downloaded firmware: ${result.fileName}`);
+                this.appendOutput(`📦 Version: ${result.version}`);
+                this.appendOutput(`📅 Release Date: ${new Date(result.releaseDate).toLocaleDateString()}`);
+                
+                // Use the downloaded file
+                this.handleFileSelection(result.filePath);
+            } else {
+                throw new Error(result?.error || 'Download failed with unknown error');
+            }
+        } catch (error) {
+            console.error('Download error:', error);
+            this.appendOutput(`❌ Failed to download firmware: ${error.message}`);
+            
+            // Enhanced error messages with specific guidance
+            if (error.message.includes('No .hex file found')) {
+                this.appendOutput('💡 The latest release may not contain a .hex file. Please check the releases page or select a local file.');
+            } else if (error.message.includes('GitHub API') || error.message.includes('network') || error.message.includes('request failed')) {
+                this.appendOutput('💡 Unable to connect to GitHub. Please check your internet connection or try again later.');
+                this.appendOutput('🔗 You can manually download from: https://github.com/SteamingCoax/DWM-V2_Firmware/releases');
+            } else if (error.message.includes('timeout')) {
+                this.appendOutput('💡 Download timed out. Please check your internet connection and try again.');
+            } else if (error.message.includes('ENOTFOUND') || error.message.includes('DNS')) {
+                this.appendOutput('💡 DNS resolution failed. Please check your internet connection and DNS settings.');
+            } else {
+                this.appendOutput('💡 Try using the "Select Local File" option if you have already downloaded the firmware.');
+            }
+        } finally {
+            // Restore button state
+            downloadBtn.disabled = false;
+            downloadBtn.innerHTML = originalText;
+        }
+    }
+
     async handleFileSelection(filePath) {
         this.selectedHexFile = filePath;
         const fileName = filePath.split(/[\\/]/).pop();
@@ -1368,8 +1427,8 @@ class DWMControl {
         uploadBtn.innerHTML = '<span class="btn-icon">⏳</span> Uploading...';
         progressContainer.style.display = 'block';
         
-        // Clear previous progress
-        this.updateProgressBar(0, 'Preparing upload...');
+        // Clear previous progress and start fresh
+        this.updateProgressBar(5, 'Initializing upload...');
         
         // Clear upload output and show upload info
         this.clearSerialMonitor();
@@ -1378,7 +1437,7 @@ class DWMControl {
         this.appendSerialMonitor(`📁 File: ${fileName}`);
         this.appendSerialMonitor(`📦 Size: ${(this.expectedFileSize / 1024).toFixed(1)} KB`);
         this.appendSerialMonitor(`🔌 Device: ${this.selectedDevice.name || 'Unknown Device'}`);
-        this.appendSerialMonitor('⏳ Initializing dfu-util...');
+        this.appendSerialMonitor('⏳ Connecting to device...');
         this.appendSerialMonitor('--- dfu-util Output ---');
         
         // Also log to main output console
@@ -1397,26 +1456,26 @@ class DWMControl {
                 this.appendSerialMonitor('✅ Firmware uploaded successfully!');
                 this.appendSerialMonitor('🎉 Device is ready to use');
                 this.appendOutput('✅ Firmware uploaded successfully!');
-                this.showProgressComplete();
+                this.updateProgressBar(100, 'Upload completed successfully!');
             } else {
                 this.appendSerialMonitor(`❌ Upload failed: ${result.error}`);
                 this.appendOutput(`❌ Upload failed: ${result.error}`);
-                this.updateProgressBar(0, 'Upload Failed');
+                this.updateProgressBar(0, 'Upload failed - check device connection');
             }
         } catch (error) {
             this.appendSerialMonitor(`❌ Upload error: ${error.message}`);
             this.appendOutput(`❌ Upload error: ${error.message}`);
-            this.updateProgressBar(0, 'Upload Error');
+            this.updateProgressBar(0, 'Upload error occurred');
         }
         
         this.isUploading = false;
         uploadBtn.disabled = false;
         uploadBtn.innerHTML = '<span class="btn-icon">⬆️</span> Upload Firmware';
         
-        // Hide progress container after a delay
+        // Hide progress container after showing final status
         setTimeout(() => {
             progressContainer.style.display = 'none';
-        }, 3000);
+        }, 4000);
         
         this.updateUploadButton();
     }
@@ -1435,62 +1494,47 @@ class DWMControl {
     }
 
     parseProgressFromDfuOutput(line) {
-        // Parse different types of dfu-util output for progress information
+        // Use a simpler, more reliable stage-based progress system
         try {
-            // Look for download progress (common in dfu-util output)
-            const downloadMatch = line.match(/Download\s+\[\s*(\d+)%\s*\]/i);
-            if (downloadMatch) {
-                const percentage = parseInt(downloadMatch[1]);
-                this.updateProgressBar(percentage, `Downloading... ${percentage}%`);
-                return;
-            }
-
-            // Look for upload progress
-            const uploadMatch = line.match(/Upload\s+\[\s*(\d+)%\s*\]/i);
-            if (uploadMatch) {
-                const percentage = parseInt(uploadMatch[1]);
-                this.updateProgressBar(percentage, `Uploading... ${percentage}%`);
-                return;
-            }
-
-            // Look for verification progress
-            const verifyMatch = line.match(/Verify\s+\[\s*(\d+)%\s*\]/i);
-            if (verifyMatch) {
-                const percentage = parseInt(verifyMatch[1]);
-                this.updateProgressBar(percentage, `Verifying... ${percentage}%`);
-                return;
-            }
-
-            // Look for bytes transferred (calculate percentage if possible)
-            const bytesMatch = line.match(/(\d+)\s+bytes/i);
-            if (bytesMatch && this.expectedFileSize) {
-                const bytes = parseInt(bytesMatch[1]);
-                const percentage = Math.min(100, Math.round((bytes / this.expectedFileSize) * 100));
-                this.updateProgressBar(percentage, `Transferring... ${percentage}%`);
-                return;
-            }
-
-            // Update progress text based on key phrases
+            // Stage 1: Device Detection and Setup (0-30%)
             if (line.match(/Opening DFU capable USB device/i)) {
                 this.updateProgressBar(10, 'Opening device...');
-            } else if (line.match(/Device ID/i)) {
-                this.updateProgressBar(20, 'Device identified');
+            } else if (line.match(/Device ID|Found DFU/i)) {
+                this.updateProgressBar(15, 'Device detected');
             } else if (line.match(/Claiming USB DFU Interface/i)) {
-                this.updateProgressBar(30, 'Claiming interface...');
+                this.updateProgressBar(20, 'Claiming interface...');
             } else if (line.match(/Setting Alternate Setting/i)) {
-                this.updateProgressBar(40, 'Setting up device...');
+                this.updateProgressBar(25, 'Configuring device...');
             } else if (line.match(/Determining device status/i)) {
-                this.updateProgressBar(50, 'Checking device status...');
+                this.updateProgressBar(30, 'Checking device status...');
+            
+            // Stage 2: Firmware Transfer Preparation (30-50%)
             } else if (line.match(/DFU mode device DFU version/i)) {
-                this.updateProgressBar(60, 'Updating Firmware... Do not interrupt this process!');
-            } else if (line.match(/Downloading to address/i)) {
-                this.updateProgressBar(70, 'Starting download...');
-            } else if (line.match(/Download done/i)) {
-                this.updateProgressBar(90, 'Download complete');
-            } else if (line.match(/File downloaded successfully/i)) {
-                this.updateProgressBar(95, 'Upload successful');
+                this.updateProgressBar(35, 'Device ready for firmware update');
+            } else if (line.match(/Downloading to address|Download from image/i)) {
+                this.updateProgressBar(45, 'Starting firmware transfer...');
+            
+            // Stage 3: Active Transfer (50-85%)
+            } else if (line.match(/Download\s+\[|Upload\s+\[|Downloading|Uploading/i)) {
+                this.updateProgressBar(65, 'Transferring firmware... Please wait');
+            } else if (line.match(/\d+\s+bytes/i)) {
+                this.updateProgressBar(75, 'Transfer in progress...');
+            
+            // Stage 4: Completion and Verification (85-100%)
+            } else if (line.match(/Download done|Upload done/i)) {
+                this.updateProgressBar(85, 'Transfer complete');
+            } else if (line.match(/File downloaded successfully|File uploaded successfully/i)) {
+                this.updateProgressBar(90, 'Firmware uploaded successfully');
             } else if (line.match(/Transitioning to dfuMANIFEST state/i)) {
-                this.updateProgressBar(98, 'Finalizing...');
+                this.updateProgressBar(95, 'Finalizing update...');
+            } else if (line.match(/Resetting USB|Reset USB/i)) {
+                this.updateProgressBar(98, 'Resetting device...');
+            } else if (line.match(/done!/i)) {
+                this.updateProgressBar(100, 'Upload complete!');
+            
+            // Error detection
+            } else if (line.match(/error|failed|Error|Failed/i)) {
+                this.updateProgressBar(0, 'Upload error detected');
             }
         } catch (error) {
             console.warn('Error parsing dfu-util output:', error);
@@ -1500,18 +1544,6 @@ class DWMControl {
     updateUploadButton() {
         const uploadBtn = document.getElementById('upload-btn');
         uploadBtn.disabled = !this.selectedHexFile || !this.selectedDevice || this.isUploading;
-    }
-
-    showProgressComplete() {
-        const progressFill = document.querySelector('.progress-fill');
-        const progressText = document.querySelector('.progress-text');
-        
-        progressFill.style.width = '100%';
-        progressText.textContent = 'Upload Complete!';
-        
-        setTimeout(() => {
-            document.getElementById('upload-progress').style.display = 'none';
-        }, 2000);
     }
 
     // Serial Port Management
