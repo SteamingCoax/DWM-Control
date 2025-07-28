@@ -27,5 +27,4 @@
 ; Finish page customization
 !define MUI_FINISHPAGE_TITLE "Completing the DWM Control Setup Wizard"
 !define MUI_FINISHPAGE_TEXT "DWM Control has been successfully installed on your computer.$\r$\n$\r$\nClick Finish to close this wizard."
-!define MUI_FINISHPAGE_RUN "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
 !define MUI_FINISHPAGE_RUN_TEXT "Run DWM Control"
