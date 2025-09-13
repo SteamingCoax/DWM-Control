@@ -1,6 +1,6 @@
 # DWM Control - Electron Version
 
-A professional, cross-platform application for DWM V2 firmware updating and device control, built with Electron.
+A cross-platform application for DWM V2 firmware updating and device control, built with Electron.
 
 ## Features
 
