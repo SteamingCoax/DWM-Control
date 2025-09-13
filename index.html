@@ -20,6 +20,14 @@
                     </div>
                 </div>
                         <div class="header-status">
+            <!-- Update Status -->
+            <div id="update-panel" class="update-panel" style="display: none;">
+                <button id="update-button" class="update-btn">
+                    <span class="update-icon">🔄</span>
+                    <span class="update-text">Update Available</span>
+                </button>
+            </div>
+            
             <!-- Serial Connection Status/Panel -->
             <div class="connection-panel">
                 <button id="connection-toggle" class="connection-status-btn">
@@ -79,6 +87,10 @@
             <button class="tab-button" data-tab="control">
                 <span class="tab-icon">🎛️</span>
                 <span class="tab-label">Control</span>
+            </button>
+            <button class="tab-button" data-tab="deembed">
+                <span class="tab-icon">📊</span>
+                <span class="tab-label">De-Embed</span>
             </button>
         </nav>
 
@@ -227,6 +239,133 @@
             <section id="control-panel" class="tab-panel">
                 <div class="panel-container">
                     <!-- Device controls will be dynamically generated here -->
+                </div>
+            </section>
+
+            <!-- De-Embed Tab -->
+            <section id="deembed-panel" class="tab-panel">
+                <div class="panel-container">
+                    <!-- De-Embed Configuration Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3><span class="card-icon">📊</span>De-Embedding Configuration</h3>
+                        </div>
+                        <div class="card-content">
+                            <!-- Primary Configuration -->
+                            <div class="deembed-primary-config">
+                                <h4>Element Configuration</h4>
+                                <div class="primary-config-grid">
+                                    <div class="config-group">
+                                        <label for="power-rating-input">Element Power Rating (Full Scale):</label>
+                                        <div class="power-rating-input-group">
+                                            <input type="number" 
+                                                   id="power-rating-input" 
+                                                   class="power-rating-input" 
+                                                   placeholder="Enter power rating" 
+                                                   step="any"
+                                                   min="0.001">
+                                            <span id="power-rating-unit" class="power-unit-display">W</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="config-group">
+                                        <label for="power-units-select">Power Units:</label>
+                                        <select id="power-units-select" class="form-select">
+                                            <option value="mW">mW (milliwatts)</option>
+                                            <option value="W" selected>W (watts)</option>
+                                            <option value="kW">kW (kilowatts)</option>
+                                            <option value="MW">MW (megawatts)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Measurement Configuration -->
+                            <div class="deembed-measurement-config">
+                                <h4>Measurement Configuration</h4>
+                                <div class="measurement-config-grid">
+                                    <div class="config-group">
+                                        <label for="data-points-select">Number of Data Points:</label>
+                                        <select id="data-points-select" class="form-select">
+                                            <option value="5">5 Points</option>
+                                            <option value="10">10 Points</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="config-group">
+                                        <label for="voltage-input-mode">Voltage Input Method:</label>
+                                        <select id="voltage-input-mode" class="form-select">
+                                            <option value="sample">Sample from Meter</option>
+                                            <option value="manual" selected>Manual Entry</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Data Entry Fields -->
+                            <div class="deembed-data-section">
+                                <h4>Power Level and Voltage Measurements</h4>
+                                <div id="data-entry-container" class="data-entry-container">
+                                    <!-- Data entry rows will be dynamically generated -->
+                                </div>
+                            </div>
+
+                            <!-- Compute Button -->
+                            <div class="compute-section">
+                                <button id="compute-btn" class="btn btn-primary btn-large">
+                                    <span class="btn-icon">🧮</span>
+                                    Compute Polynomial Fit
+                                </button>
+                            </div>
+
+                            <!-- Results Display -->
+                            <div id="results-section" class="results-section" style="display: none;">
+                                <h4>De-Embedding Result</h4>
+                                <div class="coefficients-display">
+                                    <div class="coefficient-item">
+                                        <label>COEF 1:</label>
+                                        <span id="coef1-value" class="coefficient-value">-</span>
+                                    </div>
+                                    <div class="coefficient-item">
+                                        <label>COEF 2:</label>
+                                        <span id="coef2-value" class="coefficient-value">-</span>
+                                    </div>
+                                    <div class="coefficient-item">
+                                        <label>COEF 3:</label>
+                                        <span id="coef3-value" class="coefficient-value">-</span>
+                                    </div>
+                                </div>
+                                <div class="fit-quality">
+                                    <label>Quality of Measurement:</label>
+                                    <span id="r-squared-value" class="coefficient-value">-</span>
+                                </div>
+                                
+                                <!-- Upload Section -->
+                                <div id="upload-section" class="upload-section">
+                                    <h5>Upload to Element</h5>
+                                    <div class="upload-controls">
+                                        <div class="form-group">
+                                            <label for="element-slot-select">Element Slot:</label>
+                                            <select id="element-slot-select" class="form-select">
+                                                <option value="1">Slot 1</option>
+                                                <option value="2">Slot 2</option>
+                                                <option value="3">Slot 3</option>
+                                                <option value="4">Slot 4</option>
+                                                <option value="5">Slot 5</option>
+                                                <option value="6">Slot 6</option>
+                                                <option value="7">Slot 7</option>
+                                                <option value="8">Slot 8</option>
+                                            </select>
+                                        </div>
+                                        <button id="upload-coefficients-btn" class="btn btn-success">
+                                            <span class="btn-icon">📤</span>
+                                            Upload Coefficients
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
         </main>

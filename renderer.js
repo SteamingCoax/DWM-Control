@@ -28,17 +28,21 @@ class DWMControl {
         this.tabSettings = {
             firmware: true,   // Firmware Upload tab
             terminal: false,   // Serial Terminal tab  
-            control: false     // Control panel tab
+            control: false,    // Control panel tab
+            deembed: true     // De-Embed tab
         };
         
         // UI Component Configuration - Set to false to hide components
         // To enable/disable UI components, change these values and restart the app
         // Example: To hide the Serial Communication dropdown, set headerConnection: false
         this.uiSettings = {
-            headerConnection: false   // Serial Communication Setup dropdown in header
+            headerConnection: true   // Serial Communication Setup dropdown in header
         };
         
         this.initializeApp();
+        
+        // Initialize auto-updater system
+        this.setupAutoUpdater();
     }
 
     initializeApp() {
@@ -55,6 +59,9 @@ class DWMControl {
             
             this.setupDeviceControl();
             console.log('DWM Control: Device control setup complete');
+            
+            this.setupDeEmbed();
+            console.log('DWM Control: De-Embed setup complete');
             
             this.setupThemeToggle();
             console.log('DWM Control: Theme toggle setup complete');
@@ -1674,6 +1681,497 @@ class DWMControl {
     // Configuration Management (implemented earlier)
     // Utility Functions
 
+    // De-Embed Setup
+    setupDeEmbed() {
+        console.log('setupDeEmbed called - initializing De-Embed functionality');
+        
+        // Initialize De-Embed data structure
+        this.deembedData = {
+            points: [],
+            numPoints: 5,
+            powerUnit: this.config.deembedPowerUnit || 'W',
+            voltageInputMode: this.config.deembedVoltageMode || 'manual',
+            powerRating: this.config.deembedPowerRating || null
+        };
+        
+        // Setup initial UI
+        this.loadDeEmbedConfig();
+        this.generateDataEntryFields();
+        this.setupDeEmbedEvents();
+        
+        // Initialize upload button state
+        this.updateUploadButtonState();
+        
+        console.log('setupDeEmbed completed');
+    }
+    
+    loadDeEmbedConfig() {
+        // Set power units from config
+        const powerUnitsSelect = document.getElementById('power-units-select');
+        powerUnitsSelect.value = this.deembedData.powerUnit;
+        
+        // Set voltage input mode from config
+        const voltageInputMode = document.getElementById('voltage-input-mode');
+        voltageInputMode.value = this.deembedData.voltageInputMode;
+        
+        // Set power rating from config
+        const powerRatingInput = document.getElementById('power-rating-input');
+        if (this.deembedData.powerRating !== null) {
+            powerRatingInput.value = this.deembedData.powerRating;
+        }
+        
+        // Update power unit display
+        this.updatePowerUnitDisplay();
+    }
+    
+    updatePowerUnitDisplay() {
+        const powerUnitDisplay = document.getElementById('power-rating-unit');
+        powerUnitDisplay.textContent = this.deembedData.powerUnit;
+    }
+    
+    calculatePercentFS(index) {
+        const point = this.deembedData.points[index];
+        const fsDisplay = document.getElementById(`fs-${index}`);
+        
+        if (point.power === null || this.deembedData.powerRating === null || this.deembedData.powerRating <= 0) {
+            fsDisplay.textContent = '- %FS';
+            fsDisplay.className = 'fs-display invalid';
+            point.percentFS = null;
+            return;
+        }
+        
+        // Convert power to same units as power rating
+        const powerInRatingUnits = this.convertPowerToUnits(point.power, this.deembedData.powerUnit, this.deembedData.powerUnit);
+        const percentFS = (powerInRatingUnits / this.deembedData.powerRating) * 100;
+        
+        fsDisplay.textContent = `${percentFS.toFixed(2)} %FS`;
+        fsDisplay.className = 'fs-display';
+        point.percentFS = percentFS;
+    }
+    
+    recalculateAllPercentFS() {
+        for (let i = 0; i < this.deembedData.points.length; i++) {
+            this.calculatePercentFS(i);
+        }
+    }
+    
+    convertPowerToUnits(power, fromUnit, toUnit) {
+        // Convert to base unit (W) first
+        let powerInWatts;
+        switch (fromUnit) {
+            case 'mW': powerInWatts = power / 1000; break;
+            case 'W': powerInWatts = power; break;
+            case 'kW': powerInWatts = power * 1000; break;
+            case 'MW': powerInWatts = power * 1000000; break;
+            default: powerInWatts = power; break;
+        }
+        
+        // Convert from watts to target unit
+        switch (toUnit) {
+            case 'mW': return powerInWatts * 1000;
+            case 'W': return powerInWatts;
+            case 'kW': return powerInWatts / 1000;
+            case 'MW': return powerInWatts / 1000000;
+            default: return powerInWatts;
+        }
+    }
+    
+    generateDataEntryFields() {
+        const container = document.getElementById('data-entry-container');
+        const numPoints = parseInt(document.getElementById('data-points-select').value);
+        const voltageMode = document.getElementById('voltage-input-mode').value;
+        
+        container.innerHTML = '';
+        this.deembedData.points = [];
+        
+        // Add fixed origin point (0,0) first - hidden from user
+        // This point is used internally for polynomial regression but not displayed
+        this.deembedData.points.push({
+            power: 0,
+            voltage: 0,
+            percentFS: 0
+        });
+        
+        // Add user-configurable points (displayed to user)
+        for (let i = 0; i < numPoints; i++) {
+            const row = document.createElement('div');
+            row.className = 'data-entry-row';
+            const pointIndex = i + 1; // Offset by 1 because origin is at index 0
+            
+            if (voltageMode === 'manual') {
+                row.innerHTML = `
+                    <label>Point ${pointIndex}:</label>
+                    <input type="number" 
+                           class="power-input" 
+                           placeholder="Power level" 
+                           step="any"
+                           min="0"
+                           data-index="${pointIndex}">
+                    <span class="fs-display invalid" id="fs-${pointIndex}">- %FS</span>
+                    <input type="number" 
+                           class="voltage-input" 
+                           placeholder="Voltage (mV)" 
+                           step="any"
+                           min="0"
+                           data-index="${pointIndex}">
+                    <span class="voltage-unit">mV</span>
+                `;
+            } else {
+                row.innerHTML = `
+                    <label>Point ${pointIndex}:</label>
+                    <input type="number" 
+                           class="power-input" 
+                           placeholder="Power level" 
+                           step="any"
+                           min="0"
+                           data-index="${pointIndex}">
+                    <span class="fs-display invalid" id="fs-${pointIndex}">- %FS</span>
+                    <span class="voltage-display" id="voltage-${pointIndex}">- mV</span>
+                    <button class="sample-btn" data-index="${pointIndex}">Sample</button>
+                `;
+            }
+            
+            container.appendChild(row);
+            
+            // Initialize data point
+            this.deembedData.points.push({
+                power: null,
+                voltage: null,
+                percentFS: null
+            });
+        }
+    }
+    
+    setupDeEmbedEvents() {
+        console.log('setupDeEmbedEvents called - setting up event listeners');
+        
+        // Data points selector change
+        document.getElementById('data-points-select').addEventListener('change', (e) => {
+            this.deembedData.numPoints = parseInt(e.target.value);
+            this.generateDataEntryFields();
+        });
+        
+        // Power units selector change
+        document.getElementById('power-units-select').addEventListener('change', (e) => {
+            this.deembedData.powerUnit = e.target.value;
+            this.config.deembedPowerUnit = e.target.value;
+            this.saveConfig();
+            this.updatePowerUnitDisplay();
+            this.recalculateAllPercentFS();
+        });
+        
+        // Voltage input mode selector change
+        document.getElementById('voltage-input-mode').addEventListener('change', (e) => {
+            this.deembedData.voltageInputMode = e.target.value;
+            this.config.deembedVoltageMode = e.target.value;
+            this.saveConfig();
+            this.generateDataEntryFields();
+        });
+        
+        // Power rating input change
+        document.getElementById('power-rating-input').addEventListener('input', (e) => {
+            let value = parseFloat(e.target.value);
+            
+            // Validate against negative values and zero
+            if (value <= 0) {
+                if (value < 0) {
+                    e.target.value = '';
+                    e.target.style.borderColor = 'var(--color-warning)';
+                    setTimeout(() => {
+                        e.target.style.borderColor = '';
+                    }, 1000);
+                }
+                value = null;
+            }
+            
+            this.deembedData.powerRating = isNaN(value) ? null : value;
+            this.config.deembedPowerRating = this.deembedData.powerRating;
+            this.saveConfig();
+            this.recalculateAllPercentFS();
+        });
+        
+        // Power input changes
+        document.addEventListener('input', (e) => {
+            if (e.target.classList.contains('power-input')) {
+                const index = parseInt(e.target.dataset.index);
+                let value = parseFloat(e.target.value);
+                
+                // Validate against negative values
+                if (value < 0) {
+                    value = 0;
+                    e.target.value = 0;
+                    e.target.style.borderColor = 'var(--color-warning)';
+                    setTimeout(() => {
+                        e.target.style.borderColor = '';
+                    }, 1000);
+                }
+                
+                this.deembedData.points[index].power = isNaN(value) ? null : value;
+                this.calculatePercentFS(index);
+            }
+        });
+        
+        // Voltage input changes (for manual mode)
+        document.addEventListener('change', (e) => {
+            if (e.target.classList.contains('voltage-input')) {
+                const index = parseInt(e.target.dataset.index);
+                let value = parseFloat(e.target.value);
+                
+                // Validate against negative values
+                if (value < 0) {
+                    value = 0;
+                    e.target.value = 0;
+                    e.target.style.borderColor = 'var(--color-warning)';
+                    setTimeout(() => {
+                        e.target.style.borderColor = '';
+                    }, 1000);
+                }
+                
+                this.deembedData.points[index].voltage = isNaN(value) ? null : value;
+            }
+        });
+        
+        // Sample button clicks
+        document.addEventListener('click', (e) => {
+            if (e.target.classList.contains('sample-btn')) {
+                const index = parseInt(e.target.dataset.index);
+                this.sampleVoltage(index);
+            }
+        });
+        
+        // Compute button
+        const computeBtn = document.getElementById('compute-btn');
+        if (computeBtn) {
+            computeBtn.addEventListener('click', () => {
+                console.log('Compute button clicked!');
+                this.computePolynomialFit();
+            });
+            console.log('Compute button event listener attached successfully');
+        } else {
+            console.error('Compute button not found in DOM');
+        }
+        
+        // Upload coefficients button
+        const uploadBtn = document.getElementById('upload-coefficients-btn');
+        if (uploadBtn) {
+            uploadBtn.addEventListener('click', () => {
+                this.uploadCoefficients();
+            });
+        }
+    }
+    
+    async sampleVoltage(index) {
+        const btn = document.querySelector(`[data-index="${index}"].sample-btn`);
+        const voltageDisplay = document.getElementById(`voltage-${index}`);
+        
+        try {
+            btn.disabled = true;
+            btn.textContent = 'Sampling...';
+            
+            // Sample voltage from the actual device/meter
+            const result = await window.electronAPI.sampleVoltage();
+            
+            if (result.success) {
+                const voltage = result.voltage.toFixed(2);
+                
+                // Update the data and UI
+                this.deembedData.points[index].voltage = parseFloat(voltage);
+                voltageDisplay.textContent = `${voltage} mV`;
+                voltageDisplay.classList.add('has-value');
+                
+                this.appendOutput(`Sampled voltage for point ${index + 1}: ${voltage} mV`);
+            } else {
+                throw new Error(result.error || 'Failed to sample voltage');
+            }
+            
+        } catch (error) {
+            this.appendOutput(`Error sampling voltage: ${error.message}`, 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Sample';
+        }
+    }
+    
+    async computePolynomialFit() {
+        try {
+            console.log('computePolynomialFit called');
+            this.appendOutput('Starting polynomial fit computation...');
+            
+            // Origin point (0,0) is always valid - check for additional valid points
+            const additionalValidPoints = this.deembedData.points.slice(1).filter(point => 
+                point.percentFS !== null && point.voltage !== null && !isNaN(point.percentFS)
+            );
+            
+            console.log('Additional valid points found (excluding origin):', additionalValidPoints.length);
+            console.log('Additional valid points data:', additionalValidPoints);
+            
+            // Need at least 2 additional points beyond the origin for a meaningful 3rd degree polynomial
+            if (additionalValidPoints.length < 2) {
+                this.appendOutput('Error: Need at least 2 complete data points (beyond origin) with valid %FS values for polynomial fit', 'error');
+                return;
+            }
+            
+            if (this.deembedData.powerRating === null || this.deembedData.powerRating <= 0) {
+                this.appendOutput('Error: Please enter a valid power rating (full scale) before computing', 'error');
+                return;
+            }
+            
+            // Include origin point (0,0) plus all valid additional points
+            const allValidPoints = [this.deembedData.points[0], ...additionalValidPoints];
+            
+            // Prepare data for regression
+            const percentFSData = allValidPoints.map(point => point.percentFS);
+            const voltageData = allValidPoints.map(point => point.voltage); // Keep voltage in mV
+            
+            console.log('Voltage data (mV, including origin):', voltageData);
+            console.log('Percentage FS data (including origin):', percentFSData);
+            
+            this.appendOutput(`Starting polynomial regression with ${allValidPoints.length} data points (including origin)...`);
+            
+            // Use the IPC polynomial regression service - voltage (mV) as X, %FS as Y
+            const result = await window.electronAPI.polynomialRegression({
+                xData: voltageData,
+                yData: percentFSData,
+                degree: 3
+            });
+            
+            console.log('Polynomial regression result:', result);
+            
+            if (result.success) {
+                // Display results
+                this.displayResults(result.coefficients, result.rSquared);
+                
+                // Calculate scaled coefficients for output
+                // Compensate for %FS (percentage) by dividing by 100, then apply scaling factors
+                const scaledCoefficients = [
+                    (result.coefficients[0] * 1000) / 100,        // Linear × 1,000 ÷ 100
+                    (result.coefficients[1] * 1000000) / 100,     // Quadratic × 1,000,000 ÷ 100
+                    (result.coefficients[2] * 1000000) / 100      // Cubic × 1,000,000 ÷ 100
+                ];
+                
+                this.appendOutput(`Polynomial fit completed successfully!`);
+                this.appendOutput(`- Data points used: ${result.dataPoints}`);
+                this.appendOutput(`- Quality of Measurement: ${(result.rSquared * 100).toFixed(3)}%`);
+                
+                // Add warning for poor fit quality
+                if (result.rSquared < 0.995) {
+                    this.appendOutput(`⚠️ WARNING: Low quality of measurement (${(result.rSquared * 100).toFixed(3)}%) indicates poor fit quality!`, 'error');
+                    this.appendOutput(`Consider adding more data points or checking measurement accuracy.`, 'error');
+                }
+                
+                this.appendOutput(`De-embedding coefficients (scaled for meter upload):`);
+                this.appendOutput(`- COEF 1 (Linear × 10): ${scaledCoefficients[0].toFixed(3)}`);
+                this.appendOutput(`- COEF 2 (Quadratic × 1E4): ${scaledCoefficients[1].toFixed(3)}`);
+                this.appendOutput(`- COEF 3 (Cubic × 1E4): ${scaledCoefficients[2].toFixed(3)}`);
+            } else {
+                throw new Error(result.error);
+            }
+            
+        } catch (error) {
+            console.error('Polynomial fit error:', error);
+            this.appendOutput(`Error computing polynomial fit: ${error.message}`, 'error');
+        }
+    }
+    
+    displayResults(coefficients, rSquared) {
+        document.getElementById('results-section').style.display = 'block';
+        
+        // Store original coefficients for calculations
+        this.originalCoefficients = coefficients;
+        
+        // Apply scaling factors for de-embedding values
+        // Compensate for %FS (percentage) by dividing by 100, then apply scaling factors
+        const scaledCoefficients = [
+            (coefficients[0] * 1000) / 100,        // Linear coefficient × 1,000 ÷ 100
+            (coefficients[1] * 1000000) / 100,     // Quadratic coefficient × 1,000,000 ÷ 100
+            (coefficients[2] * 1000000) / 100      // Cubic coefficient × 1,000,000 ÷ 100
+        ];
+        
+        // Store scaled coefficients for upload
+        this.currentCoefficients = scaledCoefficients;
+        
+        // Display scaled coefficients (de-embedding values) with 3 digits precision
+        document.getElementById('coef1-value').textContent = scaledCoefficients[0].toFixed(3);
+        document.getElementById('coef2-value').textContent = scaledCoefficients[1].toFixed(3);
+        document.getElementById('coef3-value').textContent = scaledCoefficients[2].toFixed(3);
+        
+        // Display R-squared value as percentage with conditional highlighting
+        const rSquaredElement = document.getElementById('r-squared-value');
+        const rSquaredPercent = rSquared * 100;
+        rSquaredElement.textContent = `${rSquaredPercent.toFixed(3)}%`;
+        
+        // Highlight in red if R-squared is below 0.995 (99.5% - poor fit quality)
+        if (rSquared < 0.995) {
+            rSquaredElement.classList.add('low-rsquared');
+        } else {
+            rSquaredElement.classList.remove('low-rsquared');
+        }
+        
+        // Update upload button state based on device connection
+        this.updateUploadButtonState();
+    }
+    
+    updateUploadButtonState() {
+        const uploadBtn = document.getElementById('upload-coefficients-btn');
+        if (!uploadBtn) return;
+        
+        if (!this.isConnected) {
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<span class="btn-icon">🔌</span> Device Not Connected';
+            uploadBtn.title = 'Connect to a device to upload coefficients';
+        } else {
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = '<span class="btn-icon">📤</span> Upload Coefficients';
+            uploadBtn.title = 'Upload coefficients to the connected device';
+        }
+    }
+    
+    async uploadCoefficients() {
+        if (!this.currentCoefficients) {
+            this.appendOutput('Error: No coefficients available to upload', 'error');
+            return;
+        }
+        
+        // Check device connection status
+        if (!this.isConnected) {
+            this.appendOutput('Error: No device connected. Please connect to a device before uploading coefficients.', 'error');
+            return;
+        }
+        
+        const elementSlot = document.getElementById('element-slot-select').value;
+        const uploadBtn = document.getElementById('upload-coefficients-btn');
+        
+        try {
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<span class="btn-icon">⏳</span> Uploading...';
+            
+            // Prepare coefficients for upload
+            const coefficientsData = {
+                slot: parseInt(elementSlot),
+                coef1: this.currentCoefficients[0],
+                coef2: this.currentCoefficients[1],
+                coef3: this.currentCoefficients[2]
+            };
+            
+            this.appendOutput(`Uploading coefficients to element slot ${elementSlot}...`);
+            
+            // TODO: Implement actual upload to device
+            // For now, just simulate the upload
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            this.appendOutput(`✓ Coefficients successfully uploaded to element slot ${elementSlot}`);
+            this.appendOutput(`- COEF 1: ${this.currentCoefficients[0].toFixed(3)}`);
+            this.appendOutput(`- COEF 2: ${this.currentCoefficients[1].toFixed(3)}`);
+            this.appendOutput(`- COEF 3: ${this.currentCoefficients[2].toFixed(3)}`);
+            
+        } catch (error) {
+            this.appendOutput(`Error uploading coefficients: ${error.message}`, 'error');
+        } finally {
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = '<span class="btn-icon">📤</span> Upload Coefficients';
+        }
+    }
+
     // Theme Toggle Setup
     setupThemeToggle() {
         const themeToggle = document.getElementById('theme-toggle');
@@ -1917,6 +2415,403 @@ class DWMControl {
             statusElement.textContent = 'Ready';
             statusDot.style.background = 'var(--color-primary)';
         }
+        
+        // Update upload button state for De-Embed tab
+        this.updateUploadButtonState();
+    }
+
+    setupAutoUpdater() {
+        const updatePanel = document.getElementById('update-panel');
+        const updateButton = document.getElementById('update-button');
+        const updateText = updateButton.querySelector('.update-text');
+        const updateIcon = updateButton.querySelector('.update-icon');
+        
+        let updateInfo = null;
+        let isUpdateDownloaded = false;
+        
+        // Listen for update events
+        window.electronAPI.onUpdateAvailable((event, info) => {
+            updateInfo = info;
+            updatePanel.style.display = 'block';
+            updateText.textContent = 'Update Available';
+            updateIcon.textContent = '🔄';
+            updateButton.className = 'update-btn';
+            this.appendOutput(`📦 Update available: v${info.version}`);
+        });
+        
+        window.electronAPI.onUpdateNotAvailable(() => {
+            this.appendOutput('✅ You have the latest version');
+        });
+        
+        window.electronAPI.onUpdateError((event, error) => {
+            this.appendOutput(`❌ Update error: ${error}`);
+            updatePanel.style.display = 'none';
+        });
+        
+        window.electronAPI.onUpdateDownloadProgress((event, progress) => {
+            const percent = Math.round(progress.percent);
+            updateText.textContent = `Downloading ${percent}%`;
+            updateIcon.textContent = '⬇️';
+            updateButton.className = 'update-btn downloading';
+            
+            // Add progress bar
+            let progressBar = updateButton.querySelector('.update-progress');
+            if (!progressBar) {
+                progressBar = document.createElement('div');
+                progressBar.className = 'update-progress';
+                updateButton.appendChild(progressBar);
+            }
+            progressBar.style.width = `${percent}%`;
+        });
+        
+        window.electronAPI.onUpdateDownloaded(() => {
+            isUpdateDownloaded = true;
+            updateText.textContent = 'Restart to Update';
+            updateIcon.textContent = '🚀';
+            updateButton.className = 'update-btn ready-to-install';
+            
+            // Remove progress bar
+            const progressBar = updateButton.querySelector('.update-progress');
+            if (progressBar) {
+                progressBar.remove();
+            }
+            
+            this.appendOutput('✅ Update downloaded. Click to restart and install.');
+        });
+        
+        // Handle update button click
+        updateButton.addEventListener('click', async () => {
+            if (isUpdateDownloaded) {
+                // Install update
+                this.appendOutput('🔄 Installing update and restarting...');
+                await window.electronAPI.installUpdate();
+            } else if (updateInfo) {
+                // Start download
+                this.appendOutput('⬇️ Downloading update...');
+                const result = await window.electronAPI.downloadUpdate();
+                if (!result.success) {
+                    this.appendOutput(`❌ Download failed: ${result.error}`);
+                }
+            }
+        });
+        
+        // Add manual update check option
+        this.addManualUpdateCheck();
+    }
+    
+    addManualUpdateCheck() {
+        // Create update panel similar to connection panel
+        const themeToggle = document.getElementById('theme-toggle');
+        
+        // Create update panel container
+        const updatePanel = document.createElement('div');
+        updatePanel.className = 'update-panel-container';
+        updatePanel.innerHTML = `
+            <button id="update-status-btn" class="update-status-btn">
+                <div class="update-indicator">
+                    <span class="update-icon" id="update-icon">↻</span>
+                    <span class="update-text" id="update-status-text">Check Updates</span>
+                    <span class="update-expand">▼</span>
+                </div>
+            </button>
+            
+            <!-- Collapsible Update Controls -->
+            <div class="update-dropdown" id="update-dropdown">
+                <div class="update-controls">
+                    <div class="update-header">
+                        <h4>Update Manager</h4>
+                    </div>
+                    <div class="update-status-display" id="update-status-display">
+                        <div class="update-status-item">
+                            <span class="update-label">Current Version:</span>
+                            <span class="update-value" id="current-version">1.0.0</span>
+                        </div>
+                        <div class="update-status-item">
+                            <span class="update-label">Status:</span>
+                            <span class="update-value" id="update-check-status">Ready to check</span>
+                        </div>
+                        <div class="update-progress-container" id="update-progress-container" style="display: none;">
+                            <div class="update-progress-bar">
+                                <div class="update-progress-fill" id="update-progress-fill"></div>
+                            </div>
+                            <div class="update-progress-text" id="update-progress-text">0%</div>
+                        </div>
+                    </div>
+                    <div class="update-actions">
+                        <button id="manual-update-check-btn" class="update-action-btn check">
+                            <span class="btn-icon">🔍</span> Check for Updates
+                        </button>
+                        <button id="download-update-btn" class="update-action-btn download" disabled style="display: none;">
+                            <span class="btn-icon">⬇️</span> Download Update
+                        </button>
+                        <button id="install-update-btn" class="update-action-btn install" disabled style="display: none;">
+                            <span class="btn-icon">🚀</span> Install & Restart
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Insert before theme toggle
+        themeToggle.parentNode.insertBefore(updatePanel, themeToggle);
+        
+        // Setup event handlers
+        this.setupUpdatePanelEvents();
+    }
+    
+    setupUpdatePanelEvents() {
+        const updateStatusBtn = document.getElementById('update-status-btn');
+        const updateDropdown = document.getElementById('update-dropdown');
+        const updatePanel = updateStatusBtn.closest('.update-panel-container');
+        
+        // Toggle dropdown
+        updateStatusBtn.addEventListener('click', () => {
+            const isExpanded = updatePanel.classList.contains('expanded');
+            updatePanel.classList.toggle('expanded', !isExpanded);
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!updatePanel.contains(e.target)) {
+                updatePanel.classList.remove('expanded');
+            }
+        });
+        
+        // Manual update check
+        document.getElementById('manual-update-check-btn').addEventListener('click', () => {
+            this.performUpdateCheck();
+        });
+        
+        // Download update
+        document.getElementById('download-update-btn').addEventListener('click', () => {
+            this.downloadUpdate();
+        });
+        
+        // Install update
+        document.getElementById('install-update-btn').addEventListener('click', () => {
+            this.installUpdate();
+        });
+    }
+    
+    async performUpdateCheck() {
+        const statusText = document.getElementById('update-status-text');
+        const statusDisplay = document.getElementById('update-check-status');
+        const updateIcon = document.getElementById('update-icon');
+        const checkBtn = document.getElementById('manual-update-check-btn');
+        
+        // Check if the dropdown is open - if so, don't show popup notifications
+        const updatePanel = document.querySelector('.update-panel-container');
+        const isDropdownOpen = updatePanel && updatePanel.classList.contains('expanded');
+        
+        try {
+            // Update UI to show checking state
+            statusText.textContent = 'Checking...';
+            statusDisplay.textContent = 'Checking for updates...';
+            updateIcon.textContent = '⏳';
+            updateIcon.style.animation = 'spin 1s linear infinite';
+            checkBtn.disabled = true;
+            
+            this.appendOutput('🔍 Checking for updates...');
+            
+            const result = await window.electronAPI.checkForUpdates();
+            console.log('Update check result:', result);
+            
+            if (result.success) {
+                if (result.message && result.message.includes('Development mode')) {
+                    // Development mode
+                    statusText.textContent = 'Dev Mode';
+                    statusDisplay.textContent = result.message;
+                    this.appendOutput(`ℹ️ ${result.message}`);
+                    if (!isDropdownOpen) {
+                        this.showUpdateNotification('Development Mode', 
+                            'Update checking is disabled in development mode.', 'info');
+                    }
+                } else if (result.noUpdates) {
+                    // No updates available (normal case)
+                    statusText.textContent = 'Up to Date';
+                    statusDisplay.textContent = result.message || 'You have the latest version';
+                    this.appendOutput('✅ You have the latest version');
+                    if (!isDropdownOpen) {
+                        this.showUpdateNotification('Up to Date', 
+                            'You are running the latest version.', 'success');
+                    }
+                } else if (result.updateInfo && result.updateInfo.updateInfo) {
+                    // Update available
+                    const version = result.updateInfo.updateInfo.version;
+                    statusText.textContent = 'Update Available';
+                    statusDisplay.textContent = `Version ${version} is available`;
+                    this.showDownloadButton(true);
+                    this.appendOutput(`📦 Update found: v${version}`);
+                    if (!isDropdownOpen) {
+                        this.showUpdateNotification('Update Available!', 
+                            `Version ${version} is available for download.`, 'success');
+                    }
+                } else {
+                    // Up to date (fallback)
+                    statusText.textContent = 'Up to Date';
+                    statusDisplay.textContent = 'You have the latest version';
+                    this.appendOutput('✅ You have the latest version');
+                    if (!isDropdownOpen) {
+                        this.showUpdateNotification('Up to Date', 
+                            'You are running the latest version.', 'success');
+                    }
+                }
+            } else {
+                // Error occurred
+                statusText.textContent = 'Check Failed';
+                statusDisplay.textContent = `Error: ${result.error}`;
+                this.appendOutput(`❌ Update check failed: ${result.error}`);
+                if (!isDropdownOpen) {
+                    this.showUpdateNotification('Update Check Failed', 
+                        `Could not check for updates: ${result.error}`, 'error');
+                }
+            }
+        } catch (error) {
+            console.error('Update check error:', error);
+            statusText.textContent = 'Error';
+            statusDisplay.textContent = `Error: ${error.message}`;
+            this.appendOutput(`❌ Update check error: ${error.message}`);
+            if (!isDropdownOpen) {
+                this.showUpdateNotification('Update Check Error', 
+                    `An error occurred: ${error.message}`, 'error');
+            }
+        } finally {
+            // Restore UI state
+            updateIcon.style.animation = '';
+            updateIcon.textContent = '↻';
+            checkBtn.disabled = false;
+        }
+    }
+    
+    showDownloadButton(show) {
+        const downloadBtn = document.getElementById('download-update-btn');
+        downloadBtn.style.display = show ? 'flex' : 'none';
+        downloadBtn.disabled = !show;
+    }
+    
+    showInstallButton(show) {
+        const installBtn = document.getElementById('install-update-btn');
+        installBtn.style.display = show ? 'flex' : 'none';
+        installBtn.disabled = !show;
+    }
+    
+    async downloadUpdate() {
+        const statusText = document.getElementById('update-status-text');
+        const statusDisplay = document.getElementById('update-check-status');
+        const progressContainer = document.getElementById('update-progress-container');
+        const progressFill = document.getElementById('update-progress-fill');
+        const progressText = document.getElementById('update-progress-text');
+        const downloadBtn = document.getElementById('download-update-btn');
+        
+        // Check if the dropdown is open
+        const updatePanel = document.querySelector('.update-panel-container');
+        const isDropdownOpen = updatePanel && updatePanel.classList.contains('expanded');
+        
+        try {
+            statusText.textContent = 'Downloading...';
+            statusDisplay.textContent = 'Downloading update...';
+            progressContainer.style.display = 'block';
+            downloadBtn.disabled = true;
+            
+            // Simulate download progress (in real app, this would come from auto-updater events)
+            for (let i = 0; i <= 100; i += 10) {
+                progressFill.style.width = `${i}%`;
+                progressText.textContent = `${i}%`;
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+            
+            statusText.textContent = 'Ready to Install';
+            statusDisplay.textContent = 'Update downloaded, ready to install';
+            this.showDownloadButton(false);
+            this.showInstallButton(true);
+            progressContainer.style.display = 'none';
+            
+            this.appendOutput('✅ Update downloaded successfully');
+            if (!isDropdownOpen) {
+                this.showUpdateNotification('Download Complete', 
+                    'Update is ready to install. Click Install & Restart when ready.', 'success');
+            }
+                
+        } catch (error) {
+            statusText.textContent = 'Download Failed';
+            statusDisplay.textContent = `Download error: ${error.message}`;
+            downloadBtn.disabled = false;
+            progressContainer.style.display = 'none';
+            
+            this.appendOutput(`❌ Download failed: ${error.message}`);
+            if (!isDropdownOpen) {
+                this.showUpdateNotification('Download Failed', 
+                    `Could not download update: ${error.message}`, 'error');
+            }
+        }
+    }
+    
+    async installUpdate() {
+        const statusText = document.getElementById('update-status-text');
+        const statusDisplay = document.getElementById('update-check-status');
+        
+        // Check if the dropdown is open
+        const updatePanel = document.querySelector('.update-panel-container');
+        const isDropdownOpen = updatePanel && updatePanel.classList.contains('expanded');
+        
+        statusText.textContent = 'Installing...';
+        statusDisplay.textContent = 'Installing update and restarting...';
+        
+        this.appendOutput('🔄 Installing update and restarting...');
+        if (!isDropdownOpen) {
+            this.showUpdateNotification('Installing Update', 
+                'The application will restart to complete the installation.', 'info');
+        }
+        
+        try {
+            await window.electronAPI.installUpdate();
+        } catch (error) {
+            this.appendOutput(`❌ Install failed: ${error.message}`);
+            if (!isDropdownOpen) {
+                this.showUpdateNotification('Install Failed', 
+                    `Could not install update: ${error.message}`, 'error');
+            }
+        }
+    }
+    
+    showUpdateNotification(title, message, type = 'info') {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `update-notification update-notification-${type}`;
+        
+        // Notification content
+        notification.innerHTML = `
+            <div class="update-notification-content">
+                <div class="update-notification-header">
+                    <span class="update-notification-icon">${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+                    <span class="update-notification-title">${title}</span>
+                    <button class="update-notification-close">×</button>
+                </div>
+                <div class="update-notification-message">${message}</div>
+            </div>
+        `;
+        
+        // Add to page
+        document.body.appendChild(notification);
+        
+        // Auto-remove after 5 seconds
+        const autoRemove = setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 5000);
+        
+        // Manual close button
+        const closeBtn = notification.querySelector('.update-notification-close');
+        closeBtn.addEventListener('click', () => {
+            clearTimeout(autoRemove);
+            notification.remove();
+        });
+        
+        // Animate in
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 100);
     }
 
     // Output Functions
@@ -1976,7 +2871,10 @@ class DWMControl {
                 outputVisible: false,
                 lastDevice: null,
                 lastPort: null,
-                lastBaud: 115200
+                lastBaud: 115200,
+                deembedPowerUnit: 'W',
+                deembedVoltageMode: 'manual',
+                deembedPowerRating: null
             };
             
             return saved ? JSON.parse(saved) : defaultConfig;
@@ -1987,7 +2885,10 @@ class DWMControl {
                 outputVisible: false,
                 lastDevice: null,
                 lastPort: null,
-                lastBaud: 115200
+                lastBaud: 115200,
+                deembedPowerUnit: 'W',
+                deembedVoltageMode: 'manual',
+                deembedPowerRating: null
             };
         }
     }

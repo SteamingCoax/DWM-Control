@@ -1,9 +1,11 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const { spawn, exec } = require('child_process');
 const fs = require('fs');
 const https = require('https');
 const { SerialPort } = require('serialport');
+const ss = require('simple-statistics');
 
 // Disable GPU acceleration IMMEDIATELY if safe-mode flag is present
 // This must be done before app.whenReady()
@@ -29,6 +31,74 @@ if (process.platform === 'win32') {
 
 // Keep a global reference of the window object
 let mainWindow;
+
+// Configure auto-updater (only check in production)
+if (app.isPackaged && process.env.NODE_ENV !== 'development') {
+  autoUpdater.checkForUpdatesAndNotify();
+}
+
+// Auto-updater event handlers
+autoUpdater.on('checking-for-update', () => {
+  console.log('Checking for update...');
+});
+
+autoUpdater.on('update-available', (info) => {
+  console.log('Update available.');
+  // Send to renderer process
+  if (mainWindow) {
+    mainWindow.webContents.send('update-available', info);
+  }
+});
+
+autoUpdater.on('update-not-available', (info) => {
+  console.log('Update not available.');
+  if (mainWindow) {
+    mainWindow.webContents.send('update-not-available');
+  }
+});
+
+autoUpdater.on('error', (err) => {
+  console.log('Error in auto-updater. ' + err);
+  if (mainWindow) {
+    // Handle the case where no update metadata is available (normal when up-to-date)
+    if (err.message.includes('latest-mac.yml') || err.message.includes('latest.yml')) {
+      // Don't send an error for this case - it means no updates are available
+      mainWindow.webContents.send('update-not-available');
+      return;
+    }
+    
+    // Handle actual errors
+    let userMessage = 'Update check failed';
+    
+    if (err.message.includes('404') || err.message.includes('HttpError')) {
+      userMessage = 'Update server not available';
+    } else if (err.message.includes('network') || err.message.includes('ENOTFOUND')) {
+      userMessage = 'Network error - check internet connection';
+    } else if (err.message.includes('rate limit')) {
+      userMessage = 'Too many requests - try again later';
+    }
+    
+    mainWindow.webContents.send('update-error', userMessage);
+  }
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+  let log_message = "Download speed: " + progressObj.bytesPerSecond;
+  log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
+  log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
+  console.log(log_message);
+  
+  if (mainWindow) {
+    mainWindow.webContents.send('update-download-progress', progressObj);
+  }
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  console.log('Update downloaded');
+  if (mainWindow) {
+    mainWindow.webContents.send('update-downloaded');
+  }
+});
 
 function createWindow() {
   // Create the browser window with modern styling
@@ -63,6 +133,13 @@ function createWindow() {
     if (process.platform === 'darwin') {
       mainWindow.moveTop();
     }
+    
+    // Check for updates after a short delay (skip in development)
+    setTimeout(() => {
+      if (process.env.NODE_ENV !== 'development' && app.isPackaged) {
+        autoUpdater.checkForUpdatesAndNotify();
+      }
+    }, 3000);
   });
 
   // Handle window closed
@@ -379,6 +456,196 @@ ipcMain.handle('download-latest-firmware', async () => {
   }
 });
 
+// De-embed voltage sampling
+ipcMain.handle('sample-voltage', async () => {
+  try {
+    // In a real implementation, this would communicate with the actual power meter
+    // For now, we'll simulate a realistic voltage reading
+    
+    // Simulate some delay for actual hardware communication
+    await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 200));
+    
+    // Generate a realistic voltage reading (0.1 to 2000 mV range)
+    // In practice, this would be replaced with actual meter communication
+    const voltage = Math.random() * 1900 + 100; // 100-2000 mV range
+    
+    return {
+      success: true,
+      voltage: voltage,
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    console.error('Voltage sampling error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
+
+// De-embed polynomial regression
+
+// De-embed polynomial regression
+ipcMain.handle('polynomial-regression', async (event, { xData, yData, degree = 3 }) => {
+  try {
+    console.log('Polynomial regression called with data:', { xData, yData, degree });
+    
+    // Validate input data
+    if (!Array.isArray(xData) || !Array.isArray(yData)) {
+      throw new Error('Input data must be arrays');
+    }
+    
+    if (xData.length !== yData.length) {
+      throw new Error('X and Y data arrays must have the same length');
+    }
+    
+    if (xData.length < degree + 1) {
+      throw new Error(`Need at least ${degree + 1} data points for degree ${degree} polynomial`);
+    }
+
+    // For polynomial regression, use the existing helper functions
+    const coefficients = calculateZeroOffsetPolynomial(xData, yData, degree);
+    
+    // Calculate R-squared
+    const meanY = yData.reduce((sum, y) => sum + y, 0) / yData.length;
+    const predictedY = xData.map(x => {
+      let result = 0;
+      for (let j = 0; j < coefficients.length; j++) {
+        result += coefficients[j] * Math.pow(x, j + 1);
+      }
+      return result;
+    });
+    
+    const ssRes = yData.reduce((sum, y, i) => sum + Math.pow(y - predictedY[i], 2), 0);
+    const ssTot = yData.reduce((sum, y) => sum + Math.pow(y - meanY, 2), 0);
+    const rSquared = 1 - (ssRes / ssTot);
+    
+    // Create equation string
+    let equation = 'y = ';
+    for (let i = coefficients.length - 1; i >= 0; i--) {
+      const coeff = coefficients[i];
+      const power = i + 1;
+      
+      if (i === coefficients.length - 1) {
+        equation += `${coeff.toFixed(6)}`;
+      } else {
+        equation += coeff >= 0 ? ` + ${coeff.toFixed(6)}` : ` - ${Math.abs(coeff).toFixed(6)}`;
+      }
+      
+      if (power > 1) {
+        equation += `x^${power}`;
+      } else {
+        equation += 'x';
+      }
+    }
+    
+    console.log('Polynomial regression result:', { coefficients, rSquared, equation });
+    
+    return {
+      success: true,
+      coefficients: coefficients,
+      rSquared: rSquared,
+      equation: equation,
+      dataPoints: xData.length
+    };
+    
+  } catch (error) {
+    console.error('Polynomial regression error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+});
+
+
+// Helper function for zero-offset polynomial calculation
+function calculateZeroOffsetPolynomial(x, y, degree) {
+  const n = x.length;
+  
+  // Create design matrix (without constant term for zero offset)
+  const A = [];
+  for (let i = 0; i < n; i++) {
+    const row = [];
+    for (let j = 1; j <= degree; j++) {
+      row.push(Math.pow(x[i], j));
+    }
+    A.push(row);
+  }
+  
+  // Calculate A^T * A
+  const AT = transpose(A);
+  const ATA = multiply(AT, A);
+  const ATy = multiplyVector(AT, y);
+  
+  // Solve using Gaussian elimination
+  return gaussianElimination(ATA, ATy);
+}
+
+function transpose(matrix) {
+  return matrix[0].map((_, colIndex) => matrix.map(row => row[colIndex]));
+}
+
+function multiply(a, b) {
+  const result = [];
+  for (let i = 0; i < a.length; i++) {
+    result[i] = [];
+    for (let j = 0; j < b[0].length; j++) {
+      result[i][j] = 0;
+      for (let k = 0; k < a[0].length; k++) {
+        result[i][j] += a[i][k] * b[k][j];
+      }
+    }
+  }
+  return result;
+}
+
+function multiplyVector(matrix, vector) {
+  return matrix.map(row => 
+    row.reduce((sum, val, i) => sum + val * vector[i], 0)
+  );
+}
+
+function gaussianElimination(A, b) {
+  const n = A.length;
+  const augmented = A.map((row, i) => [...row, b[i]]);
+  
+  // Forward elimination
+  for (let i = 0; i < n; i++) {
+    // Find pivot
+    let maxRow = i;
+    for (let k = i + 1; k < n; k++) {
+      if (Math.abs(augmented[k][i]) > Math.abs(augmented[maxRow][i])) {
+        maxRow = k;
+      }
+    }
+    
+    // Swap rows
+    [augmented[i], augmented[maxRow]] = [augmented[maxRow], augmented[i]];
+    
+    // Make all rows below this one 0 in current column
+    for (let k = i + 1; k < n; k++) {
+      const c = augmented[k][i] / augmented[i][i];
+      for (let j = i; j <= n; j++) {
+        augmented[k][j] -= c * augmented[i][j];
+      }
+    }
+  }
+  
+  // Back substitution
+  const solution = new Array(n);
+  for (let i = n - 1; i >= 0; i--) {
+    solution[i] = augmented[i][n];
+    for (let j = i + 1; j < n; j++) {
+      solution[i] -= augmented[i][j] * solution[j];
+    }
+    solution[i] /= augmented[i][i];
+  }
+  
+  return solution;
+}
+
 // Helper function to fetch latest release from GitHub
 function fetchLatestRelease() {
   return new Promise((resolve, reject) => {
@@ -682,3 +949,73 @@ function convertHexToBin(hexFilePath) {
     }
   });
 }
+
+// IPC handlers for manual update checking
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    // Simple and reliable development mode detection
+    // Only consider it development if explicitly set or if running from source
+    const isExplicitDev = process.env.NODE_ENV === 'development';
+    const isRunningFromSource = !app.isPackaged;
+    
+    console.log('Update check debug info:', {
+      NODE_ENV: process.env.NODE_ENV,
+      isPackaged: app.isPackaged,
+      isExplicitDev: isExplicitDev,
+      isRunningFromSource: isRunningFromSource,
+      execPath: process.execPath
+    });
+    
+    // Only skip update checks if explicitly in development AND running from source
+    if (isExplicitDev && isRunningFromSource) {
+      console.log('Development mode: Simulating update check');
+      return { 
+        success: true, 
+        updateInfo: null,
+        message: 'Development mode: Update checking is disabled'
+      };
+    }
+    
+    console.log('Production mode: Checking for real updates');
+    const result = await autoUpdater.checkForUpdates();
+    return { success: true, updateInfo: result };
+  } catch (error) {
+    console.error('Update check error:', error);
+    
+    // Handle the case where no update metadata is available (normal when up-to-date)
+    if (error.message.includes('latest-mac.yml') || error.message.includes('latest.yml')) {
+      return { 
+        success: true, 
+        updateInfo: null, 
+        noUpdates: true,
+        message: 'You have the latest version'
+      };
+    }
+    
+    // Handle actual errors
+    let userMessage = 'Failed to check for updates';
+    
+    if (error.message.includes('404') || error.message.includes('HttpError')) {
+      userMessage = 'Update server not available - please try again later';
+    } else if (error.message.includes('network') || error.message.includes('ENOTFOUND')) {
+      userMessage = 'Network error - please check your internet connection';
+    } else if (error.message.includes('rate limit')) {
+      userMessage = 'Too many requests - please wait a moment before trying again';
+    }
+    
+    return { success: false, error: userMessage };
+  }
+});
+
+ipcMain.handle('download-update', async () => {
+  try {
+    await autoUpdater.downloadUpdate();
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('install-update', async () => {
+  autoUpdater.quitAndInstall();
+});
