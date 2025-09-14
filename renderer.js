@@ -1264,6 +1264,11 @@ class DWMControl {
         try {
             const result = await window.electronAPI.getDfuDevices();
             
+            console.log('DFU Debug - Renderer received result:', result);
+            console.log('DFU Debug - Result success:', result.success);
+            console.log('DFU Debug - Result devices:', result.devices);
+            console.log('DFU Debug - Devices length:', result.devices ? result.devices.length : 'undefined');
+            
             combo.innerHTML = '';
             
             if (result.success && result.devices.length > 0) {

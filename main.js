@@ -257,8 +257,15 @@ ipcMain.handle('get-dfu-devices', async () => {
     });
     
     child.on('close', (code) => {
+      console.log('DFU Debug - dfu-util exit code:', code);
+      console.log('DFU Debug - stdout length:', stdout.length);
+      console.log('DFU Debug - stderr length:', stderr.length);
+      console.log('DFU Debug - stdout content:', stdout);
+      console.log('DFU Debug - stderr content:', stderr);
+      
       if (code === 0 || stdout.length > 0) {
         const devices = parseDfuDevices(stdout);
+        console.log('DFU Debug - parsed devices:', devices.length);
         
         if (devices.length === 0 && process.platform === 'win32') {
           // Provide Windows-specific guidance when no devices found
@@ -765,9 +772,15 @@ function downloadFile(url, filePath) {
 
 // Helper functions
 function getDfuUtilPath() {
-  const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+  // Use the same reliable development detection as the auto-updater
+  const isExplicitDev = process.env.NODE_ENV === 'development';
+  const isRunningFromSource = !app.isPackaged;
+  const isDev = isExplicitDev && isRunningFromSource;
+  
   const basePath = isDev ? __dirname : process.resourcesPath;
   
+  console.log('getDfuUtilPath - isExplicitDev:', isExplicitDev);
+  console.log('getDfuUtilPath - isRunningFromSource:', isRunningFromSource);
   console.log('getDfuUtilPath - isDev:', isDev);
   console.log('getDfuUtilPath - basePath:', basePath);
   console.log('getDfuUtilPath - __dirname:', __dirname);
@@ -787,13 +800,19 @@ function getDfuUtilPath() {
         // Make sure the bundled dfu-util is executable
         try {
           fs.chmodSync(bundledPath, 0o755);
+          console.log('getDfuUtilPath - Using bundled dfu-util for installed app');
           return bundledPath;
         } catch (error) {
           console.log('Failed to set executable permissions on bundled dfu-util:', error);
         }
+      } else {
+        console.log('getDfuUtilPath - Bundled dfu-util not found, falling back to system');
       }
+    } else {
+      console.log('getDfuUtilPath - Development mode, using system dfu-util');
     }
     // Fallback to system dfu-util
+    console.log('getDfuUtilPath - Using system dfu-util');
     return 'dfu-util';
   } else {
     // For Linux, try the bundled version first, fallback to system
