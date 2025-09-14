@@ -1,0 +1,8 @@
+version: 1.1.0
+files:
+  - url: DWM.Control-1.1.0-Mac.dmg
+    sha512: 52e06453c6ee133cedb9002ce828281163d5c71705d7b1f424cce8787c2235e24a87c5b7fbcee938f43eaa7a209362de39575bc5c616efaffef695f2cad37c00
+    size: 115485989
+path: DWM.Control-1.1.0-Mac.dmg
+sha512: 52e06453c6ee133cedb9002ce828281163d5c71705d7b1f424cce8787c2235e24a87c5b7fbcee938f43eaa7a209362de39575bc5c616efaffef695f2cad37c00
+releaseDate: '2025-09-14T00:34:02.000Z'

@@ -2501,7 +2501,7 @@ class DWMControl {
         });
         
         // Add manual update check option
-        this.addManualUpdateCheck();
+        // this.addManualUpdateCheck(); // Temporarily hidden - updates not working properly
     }
     
     addManualUpdateCheck() {
@@ -2529,7 +2529,7 @@ class DWMControl {
                     <div class="update-status-display" id="update-status-display">
                         <div class="update-status-item">
                             <span class="update-label">Current Version:</span>
-                            <span class="update-value" id="current-version">1.0.0</span>
+                            <span class="update-value" id="current-version">Loading...</span>
                         </div>
                         <div class="update-status-item">
                             <span class="update-label">Status:</span>
@@ -2596,6 +2596,25 @@ class DWMControl {
         document.getElementById('install-update-btn').addEventListener('click', () => {
             this.installUpdate();
         });
+        
+        // Load current app version
+        this.loadCurrentVersion();
+    }
+    
+    async loadCurrentVersion() {
+        try {
+            const version = await window.electronAPI.getAppVersion();
+            const versionElement = document.getElementById('current-version');
+            if (versionElement) {
+                versionElement.textContent = version;
+            }
+        } catch (error) {
+            console.error('Failed to load app version:', error);
+            const versionElement = document.getElementById('current-version');
+            if (versionElement) {
+                versionElement.textContent = 'Unknown';
+            }
+        }
     }
     
     async performUpdateCheck() {
