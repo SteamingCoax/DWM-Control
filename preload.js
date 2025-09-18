@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectHexFile: () => ipcRenderer.invoke('select-hex-file'),
   getFileStats: (filePath) => ipcRenderer.invoke('get-file-stats', filePath),
   downloadLatestFirmware: () => ipcRenderer.invoke('download-latest-firmware'),
+  launchZadig: () => ipcRenderer.invoke('launch-zadig'),
   
   // Serial port functionality
   getSerialPorts: () => ipcRenderer.invoke('get-serial-ports'),

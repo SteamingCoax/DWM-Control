@@ -260,15 +260,15 @@ ipcMain.handle('get-dfu-devices', async () => {
       console.log('DFU Debug - dfu-util exit code:', code);
       console.log('DFU Debug - stdout length:', stdout.length);
       console.log('DFU Debug - stderr length:', stderr.length);
-      console.log('DFU Debug - stdout content:', stdout);
-      console.log('DFU Debug - stderr content:', stderr);
       
       if (code === 0 || stdout.length > 0) {
         const devices = parseDfuDevices(stdout);
         console.log('DFU Debug - parsed devices:', devices.length);
+        console.log('DFU Debug - device details:', JSON.stringify(devices, null, 2));
         
         if (devices.length === 0 && process.platform === 'win32') {
           // Provide Windows-specific guidance when no devices found
+          console.log('DFU Debug - Returning Windows help (no devices)');
           resolve({ 
             success: false, 
             error: 'No DFU devices found', 
@@ -276,6 +276,8 @@ ipcMain.handle('get-dfu-devices', async () => {
             windowsHelp: true
           });
         } else {
+          console.log('DFU Debug - Returning success with', devices.length, 'devices');
+          console.log('DFU Debug - Devices being returned:', JSON.stringify(devices, null, 2));
           resolve({ success: true, devices, output: stdout });
         }
       } else {
@@ -777,7 +779,13 @@ function getDfuUtilPath() {
   const isRunningFromSource = !app.isPackaged;
   const isDev = isExplicitDev && isRunningFromSource;
   
-  const basePath = isDev ? __dirname : process.resourcesPath;
+  let basePath;
+  if (isDev) {
+    basePath = __dirname;
+  } else {
+    // For packaged apps, try multiple possible paths
+    basePath = process.resourcesPath || path.dirname(process.execPath);
+  }
   
   console.log('getDfuUtilPath - isExplicitDev:', isExplicitDev);
   console.log('getDfuUtilPath - isRunningFromSource:', isRunningFromSource);
@@ -785,12 +793,31 @@ function getDfuUtilPath() {
   console.log('getDfuUtilPath - basePath:', basePath);
   console.log('getDfuUtilPath - __dirname:', __dirname);
   console.log('getDfuUtilPath - process.resourcesPath:', process.resourcesPath);
+  console.log('getDfuUtilPath - process.execPath:', process.execPath);
   console.log('getDfuUtilPath - app.isPackaged:', app.isPackaged);
   
   if (process.platform === 'win32') {
-    const fullPath = path.join(basePath, 'Programs', 'dfu-util', 'dfu-util.exe');
-    console.log('getDfuUtilPath - Windows full path:', fullPath);
-    return fullPath;
+    // Try multiple possible paths for Windows
+    const possiblePaths = [
+      path.join(basePath, 'Programs', 'dfu-util', 'dfu-util.exe'),
+      path.join(basePath, 'app', 'Programs', 'dfu-util', 'dfu-util.exe'),
+      path.join(basePath, 'resources', 'Programs', 'dfu-util', 'dfu-util.exe'),
+      path.join(basePath, 'resources', 'app', 'Programs', 'dfu-util', 'dfu-util.exe'),
+      path.join(path.dirname(basePath), 'Programs', 'dfu-util', 'dfu-util.exe')
+    ];
+    
+    for (const testPath of possiblePaths) {
+      console.log('getDfuUtilPath - Testing Windows path:', testPath);
+      if (fs.existsSync(testPath)) {
+        console.log('getDfuUtilPath - Found dfu-util at:', testPath);
+        return testPath;
+      }
+    }
+    
+    // Default to first path for error reporting
+    const defaultPath = possiblePaths[0];
+    console.log('getDfuUtilPath - No dfu-util found, using default:', defaultPath);
+    return defaultPath;
   } else if (process.platform === 'darwin') {
     // On macOS, try bundled version first when packaged, then system
     if (!isDev) {
@@ -826,12 +853,14 @@ function getDfuUtilPath() {
 
 function parseDfuDevices(output) {
   const devices = [];
-  const lines = output.split('\n');
+  // Handle both Windows (\r\n) and Unix (\n) line endings
+  const lines = output.split(/\r?\n/);
   
   for (const line of lines) {
     if (line.includes('Found DFU')) {
       // More flexible regex to match different dfu-util output formats
       const match = line.match(/Found DFU: \[([0-9a-f]{4}):([0-9a-f]{4})\]/i);
+      
       if (match) {
         const vid = match[1];
         const pid = match[2];
@@ -877,18 +906,26 @@ function parseDfuDevices(output) {
   
   // Group by device (same VID:PID:Serial) and keep only the main flash interface (usually alt=0)
   const deviceMap = {};
+  console.log('DFU Debug - Grouping', devices.length, 'devices');
+  
   for (const device of devices) {
     const key = `${device.vid}:${device.pid}:${device.serial}`;
+    console.log('DFU Debug - Processing device:', key, 'alt=' + device.alt, 'name=' + device.name);
     
     // Prefer the main flash interface (alt=0) or "Internal Flash" interface
     if (!deviceMap[key] || 
         device.alt === 0 || 
         device.name.toLowerCase().includes('internal flash')) {
+      console.log('DFU Debug - Keeping device:', key);
       deviceMap[key] = device;
+    } else {
+      console.log('DFU Debug - Skipping device:', key, '(already have better match)');
     }
   }
   
-  return Object.values(deviceMap);
+  const finalDevices = Object.values(deviceMap);
+  console.log('DFU Debug - Final device count:', finalDevices.length);
+  return finalDevices;
 }
 
 function convertHexToBin(hexFilePath) {
@@ -1023,6 +1060,35 @@ ipcMain.handle('check-for-updates', async () => {
     }
     
     return { success: false, error: userMessage };
+  }
+});
+
+// Windows-specific: Launch Zadig driver installer
+ipcMain.handle('launch-zadig', async () => {
+  if (process.platform !== 'win32') {
+    return { success: false, error: 'Zadig is only available on Windows' };
+  }
+  
+  try {
+    const basePath = getBasePath();
+    const zadigPath = path.join(basePath, 'Programs', 'zadig-2.9.exe');
+    
+    if (!fs.existsSync(zadigPath)) {
+      return { success: false, error: 'Zadig not found in Programs directory' };
+    }
+    
+    const { spawn } = require('child_process');
+    spawn(zadigPath, [], { detached: true, stdio: 'ignore' });
+    
+    return { 
+      success: true, 
+      message: 'Zadig launched. Use it to install WinUSB drivers for your DFU device.' 
+    };
+  } catch (error) {
+    return { 
+      success: false, 
+      error: `Failed to launch Zadig: ${error.message}` 
+    };
   }
 });
 

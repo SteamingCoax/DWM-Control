@@ -1,6 +1,6 @@
 {
   "name": "dwm-control",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "DWM V2 Updater & Interfacing Application",
   "license": "MIT",
   "author": "SteamingCoax",
@@ -8,9 +8,9 @@
   "main": "main.js",
   "scripts": {
     "start": "electron-forge start",
-    "dev": "electron .",
-    "dev:safe": "electron . --safe-mode --disable-gpu --no-sandbox",
-    "dev:no-gpu": "electron . --disable-gpu",
+    "dev": "npx electron .",
+    "dev:safe": "npx electron . --safe-mode --disable-gpu --no-sandbox",
+    "dev:no-gpu": "npx electron . --disable-gpu",
     "rebuild": "electron-rebuild",
     "postinstall": "echo 'Using prebuilt binaries'",
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -56,6 +56,7 @@
       "index.html",
       "styles.css",
       "assets/",
+      "Programs/",
       "node_modules/serialport/**/*",
       "node_modules/@serialport/**/*",
       "!node_modules/@serialport/**/build/**",
@@ -175,7 +176,6 @@
           "to": "Programs",
           "filter": [
             "**/*",
-            "!**/dfu-util",
             "!**/*.dylib"
           ]
         }
@@ -257,7 +257,7 @@
     "@electron-forge/plugin-auto-unpack-natives": "^7.8.1",
     "@electron-forge/plugin-fuses": "^7.8.1",
     "@electron/fuses": "^1.8.0",
-    "electron": "^37.2.4",
+    "electron": "^37.5.1",
     "electron-builder": "^25.1.8",
     "electron-rebuild": "^3.2.9"
   },

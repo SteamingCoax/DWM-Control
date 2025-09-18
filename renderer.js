@@ -238,6 +238,11 @@ class DWMControl {
             await this.refreshDfuDevices();
         });
 
+        // Launch Zadig button (Windows only)
+        document.getElementById('launch-zadig-btn').addEventListener('click', async () => {
+            await this.launchZadig();
+        });
+
         // Upload button
         document.getElementById('upload-btn').addEventListener('click', async () => {
             await this.uploadFirmware();
@@ -1257,9 +1262,15 @@ class DWMControl {
     async refreshDfuDevices() {
         const combo = document.getElementById('device-combo');
         const refreshBtn = document.getElementById('refresh-devices-btn');
+        const zadigBtn = document.getElementById('launch-zadig-btn');
         
         combo.innerHTML = '<option>Scanning for devices...</option>';
         refreshBtn.disabled = true;
+        
+        // Hide Zadig button initially
+        if (zadigBtn) {
+            zadigBtn.style.display = 'none';
+        }
         
         try {
             const result = await window.electronAPI.getDfuDevices();
@@ -1268,10 +1279,12 @@ class DWMControl {
             console.log('DFU Debug - Result success:', result.success);
             console.log('DFU Debug - Result devices:', result.devices);
             console.log('DFU Debug - Devices length:', result.devices ? result.devices.length : 'undefined');
+            console.log('DFU Debug - Result error:', result.error);
+            console.log('DFU Debug - Result windowsHelp:', result.windowsHelp);
             
             combo.innerHTML = '';
             
-            if (result.success && result.devices.length > 0) {
+            if (result.success && result.devices && result.devices.length > 0) {
                 result.devices.forEach((device, index) => {
                     const option = document.createElement('option');
                     option.value = index;
@@ -1300,11 +1313,27 @@ class DWMControl {
                     this.appendOutput('⚠️ dfu-util not found! Please ensure Programs/dfu-util/dfu-util.exe exists.');
                 } else if (result.windowsHelp) {
                     this.appendOutput('No DFU devices found. Windows troubleshooting:');
-                    this.appendOutput('1. Put device in DFU mode (hold BOOT button while connecting USB)');
-                    this.appendOutput('2. Install DFU drivers with Zadig (Programs/zadig-2.9.exe)');
-                    this.appendOutput('3. Try different USB cable/port');
-                    this.appendOutput('4. Check device manager for unrecognized devices');
+                    
+                    // Use the troubleshooting steps from the backend if available
+                    if (result.troubleshooting && result.troubleshooting.length > 0) {
+                        result.troubleshooting.forEach((step, index) => {
+                            this.appendOutput(`${index + 1}. ${step}`);
+                        });
+                    } else {
+                        // Fallback to hardcoded steps
+                        this.appendOutput('1. Put device in DFU mode (hold BOOT button while connecting USB)');
+                        this.appendOutput('2. Install DFU drivers with Zadig (Programs/zadig-2.9.exe)');
+                        this.appendOutput('3. Try different USB cable/port');
+                        this.appendOutput('4. Check device manager for unrecognized devices');
+                    }
+                    
                     this.appendOutput('5. Try running app as Administrator');
+                    this.appendOutput('💡 Click "Launch Zadig" button below to install drivers automatically');
+                    
+                    // Show Zadig button on Windows when devices not found
+                    if (zadigBtn) {
+                        zadigBtn.style.display = 'inline-block';
+                    }
                 } else {
                     this.appendOutput('No DFU devices found. Ensure device is in DFU mode and connected.');
                 }
@@ -1316,6 +1345,28 @@ class DWMControl {
         }
         
         refreshBtn.disabled = false;
+    }
+
+    // Launch Zadig driver installer (Windows only)
+    async launchZadig() {
+        try {
+            this.appendOutput('🔧 Launching Zadig driver installer...');
+            const result = await window.electronAPI.launchZadig();
+            
+            if (result.success) {
+                this.appendOutput('✅ ' + result.message);
+                this.appendOutput('📋 In Zadig:');
+                this.appendOutput('   1. Make sure your DFU device is connected and in DFU mode');
+                this.appendOutput('   2. Select your device from the dropdown');
+                this.appendOutput('   3. Choose "WinUSB" as the driver');
+                this.appendOutput('   4. Click "Install Driver"');
+                this.appendOutput('   5. Come back and click "Refresh" after driver installation');
+            } else {
+                this.appendOutput('❌ Failed to launch Zadig: ' + result.error);
+            }
+        } catch (error) {
+            this.appendOutput('❌ Error launching Zadig: ' + error.message);
+        }
     }
 
     async selectHexFile() {
