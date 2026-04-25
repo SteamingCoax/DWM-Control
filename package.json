@@ -228,7 +228,6 @@
       "maintainer": "SteamingCoax"
     },
     "appImage": {
-      "license": "MIT",
       "category": "Development"
     },
     "deb": {
