@@ -41,14 +41,14 @@ jobs:
           gh release upload "$RELEASE_TAG" \
             dist/*.dmg \
             dist/*mac*.zip \
-            dist/latest-mac.yml \
+            dist/latest-mac*.yml \
             dist/*.blockmap \
             --repo "${{ github.repository }}" \
             --clobber
 
   publish-windows:
     name: Publish Windows
-    runs-on: windows-2022
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 120
 
     steps:
@@ -82,7 +82,7 @@ jobs:
 
   publish-linux:
     name: Publish Linux
-    runs-on: ubuntu-22.04
+    runs-on: [self-hosted, Linux]
     timeout-minutes: 90
 
     steps:
