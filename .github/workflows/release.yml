@@ -15,7 +15,7 @@ env:
 jobs:
   publish-mac:
     name: Publish macOS
-    runs-on: self-hosted
+    runs-on: [self-hosted, macOS]
     timeout-minutes: 90
 
     steps:
