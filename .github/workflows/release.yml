@@ -9,6 +9,9 @@ on:
 permissions:
   contents: write
 
+env:
+  RELEASE_TAG: v1.1.1
+
 jobs:
   publish-mac:
     name: Publish macOS
@@ -28,10 +31,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Publish macOS artifacts
+      - name: Build macOS artifacts
+        run: npm run build:mac
+
+      - name: Upload macOS assets to existing release
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
-        run: npm run publish:mac
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$RELEASE_TAG" \
+            dist/*.dmg \
+            dist/*mac*.zip \
+            dist/latest-mac.yml \
+            dist/*.blockmap \
+            --repo "${{ github.repository }}" \
+            --clobber
 
   publish-windows:
     name: Publish Windows
@@ -51,7 +64,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Publish Windows artifacts
+      - name: Build Windows artifacts
+        run: npm run build:win
+
+      - name: Upload Windows assets to existing release
+        shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
-        run: npm run publish:win
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$RELEASE_TAG" \
+            dist/*Setup*.exe \
+            dist/*Portable*.exe \
+            dist/latest.yml \
+            dist/*.blockmap \
+            --repo "${{ github.repository }}" \
+            --clobber
