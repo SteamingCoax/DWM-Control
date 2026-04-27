@@ -1,0 +1,244 @@
+// Firmware upload (DFU) methods — attached to DWMControl.prototype
+// Extracted from renderer.js
+
+(function attachFirmwareModule() {
+    if (typeof DWMControl === 'undefined') {
+        console.error('DWMControl not defined before firmware module loaded');
+        return;
+    }
+
+    DWMControl.prototype.refreshDfuDevices = async function() {
+        const deviceCombo = document.getElementById('device-combo');
+        const uploadButton = document.getElementById('upload-btn');
+
+        if (!deviceCombo) { return; }
+
+        try {
+            const result = await window.electronAPI.getDfuDevices();
+            deviceCombo.innerHTML = '';
+
+            if (!result || !result.success) {
+                const errMsg = (result && result.error) ? result.error : 'Failed to enumerate DFU devices.';
+                this.appendOutput(errMsg);
+                const option = document.createElement('option');
+                option.textContent = 'No DFU devices found';
+                option.disabled = true;
+                deviceCombo.appendChild(option);
+                this.selectedDevice = null;
+            } else {
+                const devices = result.devices || [];
+                if (devices.length === 0) {
+                    const option = document.createElement('option');
+                    option.textContent = 'No DFU devices found';
+                    option.disabled = true;
+                    deviceCombo.appendChild(option);
+                    this.selectedDevice = null;
+                } else {
+                    devices.forEach((device, index) => {
+                        const option = document.createElement('option');
+                        option.value = JSON.stringify(device);
+                        const sn = device.serial ? ` — SN: ${device.serial}` : '';
+                        option.textContent = `DFU Device ${index + 1}${sn}`;
+                        deviceCombo.appendChild(option);
+                    });
+
+                    this.selectedDevice = devices[0];
+                }
+            }
+        } catch (error) {
+            this.appendOutput(`Failed to enumerate DFU devices: ${error.message}`);
+            deviceCombo.innerHTML = '<option disabled>Error enumerating devices</option>';
+            this.selectedDevice = null;
+        }
+
+        this.updateUploadButton();
+    };
+
+    DWMControl.prototype.launchZadig = async function() {
+        if (window.electronAPI && window.electronAPI.launchZadig) {
+            try {
+                await window.electronAPI.launchZadig();
+            } catch (error) {
+                this.appendOutput(`Failed to launch Zadig: ${error.message}`);
+            }
+        } else {
+            this.appendOutput('Zadig launcher is not available on this platform.');
+        }
+    };
+
+    DWMControl.prototype.selectHexFile = async function() {
+        try {
+            const filePath = await window.electronAPI.selectHexFile();
+            if (filePath) {
+                await this.handleFileSelection(filePath);
+            }
+        } catch (error) {
+            this.appendOutput(`File selection failed: ${error.message}`);
+        }
+    };
+
+    DWMControl.prototype.downloadLatestFirmware = async function() {
+        const downloadButton = document.getElementById('download-firmware-btn');
+        if (downloadButton) {
+            downloadButton.disabled = true;
+            downloadButton.textContent = 'Downloading...';
+        }
+
+        try {
+            const result = await window.electronAPI.downloadLatestFirmware();
+            if (result && result.filePath) {
+                await this.handleFileSelection(result.filePath);
+                this.appendOutput(`Downloaded firmware: ${result.filePath}`);
+            } else {
+                this.appendOutput('Download completed but no file path was returned.');
+            }
+        } catch (error) {
+            let userMessage = `Firmware download failed: ${error.message}`;
+
+            if (error.message && error.message.includes('net::')) {
+                userMessage = 'Network error — check your internet connection and try again.';
+            } else if (error.message && error.message.toLowerCase().includes('not found')) {
+                userMessage = 'No firmware release found. Check the GitHub releases page manually.';
+            } else if (error.message && error.message.toLowerCase().includes('permission')) {
+                userMessage = 'Permission denied writing to downloads folder.';
+            }
+
+            this.appendOutput(userMessage);
+        } finally {
+            if (downloadButton) {
+                downloadButton.disabled = false;
+                downloadButton.textContent = 'Download Latest';
+            }
+        }
+    };
+
+    DWMControl.prototype.handleFileSelection = async function(filePath) {
+        if (!filePath) { return; }
+
+        try {
+            const stats = await window.electronAPI.getFileStats(filePath);
+            const fileInfo = document.getElementById('file-info');
+            const fileName = document.getElementById('file-name');
+            const fileSize = document.getElementById('file-size');
+            const uploadButton = document.getElementById('upload-btn');
+
+            this.selectedHexFile = filePath;
+
+            if (fileInfo) { fileInfo.style.display = 'block'; }
+            if (fileName) { fileName.textContent = filePath.split('/').pop() || filePath; }
+            if (fileSize) {
+                const sizeKb = stats && stats.size ? (stats.size / 1024).toFixed(1) : '?';
+                fileSize.textContent = `${sizeKb} KB`;
+            }
+            if (uploadButton) { uploadButton.disabled = false; }
+
+            this.appendOutput(`Selected firmware: ${filePath}`);
+        } catch (error) {
+            this.appendOutput(`Could not read file info: ${error.message}`);
+        }
+
+        this.updateUploadButton();
+    };
+
+    DWMControl.prototype.uploadFirmware = async function() {
+        if (!this.selectedHexFile) {
+            this.appendOutput('No firmware file selected.');
+            return;
+        }
+
+        if (!this.selectedDevice) {
+            this.appendOutput('No DFU device selected.');
+            return;
+        }
+
+        if (this.isUploading) {
+            this.appendOutput('Upload already in progress.');
+            return;
+        }
+
+        this.isUploading = true;
+        this.updateUploadButton();
+
+        const progressContainer = document.querySelector('.progress-container');
+        if (progressContainer) { progressContainer.style.display = 'block'; }
+
+        this.updateProgressBar(0, 'Starting DFU upload...');
+        this.appendSerialMonitor('Starting DFU firmware upload...');
+
+        try {
+            const result = await window.electronAPI.uploadFirmware({
+                hexFilePath: this.selectedHexFile,
+                deviceInfo: this.selectedDevice,
+            });
+
+            if (result && result.output) {
+                result.output.split('\n').forEach((line) => {
+                    if (line.trim()) {
+                        this.appendSerialMonitor(line);
+                        const pct = this.parseProgressFromDfuOutput(line);
+                        if (pct !== null) {
+                            this.updateProgressBar(pct, line.trim());
+                        }
+                    }
+                });
+            }
+
+            if (result && result.success) {
+                this.updateProgressBar(100, 'Upload complete!');
+                this.appendSerialMonitor('Firmware upload successful.');
+            } else {
+                this.updateProgressBar(0, 'Upload failed');
+                this.appendSerialMonitor(`Upload failed: ${result && result.error ? result.error : 'Unknown error'}`);
+            }
+        } catch (error) {
+            this.updateProgressBar(0, 'Upload error');
+            this.appendSerialMonitor(`Upload error: ${error.message}`);
+            this.appendOutput(`DFU upload error: ${error.message}`);
+        } finally {
+            this.isUploading = false;
+            this.updateUploadButton();
+
+            setTimeout(() => {
+                if (progressContainer) { progressContainer.style.display = 'none'; }
+            }, 4000);
+        }
+    };
+
+    DWMControl.prototype.updateProgressBar = function(percentage, message) {
+        const fill = document.querySelector('.progress-fill');
+        const text = document.querySelector('.progress-text');
+        const safePercent = Math.max(0, Math.min(100, percentage));
+
+        if (fill) { fill.style.width = `${safePercent}%`; }
+        if (text) { text.textContent = message || `${safePercent}%`; }
+    };
+
+    DWMControl.prototype.parseProgressFromDfuOutput = function(line) {
+        if (!line) { return null; }
+
+        if (/opening dfu/i.test(line)) { return 10; }
+        if (/matching dfu/i.test(line)) { return 20; }
+        if (/claiming usb/i.test(line)) { return 30; }
+        if (/determining device/i.test(line)) { return 40; }
+        if (/downloading.*element/i.test(line)) { return 50; }
+
+        const downloadMatch = line.match(/Download\s+\[([= >]+)\]\s+(\d+)%/i);
+        if (downloadMatch) {
+            const pct = Number.parseInt(downloadMatch[2], 10);
+            return 50 + Math.round(pct * 0.45);
+        }
+
+        if (/done!/.test(line)) { return 100; }
+        if (/successfully/i.test(line)) { return 100; }
+        if (/error/i.test(line)) { return null; }
+
+        return null;
+    };
+
+    DWMControl.prototype.updateUploadButton = function() {
+        const uploadButton = document.getElementById('upload-btn');
+        if (!uploadButton) { return; }
+        uploadButton.disabled = !this.selectedHexFile || !this.selectedDevice || this.isUploading;
+    };
+
+})();

@@ -185,7 +185,7 @@ body {
     "nav nav"
     "content console";
   grid-template-rows: var(--header-height) var(--nav-height) 1fr;
-  grid-template-columns: 1fr var(--sidebar-width);
+  grid-template-columns: 1fr auto;
 }
 
 /* Header */
@@ -924,14 +924,18 @@ body {
 /* Main Content */
 .main-content {
   grid-area: content;
-  padding: var(--space-6);
+  padding: 0;
   overflow-y: auto;
-  max-height: calc(100vh - var(--header-height) - var(--nav-height));
+  height: calc(100vh - var(--header-height) - var(--nav-height));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 .panel-container {
-  max-width: 800px;
-  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-6);
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
@@ -944,7 +948,19 @@ body {
 }
 
 .tab-panel.active {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Control panel fills full available area — no extra padding needed */
+.main-content:has(> #control-panel.active) {
+  padding: 0;
+}
+
+#control-panel.active {
+  overflow: hidden;
 }
 
 @keyframes fadeIn {
@@ -1455,6 +1471,7 @@ label {
 
 .console-sidebar {
   grid-area: console;
+  width: var(--sidebar-width);
   background: var(--bg-secondary);
   border-left: 1px solid var(--border-light);
   display: flex;
@@ -1524,6 +1541,7 @@ label {
   
   .main-content {
     max-height: none;
+    height: auto;
   }
 }
 
@@ -2564,12 +2582,12 @@ label {
 }
 
 .deembed-primary-config h4::before {
-  content: "⚡";
+  content: "";
   font-size: 18px;
 }
 
 .deembed-measurement-config h4::before {
-  content: "📏";
+  content: "";
   font-size: 18px;
 }
 
@@ -2647,7 +2665,7 @@ label {
 }
 
 .deembed-data-section h4::before {
-  content: "📊";
+  content: "";
   font-size: 18px;
 }
 
@@ -3021,4 +3039,1095 @@ label {
     gap: 8px;
     text-align: center;
   }
+}
+
+/* ─── Meter live panel (replaces old readings bar) ────────────────────────── */
+
+.meter-live-section {
+    border-top: 1px solid var(--border-color);
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    background: var(--readings-bar-bg, rgba(0,0,0,0.08));
+}
+
+/* Toolbar: view toggle + poll controls */
+.meter-live-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.meter-live-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.meter-chart-actions {
+    display: flex;
+    align-items: center;
+}
+
+/* Segmented view toggle */
+.meter-view-toggle {
+    display: flex;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.meter-view-btn {
+    padding: 4px 14px;
+    font-size: 11px;
+    font-weight: 600;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    letter-spacing: 0.02em;
+}
+
+.meter-view-btn.active {
+    background: var(--accent-color, #4a9eff);
+    color: #fff;
+}
+
+.meter-view-btn:not(.active):hover {
+    background: rgba(255,255,255,0.07);
+    color: var(--text-primary);
+}
+
+/* Gauge pair */
+.meter-gauge-pair {
+    display: flex;
+    gap: 12px;
+}
+
+.meter-gauge {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+/* Gauge header: label left, full-scale right */
+.meter-gauge-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+
+.meter-gauge-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted);
+}
+
+.meter-gauge-scale {
+    font-size: 9px;
+    color: var(--text-muted);
+    opacity: 0.65;
+    font-family: monospace;
+}
+
+/* Gauge bar */
+.meter-gauge-track {
+    position: relative;
+    height: 100px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    overflow: hidden;
+    box-shadow: inset 0 2px 8px rgba(0,0,0,0.35);
+}
+
+.meter-gauge-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 0%;
+    background: linear-gradient(to right,
+        #1a9fe8 0%,
+        #22c55e 40%,
+        #f5c842 68%,
+        #ef4444 100%
+    );
+    border-radius: 8px;
+    transition: width 0.18s cubic-bezier(0.25, 0.8, 0.25, 1);
+    box-shadow: 0 0 10px rgba(74, 158, 255, 0.3);
+}
+
+/* PEP uses warm gradient */
+.meter-gauge-fill-pep {
+    background: linear-gradient(to right,
+        #f59e0b 0%,
+        #f08030 45%,
+        #ef4444 80%,
+        #dc2626 100%
+    );
+    box-shadow: 0 0 10px rgba(240, 128, 48, 0.3);
+}
+
+/* Glass reflection shimmer */
+.meter-gauge-track::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 40%;
+    background: linear-gradient(to bottom, rgba(255,255,255,0.08), transparent);
+    border-radius: 8px 8px 0 0;
+    pointer-events: none;
+}
+
+/* Value overlay — centered on the track */
+.meter-gauge-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    pointer-events: none;
+}
+
+.meter-gauge-overlay-val {
+    font-size: 32px;
+    font-weight: 700;
+    font-family: monospace;
+    color: #fff;
+    text-shadow: 0 1px 6px rgba(0,0,0,0.75);
+    min-width: 1ch;
+}
+
+.meter-gauge-overlay-unit {
+    font-size: 14px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.75);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+    align-self: flex-end;
+    padding-bottom: 6px;
+}
+
+/* Two-panel radial gauge layout */
+.meter-gauge-radial-pair {
+    display: flex;
+    gap: 8px;
+}
+
+/* ── Layout variants driven by data-layout on .meter-gauges-view ── */
+.meter-gauges-view[data-layout="dual"]       .meter-gauge-radial-pair { flex-direction: row; }
+.meter-gauges-view[data-layout="stacked"]    .meter-gauge-radial-pair { flex-direction: column; }
+.meter-gauges-view[data-layout="single-L"]   .meter-gauge-radial-pair { flex-direction: row; }
+.meter-gauges-view[data-layout="single-R"]   .meter-gauge-radial-pair { flex-direction: row; }
+.meter-gauges-view[data-layout="wide-left"]  .meter-gauge-radial-pair { flex-direction: row; }
+.meter-gauges-view[data-layout="wide-right"] .meter-gauge-radial-pair { flex-direction: row; }
+
+/* Wide-left: left panel takes 2/3, right takes 1/3 */
+.meter-gauges-view[data-layout="wide-left"]  .meter-gauge-radial-panel:first-child { flex: 2; }
+.meter-gauges-view[data-layout="wide-left"]  .meter-gauge-radial-panel:last-child  { flex: 1; }
+/* Wide-right: right panel takes 2/3, left takes 1/3 */
+.meter-gauges-view[data-layout="wide-right"] .meter-gauge-radial-panel:first-child { flex: 1; }
+.meter-gauges-view[data-layout="wide-right"] .meter-gauge-radial-panel:last-child  { flex: 2; }
+
+/* ── Layout picker button group ── */
+.meter-layout-picker {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 5px;
+    padding: 2px 3px;
+}
+
+.meter-layout-btn {
+    background: none;
+    border: none;
+    border-radius: 3px;
+    color: rgba(255,255,255,0.38);
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    padding: 2px 5px;
+    transition: background 0.12s, color 0.12s;
+}
+.meter-layout-btn:hover  { background: rgba(255,255,255,0.10); color: rgba(255,255,255,0.80); }
+.meter-layout-btn.active { background: rgba(74,158,255,0.22);  color: #4a9eff; }
+
+[data-theme="light"] .meter-layout-picker {
+    background: rgba(0,0,0,0.04);
+    border-color: rgba(0,0,0,0.14);
+}
+[data-theme="light"] .meter-layout-btn { color: rgba(0,0,0,0.35); }
+[data-theme="light"] .meter-layout-btn:hover  { background: rgba(0,0,0,0.08); color: rgba(0,0,0,0.75); }
+[data-theme="light"] .meter-layout-btn.active { background: rgba(37,99,235,0.14); color: #2563eb; }
+
+.meter-gauge-radial-panel {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.meter-gauge-panel-controls {
+  display: flex;
+  gap: 6px;
+}
+
+.gauge-metric-select {
+  flex: 1 1 auto;
+    font-size: 13px;
+    padding: 3px 6px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 4px;
+    color: rgba(255,255,255,0.7);
+    cursor: pointer;
+}
+
+.gauge-metric-select:focus {
+    outline: none;
+    border-color: rgba(74,158,255,0.5);
+}
+
+.gauge-display-select {
+  flex: 0 0 132px;
+  font-size: 12px;
+  padding: 3px 6px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 4px;
+  color: rgba(255,255,255,0.76);
+  cursor: pointer;
+}
+
+.gauge-display-select:focus {
+  outline: none;
+  border-color: rgba(74,158,255,0.5);
+}
+
+.meter-gauge-radial-canvas {
+    width: 100%;
+    display: block;
+    border-radius: 6px;
+}
+
+[data-theme="light"] .gauge-metric-select {
+    background: rgba(0,0,0,0.04);
+    border-color: rgba(0,0,0,0.15);
+    color: rgba(0,0,0,0.7);
+}
+
+[data-theme="light"] .gauge-display-select {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.15);
+  color: rgba(0,0,0,0.7);
+}
+
+.meter-snapshot-settings {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 8px;
+}
+
+.meter-snapshot-settings .form-select {
+  min-width: 126px;
+}
+
+.meter-snapshot-settings .form-select.form-select-sm {
+  min-width: 104px;
+}
+
+@media (max-width: 900px) {
+  .meter-gauge-panel-controls {
+    flex-direction: column;
+  }
+
+  .gauge-display-select {
+    flex: 1 1 auto;
+  }
+}
+
+/* History graph */
+.meter-history-view {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.meter-history-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 2px 0;
+}
+
+.meter-history-range-select {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    height: 100%;
+    min-height: 24px;
+}
+
+.meter-range-frame {
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.meter-range-label {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 0 6px;
+    height: 24px;
+    line-height: 24px;
+    background: var(--sidebar-bg, rgba(128,128,128,0.1));
+    color: var(--text-muted, var(--text-secondary));
+    border-right: 1px solid var(--border-color);
+    white-space: nowrap;
+    user-select: none;
+}
+
+.meter-history-canvas {
+    width: 100%;
+    min-height: 220px;
+    border-radius: 6px;
+    display: block;
+}
+
+.meter-history-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+/* Metric toggle chip */
+.meter-hist-line-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.35);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s, color 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.meter-hist-line-toggle input[type=checkbox] { display: none; }
+.meter-hist-line-toggle.active   { background: rgba(255,255,255,0.10); color: #f0f0f0; border-color: rgba(255,255,255,0.35); }
+.meter-hist-line-toggle.disabled { opacity: 0.38; cursor: not-allowed; }
+
+/* Per-metric accent colours (dark) */
+.meter-hist-inst.active { color: #c4b5fd; border-color: #a78bfa; }
+.meter-hist-avg.active  { color: #93c5fd; border-color: #4a9eff; }
+.meter-hist-peak.active { color: #fed7aa; border-color: #f08030; }
+.meter-hist-max.active  { color: #fca5a5; border-color: #f43f5e; }
+.meter-hist-min.active  { color: #6ee7b7; border-color: #34d399; }
+.meter-hist-dev.active  { color: #fde68a; border-color: #fbbf24; }
+
+/* Light theme overrides */
+[data-theme="light"] .meter-hist-line-toggle {
+    border-color: rgba(0,0,0,0.15);
+    background: rgba(0,0,0,0.04);
+    color: rgba(0,0,0,0.35);
+}
+[data-theme="light"] .meter-hist-line-toggle.active {
+    background: rgba(0,0,0,0.07);
+    color: #1e293b;
+    border-color: rgba(0,0,0,0.30);
+}
+[data-theme="light"] .meter-hist-inst.active { color: #6d28d9; border-color: #7c3aed; }
+[data-theme="light"] .meter-hist-avg.active  { color: #1d4ed8; border-color: #2563eb; }
+[data-theme="light"] .meter-hist-peak.active { color: #c2410c; border-color: #ea580c; }
+[data-theme="light"] .meter-hist-max.active  { color: #be123c; border-color: #e11d48; }
+[data-theme="light"] .meter-hist-min.active  { color: #047857; border-color: #059669; }
+[data-theme="light"] .meter-hist-dev.active  { color: #b45309; border-color: #d97706; }
+
+/* Light theme adjustments */
+[data-theme="light"] .meter-gauge-track {
+    background: rgba(0,0,0,0.06);
+    border-color: rgba(0,0,0,0.1);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
+[data-theme="light"] .meter-gauge-overlay-val,
+[data-theme="light"] .meter-gauge-overlay-unit {
+    text-shadow: 0 1px 3px rgba(255,255,255,0.5), 0 1px 6px rgba(0,0,0,0.4);
+}
+
+[data-theme="light"] .meter-view-btn.active {
+    background: #2563eb;
+}
+
+/* ─── Meter Global Toolbar ────────────────────────────────────────────────── */
+
+.meter-page-shell {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.meter-page-main {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.meter-global-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--card-bg);
+    flex-wrap: wrap;
+}
+
+  .meter-global-toolbar-note {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+  }
+
+.meter-global-toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.meter-global-toolbar-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.meter-global-toolbar-input {
+    width: 80px;
+}
+
+.meter-settings-panel {
+  width: 0;
+  overflow: hidden;
+  border-left: 1px solid transparent;
+  background: var(--card-bg);
+  opacity: 0;
+  padding: 0;
+  transition: width 0.22s ease, opacity 0.18s ease, padding 0.22s ease, border-color 0.22s ease;
+}
+
+.meter-page-shell.settings-open .meter-settings-panel {
+  width: 300px;
+  opacity: 1;
+  padding: 12px;
+  border-left-color: var(--border-color);
+}
+
+/* Settings toggle rail — narrow strip between board and settings panel */
+.meter-settings-rail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 24px;
+  flex-shrink: 0;
+  background: linear-gradient(
+    to right,
+    rgba(0,0,0,0.18) 0%,
+    rgba(255,255,255,0.04) 40%,
+    rgba(255,255,255,0.06) 60%,
+    rgba(0,0,0,0.10) 100%
+  );
+  border-left: 1px solid var(--border-color);
+  border-right: 1px solid rgba(255,255,255,0.07);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+/* Center line down the rail */
+.meter-settings-rail::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: rgba(255,255,255,0.08);
+  pointer-events: none;
+}
+
+.meter-settings-rail:hover {
+  background: linear-gradient(
+    to right,
+    rgba(0,0,0,0.14) 0%,
+    rgba(255,255,255,0.08) 40%,
+    rgba(255,255,255,0.10) 60%,
+    rgba(0,0,0,0.06) 100%
+  );
+}
+
+.meter-settings-rail-btn {
+  position: sticky;
+  top: calc((100vh - var(--header-height) - var(--nav-height)) / 2 - 16px);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 6px 4px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s, border-color 0.15s, transform 0.22s ease;
+  transform: rotate(0deg);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+  z-index: 1;
+}
+
+.meter-settings-rail-btn:hover {
+  color: var(--text-primary);
+  background: var(--hover-bg, rgba(255, 255, 255, 0.10));
+  border-color: var(--accent-color, #4a9eff);
+}
+
+.meter-page-shell.settings-open .meter-settings-rail-btn {
+  transform: rotate(180deg);
+}
+
+.meter-settings-panel-header {
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 10px;
+  color: var(--text-primary);
+}
+
+.meter-settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.meter-settings-group:last-child {
+  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.meter-settings-help {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.meter-settings-value {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.meter-settings-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+#global-timing-ms {
+  width: 100%;
+}
+
+#global-gauge-smoothing {
+  width: 100%;
+}
+
+/* ─── Meter Board ─────────────────────────────────────────────────────────── */
+
+.meter-board {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+}
+
+.meter-board-empty {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--text-muted);
+}
+
+.meter-board-empty p {
+    margin: 4px 0;
+}
+
+/* Meter card */
+.meter-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+}
+
+.meter-card:has(.meter-badge-connected) {
+    border-color: var(--accent-color, #4a9eff);
+}
+
+/* Drag handle */
+.meter-drag-handle {
+    cursor: grab;
+    color: var(--text-muted);
+    font-size: 18px;
+    line-height: 1;
+    padding: 0 4px;
+    flex-shrink: 0;
+    user-select: none;
+    opacity: 0.4;
+    transition: opacity 0.15s;
+}
+
+.meter-drag-handle:hover {
+    opacity: 0.9;
+}
+
+/* Card dragging state */
+.meter-card-dragging {
+    opacity: 0.35;
+    cursor: grabbing;
+}
+
+/* Drag-over highlight */
+.meter-card-drag-over {
+    outline: 2px dashed var(--accent-color, #4a9eff);
+    outline-offset: 2px;
+}
+
+/* Card header row */
+.meter-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 20px;
+    flex-wrap: wrap;
+}
+
+.meter-card-identity {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    flex-wrap: wrap;
+}
+
+.meter-card-name {
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--text-primary);
+}
+
+.meter-name-editable {
+    cursor: pointer;
+    border-radius: 4px;
+    padding: 1px 4px;
+    transition: background 0.15s;
+}
+
+.meter-name-editable:hover {
+    background: rgba(128, 128, 128, 0.12);
+}
+
+.meter-name-inline-input {
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--text-primary);
+    background: var(--input-bg, rgba(0,0,0,0.2));
+    border: 1px solid var(--accent-color, #4a9eff);
+    border-radius: 4px;
+    padding: 1px 6px;
+    outline: none;
+    width: 14ch;
+    max-width: 200px;
+}
+
+/* Element info chips row */
+.meter-elem-info-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding-bottom: 4px;
+}
+
+.meter-elem-inline-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.meter-elem-inline-group .form-select {
+  min-width: 96px;
+  max-width: 170px;
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.meter-elem-profile-group .form-select {
+  min-width: 180px;
+  max-width: 260px;
+}
+
+.meter-elem-inline-group .btn {
+  padding: 2px 8px;
+}
+
+.meter-elem-inline-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.meter-elem-chip {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 100px;
+    background: rgba(128, 128, 128, 0.10);
+    border: 1px solid rgba(128, 128, 128, 0.18);
+    color: var(--text-muted);
+    font-family: monospace;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+}
+
+.meter-elem-chip-etype {
+    color: var(--accent-color, #4a9eff);
+    border-color: rgba(74, 158, 255, 0.25);
+    background: rgba(74, 158, 255, 0.07);
+}
+
+[data-theme="light"] .meter-elem-inline-group {
+  background: rgba(0,0,0,0.03);
+  border-color: rgba(0,0,0,0.12);
+}
+
+.meter-chip {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 100px;
+    background: var(--chip-bg, rgba(128,128,128,0.12));
+    color: var(--text-muted);
+    font-family: monospace;
+    white-space: nowrap;
+}
+
+.meter-chip-uid {
+    color: var(--accent-color, #4a9eff);
+}
+
+.meter-card-header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+/* Connection state badge */
+.meter-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 100px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.meter-badge-available {
+    background: rgba(100, 100, 100, 0.15);
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+}
+
+.meter-badge-connected {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.meter-badge-disconnected {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+/* Readings bar (shown when connected) */
+.meter-readings-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 16px;
+    background: var(--readings-bar-bg, rgba(0,0,0,0.08));
+    border-top: 1px solid var(--border-color);
+    flex-wrap: wrap;
+}
+
+.meter-reading-group {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex: 1;
+}
+
+.meter-reading-item {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.meter-reading-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    width: 36px;
+}
+
+.meter-reading-value {
+    font-size: 18px;
+    font-weight: 600;
+    font-family: monospace;
+    color: var(--text-primary);
+    min-width: 72px;
+}
+
+.meter-reading-unit {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.meter-poll-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+/* Expand row */
+.meter-card-expand-row {
+    padding: 4px 12px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: center;
+}
+
+.meter-expand-btn {
+    width: 100%;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 4px 0;
+}
+
+.meter-expand-btn:hover {
+    color: var(--text-primary);
+}
+
+/* Detail panel */
+.meter-card-detail {
+    border-top: 1px solid var(--border-color);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.meter-detail-heading {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin: 0 0 8px 0;
+}
+
+.meter-detail-section {
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.meter-detail-section:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.meter-detail-toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.meter-raw-debug-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.meter-sys-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.meter-sys-action-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--input-bg, rgba(0, 0, 0, 0.2));
+  color: var(--text-primary);
+  padding: 10px 12px;
+  font: 12px/1.45 monospace;
+}
+
+.control-debug-console {
+  min-height: 180px;
+}
+
+.meter-raw-debug-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.meter-snapshot-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+/* Small form-select variant */
+.form-select-sm {
+    padding: 4px 8px;
+    font-size: 12px;
+    height: auto;
+}
+
+/* Light theme overrides */
+[data-theme="light"] .meter-readings-bar {
+    background: rgba(0,0,0,0.04);
+}
+
+[data-theme="light"] .meter-card:has(.meter-badge-connected) {
+    border-color: #2563eb;
+}
+
+[data-theme="light"] .meter-badge-connected {
+    background: rgba(34, 197, 94, 0.12);
+}
+
+/* Responsive: stack on narrow panels */
+@media (max-width: 640px) {
+  .meter-page-shell {
+    flex-direction: column;
+  }
+
+  .meter-settings-rail {
+    width: 100%;
+    height: 24px;
+    flex-direction: row;
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+    border-right: none;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    background: linear-gradient(
+      to bottom,
+      rgba(0,0,0,0.18) 0%,
+      rgba(255,255,255,0.06) 60%,
+      rgba(0,0,0,0.10) 100%
+    );
+  }
+
+  .meter-settings-rail::before {
+    top: 50%;
+    bottom: auto;
+    left: 0;
+    right: 0;
+    width: auto;
+    height: 1px;
+    transform: translateY(-50%);
+  }
+
+  .meter-settings-rail-btn {
+    transform: rotate(90deg);
+  }
+
+  .meter-page-shell.settings-open .meter-settings-rail-btn {
+    transform: rotate(270deg);
+  }
+
+  .meter-page-shell.settings-open .meter-settings-panel {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+  }
+
+    .meter-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .meter-card-header-right {
+        width: 100%;
+        justify-content: flex-end;
+    }
+    .meter-reading-group {
+        gap: 12px;
+    }
+    .meter-reading-value {
+        font-size: 14px;
+    }
 }

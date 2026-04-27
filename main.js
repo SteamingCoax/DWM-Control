@@ -103,10 +103,10 @@ autoUpdater.on('update-downloaded', (info) => {
 function createWindow() {
   // Create the browser window with modern styling
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 900,
-    minWidth: 800,
-    minHeight: 600,
+    width: 2400,
+    height: 1000,
+    minWidth: 1600,
+    minHeight: 800,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -361,12 +361,162 @@ ipcMain.handle('upload-firmware', async (event, { hexFilePath, deviceInfo }) => 
   });
 });
 
+// Multi-port serial state — keyed by portPath
+const serialPorts = new Map();
+
+// Decode a Buffer of bytes into a UTF-8 string, skipping invalid sequences
+function decodeSerialBuffer(buf) {
+  const buffer = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
+  let text = '';
+  for (let i = 0; i < buffer.length; i++) {
+    const byte = buffer[i];
+    if (byte < 0x80) {
+      text += String.fromCharCode(byte);
+    } else if ((byte & 0xE0) === 0xC0 && i + 1 < buffer.length) {
+      const b2 = buffer[i + 1];
+      if ((b2 & 0xC0) === 0x80) {
+        text += String.fromCharCode(((byte & 0x1F) << 6) | (b2 & 0x3F));
+        i += 1;
+      } else {
+        text += String.fromCharCode(byte);
+      }
+    } else if ((byte & 0xF0) === 0xE0 && i + 2 < buffer.length) {
+      const b2 = buffer[i + 1]; const b3 = buffer[i + 2];
+      if ((b2 & 0xC0) === 0x80 && (b3 & 0xC0) === 0x80) {
+        text += String.fromCharCode(((byte & 0x0F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F));
+        i += 2;
+      } else {
+        text += String.fromCharCode(byte);
+      }
+    } else if ((byte & 0xF8) === 0xF0 && i + 3 < buffer.length) {
+      const b2 = buffer[i + 1]; const b3 = buffer[i + 2]; const b4 = buffer[i + 3];
+      if ((b2 & 0xC0) === 0x80 && (b3 & 0xC0) === 0x80 && (b4 & 0xC0) === 0x80) {
+        const cp = ((byte & 0x07) << 18) | ((b2 & 0x3F) << 12) | ((b3 & 0x3F) << 6) | (b4 & 0x3F);
+        if (cp > 0xFFFF) {
+          const adj = cp - 0x10000;
+          text += String.fromCharCode(0xD800 + (adj >> 10), 0xDC00 + (adj & 0x3FF));
+        } else {
+          text += String.fromCharCode(cp);
+        }
+        i += 3;
+      } else {
+        text += String.fromCharCode(byte);
+      }
+    }
+    // invalid sequences are skipped silently
+  }
+  return text;
+}
+
 // IPC Handlers for Serial Port functionality
 ipcMain.handle('get-serial-ports', async () => {
   try {
     const ports = await SerialPort.list();
     return { success: true, ports };
   } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Open serial port — supports multiple simultaneous ports
+ipcMain.handle('open-serial-port', async (event, { portPath, baudRate }) => {
+  try {
+    // Close existing port at this path if already open
+    const existing = serialPorts.get(portPath);
+    if (existing) {
+      try {
+        if (existing.isOpen) {
+          await new Promise((resolve) => existing.close(() => resolve()));
+        }
+      } catch (err) {
+        console.warn('Error closing existing port at', portPath, ':', err.message);
+      }
+      serialPorts.delete(portPath);
+    }
+
+    const port = new SerialPort({
+      path: portPath,
+      baudRate: baudRate || 115200,
+      autoOpen: false,
+    });
+
+    await new Promise((resolve, reject) => {
+      port.open((err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    port.on('data', (data) => {
+      if (mainWindow) {
+        mainWindow.webContents.send('serial-data', { portPath, data: decodeSerialBuffer(data) });
+      }
+    });
+
+    port.on('close', () => {
+      serialPorts.delete(portPath);
+    });
+
+    port.on('error', (err) => {
+      console.error('Serial port error on', portPath, ':', err.message);
+      serialPorts.delete(portPath);
+    });
+
+    serialPorts.set(portPath, port);
+    return { success: true };
+  } catch (error) {
+    console.error('Error opening serial port:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Close a specific serial port (or all ports if portPath is omitted)
+ipcMain.handle('close-serial-port', async (event, { portPath } = {}) => {
+  try {
+    if (portPath) {
+      const port = serialPorts.get(portPath);
+      if (port) {
+        if (port.isOpen) {
+          await new Promise((resolve) => port.close(() => resolve()));
+        }
+        serialPorts.delete(portPath);
+      }
+    } else {
+      // Close all open ports (e.g. on app shutdown)
+      for (const [path, port] of serialPorts) {
+        try {
+          if (port.isOpen) await new Promise((resolve) => port.close(() => resolve()));
+        } catch (err) {
+          console.warn('Error closing port', path, ':', err.message);
+        }
+        serialPorts.delete(path);
+      }
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Error closing serial port:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Write data to a specific serial port
+ipcMain.handle('write-serial', async (event, { portPath, data }) => {
+  try {
+    const port = serialPorts.get(portPath);
+    if (!port || !port.isOpen) {
+      return { success: false, error: 'Serial port not open' };
+    }
+
+    await new Promise((resolve, reject) => {
+      port.write(data, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error writing to serial port:', error);
     return { success: false, error: error.message };
   }
 });
@@ -1060,35 +1210,6 @@ ipcMain.handle('check-for-updates', async () => {
     }
     
     return { success: false, error: userMessage };
-  }
-});
-
-// Windows-specific: Launch Zadig driver installer
-ipcMain.handle('launch-zadig', async () => {
-  if (process.platform !== 'win32') {
-    return { success: false, error: 'Zadig is only available on Windows' };
-  }
-  
-  try {
-    const basePath = getBasePath();
-    const zadigPath = path.join(basePath, 'Programs', 'zadig-2.9.exe');
-    
-    if (!fs.existsSync(zadigPath)) {
-      return { success: false, error: 'Zadig not found in Programs directory' };
-    }
-    
-    const { spawn } = require('child_process');
-    spawn(zadigPath, [], { detached: true, stdio: 'ignore' });
-    
-    return { 
-      success: true, 
-      message: 'Zadig launched. Use it to install WinUSB drivers for your DFU device.' 
-    };
-  } catch (error) {
-    return { 
-      success: false, 
-      error: `Failed to launch Zadig: ${error.message}` 
-    };
   }
 });
 

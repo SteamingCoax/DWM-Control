@@ -9,10 +9,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectHexFile: () => ipcRenderer.invoke('select-hex-file'),
   getFileStats: (filePath) => ipcRenderer.invoke('get-file-stats', filePath),
   downloadLatestFirmware: () => ipcRenderer.invoke('download-latest-firmware'),
-  launchZadig: () => ipcRenderer.invoke('launch-zadig'),
   
   // Serial port functionality
   getSerialPorts: () => ipcRenderer.invoke('get-serial-ports'),
+  openSerialPort: (portPath, baudRate) => ipcRenderer.invoke('open-serial-port', { portPath, baudRate }),
+  closeSerialPort: (portPath) => ipcRenderer.invoke('close-serial-port', { portPath }),
+  writeSerial: (portPath, data) => ipcRenderer.invoke('write-serial', { portPath, data }),
+  onSerialData: (callback) => {
+    const listener = (_event, payload) => callback(payload.portPath, payload.data);
+    ipcRenderer.on('serial-data', listener);
+    return () => ipcRenderer.removeListener('serial-data', listener);
+  },
   
   // De-Embed functionality
   sampleVoltage: () => ipcRenderer.invoke('sample-voltage'),
