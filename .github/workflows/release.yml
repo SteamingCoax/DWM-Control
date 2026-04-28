@@ -80,10 +80,17 @@ jobs:
           NSIS_USE_SYSTEM_NSIS: "true"
           XDG_RUNTIME_DIR: ${{ runner.temp }}/xdg-runtime
           DISPLAY: ":99"
+          WINEARCH: win64
+          WINEPREFIX: ${{ runner.temp }}/wine64
         run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          ln -sf "$(command -v wine64)" "$RUNNER_TEMP/bin/wine"
+          export PATH="$RUNNER_TEMP/bin:$PATH"
           Xvfb :99 -screen 0 1024x768x16 >/tmp/xvfb.log 2>&1 &
           XVFB_PID=$!
           trap 'kill "$XVFB_PID" >/dev/null 2>&1 || true' EXIT
+          wine --version
+          wineboot -u
           npm run build:win
 
       - name: Upload Windows assets to existing release
