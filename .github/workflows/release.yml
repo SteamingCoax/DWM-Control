@@ -54,6 +54,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install system dependencies
+        run: sudo apt-get update -qq && sudo apt-get install -y wine binutils
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -86,6 +89,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: sudo apt-get update -qq && sudo apt-get install -y binutils
 
       - name: Setup Node
         uses: actions/setup-node@v4
