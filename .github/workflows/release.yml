@@ -31,6 +31,9 @@ jobs:
         run: npm install
 
       - name: Build macOS artifacts
+        env:
+          CSC_NAME: ${{ secrets.MAC_CODESIGN_IDENTITY }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npm run build:mac
 
       - name: Ensure gh CLI is available
