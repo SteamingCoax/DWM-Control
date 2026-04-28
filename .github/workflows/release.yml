@@ -84,18 +84,12 @@ jobs:
           WINEPREFIX: ${{ runner.temp }}/wine64
         run: |
           mkdir -p "$RUNNER_TEMP/bin"
-          cat > "$RUNNER_TEMP/bin/wine" <<'EOF'
-          #!/usr/bin/env bash
-          if command -v wine64 >/dev/null 2>&1; then
-            exec wine64 "$@"
-          elif command -v wine >/dev/null 2>&1; then
-            exec wine "$@"
-          else
+          WINE_BIN="$(command -v wine64 || command -v wine || true)"
+          if [ -z "$WINE_BIN" ]; then
             echo "Neither wine64 nor wine is installed on this runner" >&2
             exit 127
           fi
-          EOF
-          chmod +x "$RUNNER_TEMP/bin/wine"
+          ln -sf "$WINE_BIN" "$RUNNER_TEMP/bin/wine"
           export PATH="$RUNNER_TEMP/bin:$PATH"
           Xvfb :99 -screen 0 1024x768x16 >/tmp/xvfb.log 2>&1 &
           XVFB_PID=$!
