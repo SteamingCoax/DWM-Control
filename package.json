@@ -170,7 +170,7 @@
         }
       ],
       "icon": "assets/icon.ico",
-      "publisherName": "SteamingCoax",
+      "signAndEditExecutable": false,
       "verifyUpdateCodeSignature": false,
       "requestedExecutionLevel": "asInvoker",
       "extraResources": [
