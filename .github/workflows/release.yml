@@ -69,11 +69,22 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Prepare Wine runtime directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/xdg-runtime"
+          chmod 700 "$RUNNER_TEMP/xdg-runtime"
+
       - name: Build Windows artifacts
         env:
           WINE: wine64
           NSIS_USE_SYSTEM_NSIS: "true"
-        run: npm run build:win
+          XDG_RUNTIME_DIR: ${{ runner.temp }}/xdg-runtime
+          DISPLAY: ":99"
+        run: |
+          Xvfb :99 -screen 0 1024x768x16 >/tmp/xvfb.log 2>&1 &
+          XVFB_PID=$!
+          trap 'kill "$XVFB_PID" >/dev/null 2>&1 || true' EXIT
+          npm run build:win
 
       - name: Upload Windows assets to existing release
         shell: bash
