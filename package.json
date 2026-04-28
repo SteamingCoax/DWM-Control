@@ -101,6 +101,7 @@
     "mac": {
       "category": "public.app-category.developer-tools",
       "icon": "assets/icon.icns",
+      "artifactName": "DWM-Control-${version}-macOS-AppleSilicon.${ext}",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
@@ -150,9 +151,6 @@
           "type": "file"
         }
       ]
-    },
-    "zip": {
-      "artifactName": "DWM-Control-${version}-macOS-AppleSilicon.${ext}"
     },
     "win": {
       "target": [
