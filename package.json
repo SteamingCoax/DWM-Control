@@ -115,7 +115,6 @@
         {
           "target": "zip",
           "arch": [
-            "x64",
             "arm64"
           ]
         }
@@ -131,6 +130,7 @@
       ]
     },
     "dmg": {
+      "artifactName": "DWM-Control-${version}-macOS-Intel.${ext}",
       "title": "${productName} ${version}",
       "icon": "assets/icon.icns",
       "window": {
@@ -151,16 +151,13 @@
         }
       ]
     },
+    "zip": {
+      "artifactName": "DWM-Control-${version}-macOS-AppleSilicon.${ext}"
+    },
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
           "arch": [
             "x64"
           ]
@@ -193,10 +190,7 @@
       "installerIcon": "assets/icon.ico",
       "uninstallerIcon": "assets/icon.ico",
       "installerHeaderIcon": "assets/icon.ico",
-      "artifactName": "${productName} Setup ${version}.${ext}"
-    },
-    "portable": {
-      "artifactName": "${productName} Portable ${version}.${ext}"
+      "artifactName": "DWM-Control-${version}-Windows-Setup.${ext}"
     },
     "linux": {
       "target": [
@@ -221,9 +215,11 @@
       "maintainer": "SteamingCoax"
     },
     "appImage": {
+      "artifactName": "DWM-Control-${version}-Linux.${ext}",
       "category": "Development"
     },
     "deb": {
+      "artifactName": "DWM-Control-${version}-Linux.${ext}",
       "depends": [
         "libusb-1.0-0",
         "dfu-util"

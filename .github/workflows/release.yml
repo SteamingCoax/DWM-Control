@@ -45,10 +45,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload "$RELEASE_TAG" \
-            dist/*.dmg \
-            dist/*mac*.zip \
+            dist/DWM-Control-*-macOS-Intel.dmg \
+            dist/DWM-Control-*-macOS-AppleSilicon.zip \
             dist/latest-mac*.yml \
-            dist/*.blockmap \
             --repo "${{ github.repository }}" \
             --clobber
 
@@ -104,10 +103,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload "$RELEASE_TAG" \
-            dist/*Setup*.exe \
-            dist/*Portable*.exe \
+            dist/DWM-Control-*-Windows-Setup.exe \
             dist/latest.yml \
-            dist/*.blockmap \
             --repo "${{ github.repository }}" \
             --clobber
 
@@ -136,8 +133,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload "$RELEASE_TAG" \
-            dist/*.AppImage \
-            dist/*.deb \
+            dist/DWM-Control-*-Linux.AppImage \
+            dist/DWM-Control-*-Linux.deb \
             dist/latest-linux.yml \
             --repo "${{ github.repository }}" \
             --clobber
