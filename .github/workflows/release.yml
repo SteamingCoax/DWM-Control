@@ -66,6 +66,8 @@ jobs:
         run: npm install
 
       - name: Build Windows artifacts
+        env:
+          WINE: wine64
         run: npm run build:win
 
       - name: Upload Windows assets to existing release
