@@ -33,6 +33,9 @@ jobs:
       - name: Build macOS artifacts
         run: npm run build:mac
 
+      - name: Ensure gh CLI is available
+        run: brew install gh || true
+
       - name: Upload macOS assets to existing release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -53,9 +56,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Install system dependencies
-        run: sudo apt-get update -qq && sudo apt-get install -y wine binutils
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -89,9 +89,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Install system dependencies
-        run: sudo apt-get update -qq && sudo apt-get install -y binutils
 
       - name: Setup Node
         uses: actions/setup-node@v4
