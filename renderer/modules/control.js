@@ -329,11 +329,19 @@
         `;
 
         const settingsToggle = document.getElementById('meter-settings-toggle');
+        const settingsRail   = document.getElementById('meter-settings-rail');
+        const doToggle = () => {
+            const visible = !document.getElementById('meter-page-shell')?.classList.contains('settings-open');
+            this._setGlobalSettingsPanelVisible(Boolean(visible));
+        };
         if (settingsToggle) {
-            settingsToggle.addEventListener('click', () => {
-                const visible = !document.getElementById('meter-page-shell')?.classList.contains('settings-open');
-                this._setGlobalSettingsPanelVisible(Boolean(visible));
+            settingsToggle.addEventListener('click', (e) => {
+                e.stopPropagation(); // prevent rail handler from also firing
+                doToggle();
             });
+        }
+        if (settingsRail) {
+            settingsRail.addEventListener('click', doToggle);
         }
 
         const timingInput = document.getElementById('global-timing-ms');
@@ -376,6 +384,7 @@
 
         this._applyGlobalTimingMs(timingMs, { persist: false, restartTimers: false });
         this._initDragDrop();
+        this._setupCanvasResizeObserver();
     };
 
     // ─── Drag-and-drop card ordering ──────────────────────────────────────────
@@ -538,6 +547,10 @@
                 const wrapper = document.createElement('div');
                 wrapper.innerHTML = html;
                 board.appendChild(wrapper.firstElementChild);
+                // Restore non-default layout
+                if (swrRec.state?.cardLayout && swrRec.state.cardLayout !== 'both') {
+                    this._setSwrCardLayout(cfg.id, swrRec.state.cardLayout);
+                }
             }
         });
 
@@ -599,14 +612,14 @@
           <button class="meter-view-btn active" data-meter-action="view-meters">Meters</button>
           <button class="meter-view-btn" data-meter-action="view-history">History</button>
         </div>
-        <div class="meter-layout-picker" id="meter-${sid}-layout-picker">
-          <button class="meter-layout-btn${cardLayout === 'dual'       ? ' active' : ''}" data-meter-action="layout-dual"       title="Dual gauges">⊞</button>
-          <button class="meter-layout-btn${cardLayout === 'single-L'   ? ' active' : ''}" data-meter-action="layout-single-L"   title="Left gauge only">⬜</button>
-          <button class="meter-layout-btn${cardLayout === 'single-R'   ? ' active' : ''}" data-meter-action="layout-single-R"   title="Right gauge only">⬜</button>
-          <button class="meter-layout-btn${cardLayout === 'wide-left'  ? ' active' : ''}" data-meter-action="layout-wide-left"  title="Wide left gauge">⬛</button>
-          <button class="meter-layout-btn${cardLayout === 'wide-right' ? ' active' : ''}" data-meter-action="layout-wide-right" title="Wide right gauge">⬛</button>
-          <button class="meter-layout-btn${cardLayout === 'stacked'    ? ' active' : ''}" data-meter-action="layout-stacked"    title="Stacked gauges">⏥</button>
-        </div>
+        <select class="form-select form-select-sm meter-layout-select" data-meter-field="cardLayout">
+          <option value="dual"${cardLayout === 'dual'       ? ' selected' : ''}>Dual Gauges</option>
+          <option value="single-L"${cardLayout === 'single-L'   ? ' selected' : ''}>Left Only</option>
+          <option value="single-R"${cardLayout === 'single-R'   ? ' selected' : ''}>Right Only</option>
+          <option value="wide-left"${cardLayout === 'wide-left'  ? ' selected' : ''}>Wide Left</option>
+          <option value="wide-right"${cardLayout === 'wide-right' ? ' selected' : ''}>Wide Right</option>
+          <option value="stacked"${cardLayout === 'stacked'    ? ' selected' : ''}>Stacked</option>
+        </select>
         <div class="meter-chart-actions">
                     <button class="btn btn-secondary btn-small" data-meter-action="export-history">Export Data</button>
         </div>
@@ -899,6 +912,11 @@
             historyWindowMs: 30000,
             lastComputed: null,   // {swr, rl, gamma, fwdW, refW, ts}
             viewMode: 'gauges',
+            cardLayout: 'both',
+            bestSwr:  null,   // lowest SWR seen (avg metric)
+            worstSwr: null,   // highest SWR seen (avg metric)
+            bestRl:   null,   // highest RL (dB) seen (avg metric)
+            worstRl:  null,   // lowest RL (dB) seen (avg metric)
         };
     };
 
@@ -939,8 +957,6 @@
             { v: 'avg',  l: 'AVG — Average'       },
             { v: 'inst', l: 'INST — Instantaneous' },
             { v: 'peak', l: 'PEP — Peak Envelope'  },
-            { v: 'max',  l: 'MAX — Running Max'     },
-            { v: 'min',  l: 'MIN — Running Min'     },
         ];
         return opts.map(o => `<option value="${o.v}"${o.v === selected ? ' selected' : ''}>${o.l}</option>`).join('');
     };
@@ -949,6 +965,8 @@
         const id  = swrRec.id;
         const sid = this.swrSafeId(id);
         const histWindowMs = swrRec.state?.historyWindowMs || 30000;
+        const viewMode     = swrRec.state?.viewMode    || 'gauges';
+        const cardLayout   = swrRec.state?.cardLayout  || 'both';
         const histRangeOptions = [
             [5000, '5 s'], [10000, '10 s'], [30000, '30 s'], [60000, '1 min'],
             [300000, '5 min'], [600000, '10 min'], [1800000, '30 min'],
@@ -993,13 +1011,26 @@
     <span class="swr-status-text" id="swr-${sid}-status">Select forward and reflected power sources above.</span>
   </div>
 
-  <div class="swr-gauges-view" id="swr-${sid}-gauges-view">
+  <div class="swr-toolbar">
+    <select class="form-select form-select-sm" data-swr-id="${id}" data-swr-field="view">
+      <option value="gauges"${viewMode === 'gauges'  ? ' selected' : ''}>Meters</option>
+      <option value="history"${viewMode === 'history' ? ' selected' : ''}>History</option>
+    </select>
+    <select class="form-select form-select-sm" data-swr-id="${id}" data-swr-field="cardLayout">
+      <option value="both"${cardLayout === 'both'     ? ' selected' : ''}>Both Gauges</option>
+      <option value="swr-only"${cardLayout === 'swr-only' ? ' selected' : ''}>SWR Only</option>
+      <option value="rl-only"${cardLayout === 'rl-only'  ? ' selected' : ''}>Return Loss Only</option>
+      <option value="stacked"${cardLayout === 'stacked'  ? ' selected' : ''}>Stacked</option>
+    </select>
+  </div>
+
+  <div class="swr-gauges-view" id="swr-${sid}-gauges-view" data-layout="${cardLayout}"${viewMode === 'history' ? ' style="display:none"' : ''}>
     <div class="swr-gauge-pair">
-      <div class="swr-gauge-panel">
+      <div class="swr-gauge-panel" data-swr-panel="swr">
         <div class="swr-gauge-panel-label">SWR</div>
         <canvas id="swr-${sid}-gauge-swr" class="meter-gauge-radial-canvas"></canvas>
       </div>
-      <div class="swr-gauge-panel">
+      <div class="swr-gauge-panel" data-swr-panel="rl">
         <div class="swr-gauge-panel-label">Return Loss</div>
         <canvas id="swr-${sid}-gauge-rl" class="meter-gauge-radial-canvas"></canvas>
       </div>
@@ -1025,6 +1056,23 @@
         <span class="swr-chip-label">Reflected</span>
         <span id="swr-${sid}-val-ref" class="swr-chip-value">—</span>
       </div>
+      <div class="swr-chip swr-chip-best">
+        <span class="swr-chip-label">BEST SWR</span>
+        <span id="swr-${sid}-val-best-swr" class="swr-chip-value swr-chip-best-val">—</span>
+      </div>
+      <div class="swr-chip swr-chip-best-rl">
+        <span class="swr-chip-label">BEST RL</span>
+        <span id="swr-${sid}-val-best-rl" class="swr-chip-value swr-chip-best-val">—</span>
+      </div>
+      <div class="swr-chip swr-chip-worst">
+        <span class="swr-chip-label">WORST SWR</span>
+        <span id="swr-${sid}-val-worst-swr" class="swr-chip-value swr-chip-worst-val">—</span>
+      </div>
+      <div class="swr-chip swr-chip-worst-rl">
+        <span class="swr-chip-label">WORST RL</span>
+        <span id="swr-${sid}-val-worst-rl" class="swr-chip-value swr-chip-worst-val">—</span>
+      </div>
+      <button class="btn btn-danger btn-small swr-bw-reset-btn" data-swr-id="${id}" data-swr-action="reset-best-worst" title="Reset BEST / WORST to current reading">STAT Reset</button>
     </div>
   </div>
 
@@ -1038,6 +1086,48 @@
     <canvas id="swr-${sid}-history-canvas" class="meter-history-canvas"></canvas>
   </div>
 </div>`;
+    };
+
+    // ─── Canvas resize / zoom repaint ─────────────────────────────────────────
+
+    DWMControl.prototype._repaintAllCanvases = function() {
+        // Repaint all power meter gauge + history canvases
+        for (const [key, record] of this.meterRegistry.entries()) {
+            if (record.state?.lastSnapshotResponse) {
+                requestAnimationFrame(() => this._updateMeterGauges(key, record.state.lastSnapshotResponse));
+            }
+            this._drawMeterHistory(key);
+        }
+        // Repaint all SWR gauge + history canvases
+        if (this.swrCardRegistry) {
+            for (const [id, rec] of this.swrCardRegistry.entries()) {
+                if (rec.fwdKey) {
+                    requestAnimationFrame(() => this._updateSwrCardsForMeter(rec.fwdKey));
+                }
+                this._drawSwrHistory(id);
+            }
+        }
+    };
+
+    DWMControl.prototype._setupCanvasResizeObserver = function() {
+        const main = document.querySelector('.meter-page-main');
+        if (!main || this._canvasResizeObserver) return;
+
+        let debounceTimer = null;
+        const repaint = () => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => this._repaintAllCanvases(), 80);
+        };
+
+        this._canvasResizeObserver = new ResizeObserver(repaint);
+        this._canvasResizeObserver.observe(main);
+
+        // Also repaint when device pixel ratio changes (Electron Ctrl+/- zoom)
+        const trackDprChange = () => {
+            const mq = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+            mq.addEventListener('change', () => { repaint(); trackDprChange(); }, { once: true });
+        };
+        trackDprChange();
     };
 
 })();

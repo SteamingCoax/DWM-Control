@@ -161,15 +161,18 @@
 
 html {
   font-size: 16px;
+  height: 100%;
+  overflow: hidden;
   line-height: var(--line-height-normal);
   transition: var(--transition-normal);
 }
 
 body {
+  height: 100%;
+  overflow: hidden;
   font-family: var(--font-family);
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  overflow-x: hidden;
   transition: background-color var(--transition-normal), color var(--transition-normal);
 }
 
@@ -178,7 +181,8 @@ body {
    =============================================== */
 
 .app-container {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   display: grid;
   grid-template-areas: 
     "header header"
@@ -213,15 +217,11 @@ body {
 }
 
 .logo-icon {
-  font-size: var(--font-size-3xl);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   width: 48px;
   height: 48px;
-  background: rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-lg);
-  backdrop-filter: blur(10px);
+  object-fit: contain;
 }
 
 .logo-text h1 {
@@ -926,7 +926,7 @@ body {
   grid-area: content;
   padding: 0;
   overflow-y: auto;
-  height: calc(100vh - var(--header-height) - var(--nav-height));
+  min-height: 0;    /* grid item: prevent overflow beyond allocated row */
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -1534,54 +1534,90 @@ label {
     grid-template-columns: 1fr;
     grid-template-rows: var(--header-height) var(--nav-height) 1fr auto;
   }
-  
+
   .console-sidebar {
     max-height: 300px;
-  }
-  
-  .main-content {
-    max-height: none;
-    height: auto;
   }
 }
 
 @media (max-width: 768px) {
   .app-header {
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-2) var(--space-3);
   }
-  
+
   .header-content {
-    flex-direction: column;
-    gap: var(--space-3);
-    text-align: center;
+    flex-direction: row;
+    gap: var(--space-2);
   }
-  
-  .main-content {
-    padding: var(--space-4);
-  }
-  
+
   .panel-container {
     gap: var(--space-4);
   }
-  
+
   .card-content {
     padding: var(--space-4);
   }
-  
+
   .form-row {
     grid-template-columns: 1fr;
   }
-  
+
   .control-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .tab-navigation {
-    padding: 0 var(--space-4);
+    padding: 0 var(--space-2);
   }
-  
+
   .tab-button {
-    padding: var(--space-3) var(--space-4);
+    padding: var(--space-2) var(--space-3);
+  }
+}
+
+/* Compact mode: narrow tiled window (≤ 480px wide) */
+@media (max-width: 480px) {
+  :root {
+    --header-height: 48px;
+    --nav-height:    40px;
+  }
+
+  .logo-text {
+    display: none;
+  }
+
+  .logo-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .app-header {
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .tab-label {
+    display: none;
+  }
+
+  .tab-button {
+    padding: var(--space-2);
+    gap: 0;
+  }
+
+  .tab-navigation {
+    padding: 0 var(--space-1);
+  }
+}
+
+/* Ultra-compact: very thin portrait / tiled (≤ 320px wide) */
+@media (max-width: 320px) {
+  :root {
+    --header-height: 40px;
+    --nav-height:    36px;
+  }
+
+  .header-status {
+    display: none;
   }
 }
 

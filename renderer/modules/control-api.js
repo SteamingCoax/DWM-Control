@@ -576,16 +576,15 @@
         if (!record?.state) return;
         record.state.cardLayout = layout;
 
-        const sid       = this.meterSafeId(key);
+        const sid        = this.meterSafeId(key);
         const gaugesView = document.getElementById(`meter-${sid}-gauges-view`);
         if (gaugesView) gaugesView.dataset.layout = layout;
 
-        // Update active state on picker buttons
-        const picker = document.getElementById(`meter-${sid}-layout-picker`);
-        if (picker) {
-            picker.querySelectorAll('.meter-layout-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.meterAction === `layout-${layout}`);
-            });
+        // Sync layout dropdown value
+        const cardEl = document.querySelector(`[data-meter-key="${key}"]`);
+        if (cardEl) {
+            const sel = cardEl.querySelector('.meter-layout-select');
+            if (sel) sel.value = layout;
         }
 
         // Hide panels that aren't shown in this layout
@@ -602,6 +601,33 @@
         const liveRecord = this.meterRegistry.get(key);
         if (liveRecord?.state?.lastSnapshotResponse) {
             requestAnimationFrame(() => this._updateMeterGauges(key, liveRecord.state.lastSnapshotResponse));
+        }
+    };
+
+    DWMControl.prototype._setSwrCardLayout = function(id, layout) {
+        const reg = this._getSwrRegistry();
+        const rec = reg.get(id);
+        if (!rec?.state) return;
+        rec.state.cardLayout = layout;
+
+        const sid        = this.swrSafeId(id);
+        const gaugesView = document.getElementById(`swr-${sid}-gauges-view`);
+        if (gaugesView) gaugesView.dataset.layout = layout;
+
+        // Show/hide individual gauge panels
+        const swrPanel = gaugesView?.querySelector('[data-swr-panel="swr"]');
+        const rlPanel  = gaugesView?.querySelector('[data-swr-panel="rl"]');
+        if (swrPanel && rlPanel) {
+            const showSwr = layout !== 'rl-only';
+            const showRl  = layout !== 'swr-only';
+            swrPanel.style.display = showSwr ? '' : 'none';
+            rlPanel.style.display  = showRl  ? '' : 'none';
+        }
+
+        // Force gauge repaint at new size using the fwd meter key
+        const fwdKey = rec.fwdKey;
+        if (fwdKey && rec.state.lastComputed) {
+            requestAnimationFrame(() => this._updateSwrCardsForMeter(fwdKey));
         }
     };
 })();

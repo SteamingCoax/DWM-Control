@@ -391,7 +391,7 @@
      * @param {string}   metricLabel  label shown in digital readout strip
      * @param {Array}    tickDefs     [{p, label, major}] tick descriptors; p is 0-1 normalized position
      */
-    DWMControl.prototype._drawSwrGauge = function(canvas, pct, valStr, metricLabel, tickDefs, zoneOpts) {
+    DWMControl.prototype._drawSwrGauge = function(canvas, pct, valStr, metricLabel, tickDefs, zoneOpts, overlayMsg) {
         if (!canvas || canvas.offsetWidth === 0) return;
 
         const TRACK_W  = 14;
@@ -527,6 +527,18 @@
         ctx.beginPath(); ctx.arc(cx, cy, 9,   0, Math.PI * 2); ctx.fillStyle = pal.pivotOuter; ctx.fill();
         ctx.beginPath(); ctx.arc(cx, cy, 5.5, 0, Math.PI * 2); ctx.fillStyle = pal.pivotMid;   ctx.fill();
         ctx.beginPath(); ctx.arc(cx, cy, 2,   0, Math.PI * 2); ctx.fillStyle = pal.pivotInner; ctx.fill();
+
+        // ── Overlay message (e.g. "No FWD Power") — drawn in arc center, hides needle area
+        if (overlayMsg) {
+            const msgFS = Math.max(14, Math.min(28, Math.floor((cssW - PAD_SIDE * 0.6) / Math.max(overlayMsg.length, 1) * 1.1)));
+            ctx.fillStyle    = pal.digBg;
+            ctx.fillRect(cx - radius * 0.88, cy - radius * 0.55, radius * 1.76, radius * 0.72);
+            ctx.fillStyle    = 'rgba(200,80,80,0.88)';
+            ctx.font         = `bold ${msgFS}px sans-serif`;
+            ctx.textAlign    = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(overlayMsg, cx, cy - radius * 0.20);
+        }
 
         // ── Digital readout strip
         const digTop = cy + 14;

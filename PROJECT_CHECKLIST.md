@@ -1,9 +1,11 @@
 # DWM Control Project Checklist
 
 ## Overall Application
-- [ ] Add back in the app icon next to the App title
-- [ ] Put in a professional looking icon for the light/dark mode button.
-- [ ] Put the Control Tab first and the Firmware Upload tab second
+- [x] Add back in the app icon next to the App title
+- [x] Put in a professional looking icon for the light/dark mode button.
+- [x] Put the Control Tab first and the Firmware Upload tab second
+- [x] Make app and elements properly resize to fit nearly any display and make zooming in and out propely scale the elements.
+- [ ] When closing the main app window, the app should fully quit.
 
 
 ## Control Tab (USB API)
@@ -29,6 +31,7 @@
 - [x] Add multiple meter card layout configurations (single gauge, dual gauge, different positioning schemes of gauges and dropdowns)
 - [x] Ensure that no code files are getting to large and see if they should be subdivided.
 - [x] Design a card for using the data from two meter cards for returnloss/SWR metering and graphing. The meters cards used for forward power and reflected power are to be selectable.
+- [x] Make the expandable Global Settings bar arrow button work for the entire vertical range of the window along the bar.
 
 ## Hardware Validation
 - [x] Connect to real DWM device over serial

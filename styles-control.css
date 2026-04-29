@@ -1337,6 +1337,7 @@
 /* Two-panel radial gauge layout */
 .meter-gauge-radial-pair {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
 }
 
@@ -1348,6 +1349,13 @@
 .meter-gauges-view[data-layout="wide-left"]  .meter-gauge-radial-pair { flex-direction: row; }
 .meter-gauges-view[data-layout="wide-right"] .meter-gauge-radial-pair { flex-direction: row; }
 
+/* Single-gauge layouts: constrain the visible panel to 90% width so it doesn't over-fill */
+.meter-gauges-view[data-layout="single-L"] .meter-gauge-radial-panel:first-child,
+.meter-gauges-view[data-layout="single-R"] .meter-gauge-radial-panel:last-child {
+    max-width: 90%;
+    margin: 0 auto;
+}
+
 /* Wide-left: left panel takes 2/3, right takes 1/3 */
 .meter-gauges-view[data-layout="wide-left"]  .meter-gauge-radial-panel:first-child { flex: 2; }
 .meter-gauges-view[data-layout="wide-left"]  .meter-gauge-radial-panel:last-child  { flex: 1; }
@@ -1355,42 +1363,22 @@
 .meter-gauges-view[data-layout="wide-right"] .meter-gauge-radial-panel:first-child { flex: 1; }
 .meter-gauges-view[data-layout="wide-right"] .meter-gauge-radial-panel:last-child  { flex: 2; }
 
-/* ── Layout picker button group ── */
-.meter-layout-picker {
-    display: flex;
-    gap: 2px;
-    align-items: center;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 5px;
-    padding: 2px 3px;
+/* ── Layout dropdown (replaces button group) ── */
+.meter-layout-select {
+    font-size: 12px;
+    padding:   3px 24px 3px 8px;
+    height:    26px;
+    width:     auto;
 }
-
-.meter-layout-btn {
-    background: none;
-    border: none;
-    border-radius: 3px;
-    color: rgba(255,255,255,0.38);
-    cursor: pointer;
-    font-size: 13px;
-    line-height: 1;
-    padding: 2px 5px;
-    transition: background 0.12s, color 0.12s;
-}
-.meter-layout-btn:hover  { background: rgba(255,255,255,0.10); color: rgba(255,255,255,0.80); }
-.meter-layout-btn.active { background: rgba(74,158,255,0.22);  color: #4a9eff; }
 
 [data-theme="light"] .meter-layout-picker {
     background: rgba(0,0,0,0.04);
     border-color: rgba(0,0,0,0.14);
 }
-[data-theme="light"] .meter-layout-btn { color: rgba(0,0,0,0.35); }
-[data-theme="light"] .meter-layout-btn:hover  { background: rgba(0,0,0,0.08); color: rgba(0,0,0,0.75); }
-[data-theme="light"] .meter-layout-btn.active { background: rgba(37,99,235,0.14); color: #2563eb; }
 
 .meter-gauge-radial-panel {
-    flex: 1;
-    min-width: 0;
+    flex: 1 1 180px;
+    min-width: 180px;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -1402,7 +1390,8 @@
 }
 
 .gauge-metric-select {
-  flex: 1 1 auto;
+    flex: 0 0 auto;
+    width: auto;
     font-size: 13px;
     padding: 3px 6px;
     background: rgba(255,255,255,0.06);
@@ -1418,7 +1407,8 @@
 }
 
 .gauge-display-select {
-  flex: 0 0 132px;
+  flex: 0 0 auto;
+  width: auto;
   font-size: 12px;
   padding: 3px 6px;
   background: rgba(255,255,255,0.06);
@@ -1660,7 +1650,7 @@
 }
 
 .meter-page-shell.settings-open .meter-settings-panel {
-  width: 300px;
+  width: min(300px, 75vw);
   opacity: 1;
   padding: 12px;
   border-left-color: var(--border-color);
@@ -2250,6 +2240,33 @@
     }
 }
 
+/* ── Narrow window responsive: single-column gauge wrap (< 520px) ──────── */
+@media (max-width: 520px) {
+  .meter-gauge-radial-pair,
+  .swr-gauge-pair {
+    flex-direction: column;
+  }
+  .meter-gauge-radial-panel,
+  .swr-gauge-panel {
+    min-width: 0;
+    width: 100%;
+  }
+  .swr-chip {
+    min-width: 60px;
+    padding: 4px 7px;
+  }
+  .swr-chip-value {
+    font-size: 13px;
+  }
+  .meter-gauge-overlay-val {
+    font-size: 22px;
+  }
+  .meter-board {
+    padding: 10px;
+    gap: 10px;
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    SWR / RETURN LOSS DERIVED CARDS
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -2349,9 +2366,25 @@
     flex-shrink: 0;
 }
 .swr-metric-row .form-select {
-    flex:      1 1 auto;
+    flex:      0 0 auto;
+    width:     auto;
     font-size: 12px;
     padding:   4px 6px;
+}
+
+/* ── SWR toolbar ──────────────────────────────────────────────────────────── */
+.swr-toolbar {
+    display:     flex;
+    align-items: center;
+    gap:         8px;
+    margin-top:  8px;
+    flex-wrap:   wrap;
+}
+.swr-toolbar .form-select {
+    font-size: 12px;
+    padding:   4px 24px 4px 8px;
+    height:    28px;
+    width:     auto;
 }
 .swr-source-arrow {
     font-size:   22px;
@@ -2386,10 +2419,12 @@
 }
 .swr-gauge-pair {
     display: flex;
+    flex-wrap: wrap;
     gap:     16px;
 }
 .swr-gauge-panel {
-    flex:          1 1 0;
+    flex:          1 1 160px;
+    min-width:     160px;
     display:       flex;
     flex-direction: column;
     align-items:   center;
@@ -2402,6 +2437,15 @@
     letter-spacing: 0.06em;
     color:          rgba(139, 92, 246, 0.80);
 }
+
+/* ── SWR gauge layout variants ─────────────────────────────────────────────── */
+.swr-gauges-view[data-layout="swr-only"] [data-swr-panel="rl"]  { display: none; }
+.swr-gauges-view[data-layout="rl-only"]  [data-swr-panel="swr"] { display: none; }
+.swr-gauges-view[data-layout="stacked"]  .swr-gauge-pair {
+    flex-direction: column;
+    align-items:    stretch;
+}
+.swr-gauges-view[data-layout="stacked"]  .swr-gauge-panel { flex: none; }
 
 /* ── Derived value chips ────────────────────────────────────────────────────── */
 .swr-derived-chips {
@@ -2443,12 +2487,23 @@
 .swr-chip-gamma { border-color: rgba(20,  184, 166, 0.40); }   /* teal  */
 .swr-chip-fwd   { border-color: rgba(34,  197, 94,  0.40); }   /* green */
 .swr-chip-ref   { border-color: rgba(239,  68,  68,  0.40); }  /* red   */
+.swr-chip-best     { border-color: rgba(34,  197, 94,  0.40); } /* green */
+.swr-chip-best-rl  { border-color: rgba(34,  197, 94,  0.40); }
+.swr-chip-worst    { border-color: rgba(239,  68,  68,  0.40); } /* red  */
+.swr-chip-worst-rl { border-color: rgba(239,  68,  68,  0.40); }
 
 .swr-chip-swr   .swr-chip-value { color: #fbbf24; }
 .swr-chip-rl    .swr-chip-value { color: #60a5fa; }
 .swr-chip-gamma .swr-chip-value { color: #2dd4bf; }
 .swr-chip-fwd   .swr-chip-value { color: #4ade80; }
 .swr-chip-ref   .swr-chip-value { color: #f87171; }
+.swr-chip-best-val  { color: #4ade80; }   /* green — best is good */
+.swr-chip-worst-val { color: #f87171; }   /* red   — worst is bad */
+
+.swr-bw-reset-btn {
+    align-self: center;
+    margin-left: 4px;
+}
 
 /* ── History view ──────────────────────────────────────────────────────────── */
 .swr-history-view {
@@ -2490,5 +2545,7 @@
 [data-theme="light"] .swr-chip-gamma  .swr-chip-value { color: #0f766e; }
 [data-theme="light"] .swr-chip-fwd    .swr-chip-value { color: #15803d; }
 [data-theme="light"] .swr-chip-ref    .swr-chip-value { color: #b91c1c; }
+[data-theme="light"] .swr-chip-best-val  { color: #15803d; }
+[data-theme="light"] .swr-chip-worst-val { color: #b91c1c; }
 [data-theme="light"] .swr-history-toolbar { color: rgba(100, 70, 170, 0.70); }
 

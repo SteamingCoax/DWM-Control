@@ -82,6 +82,64 @@
 
         board.addEventListener('change', async (e) => {
             const sel = e.target;
+
+            // SWR toolbar dropdowns (no id, identified by dataset)
+            if (sel.dataset.swrId && sel.dataset.swrField) {
+                const swrId = sel.dataset.swrId;
+                const field = sel.dataset.swrField;
+                const swrCards = this.config.swrCards || [];
+                const cfg = swrCards.find(c => c.id === swrId);
+
+                if (field === 'view') {
+                    const sid        = this.swrSafeId(swrId);
+                    const gaugesView = document.getElementById(`swr-${sid}-gauges-view`);
+                    const histView   = document.getElementById(`swr-${sid}-history-view`);
+                    const isHistory  = sel.value === 'history';
+                    if (gaugesView) gaugesView.style.display = isHistory ? 'none' : '';
+                    if (histView)   histView.style.display   = isHistory ? '' : 'none';
+                    const rec = this._getSwrRegistry().get(swrId);
+                    if (rec?.state) rec.state.viewMode = sel.value;
+                    if (isHistory) this._drawSwrHistory(swrId);
+                    return;
+                }
+
+                if (field === 'cardLayout') {
+                    this._setSwrCardLayout(swrId, sel.value);
+                    return;
+                }
+
+                if (cfg) {
+                    if (field === 'historyRange') {
+                        const ms = Number.parseInt(sel.value, 10);
+                        const rec = this._getSwrRegistry().get(swrId);
+                        if (rec?.state && Number.isFinite(ms) && ms > 0) {
+                            rec.state.historyWindowMs = ms;
+                            this._drawSwrHistory(swrId);
+                        }
+                    } else if (field === 'metric') {
+                        cfg.fwdMetric = sel.value || 'avg';
+                        cfg.refMetric = sel.value || 'avg';
+                        const rec = this._getSwrRegistry().get(swrId);
+                        if (rec) { rec.fwdMetric = cfg.fwdMetric; rec.refMetric = cfg.refMetric; }
+                        this.saveConfig();
+                    } else {
+                        cfg[field] = sel.value || null;
+                        const rec = this._getSwrRegistry().get(swrId);
+                        if (rec) rec[field] = sel.value || null;
+                        this.saveConfig();
+                    }
+                }
+                return;
+            }
+
+            // Meter layout dropdown (no id)
+            if (sel.dataset.meterField === 'cardLayout') {
+                const cardEl = sel.closest('[data-meter-key]');
+                const key = cardEl?.dataset.meterKey;
+                if (key) this._setMeterCardLayout(key, sel.value);
+                return;
+            }
+
             if (!sel.id) return;
 
             // History line metric toggle checkboxes
@@ -250,35 +308,6 @@
                 }
             }
 
-            // SWR card source/field selectors
-            if (sel.dataset.swrId && sel.dataset.swrField) {
-                const swrId    = sel.dataset.swrId;
-                const field    = sel.dataset.swrField;
-                const swrCards = this.config.swrCards || [];
-                const cfg      = swrCards.find(c => c.id === swrId);
-                if (cfg) {
-                    if (field === 'historyRange') {
-                        const ms = Number.parseInt(sel.value, 10);
-                        const rec = this._getSwrRegistry().get(swrId);
-                        if (rec?.state && Number.isFinite(ms) && ms > 0) {
-                            rec.state.historyWindowMs = ms;
-                            this._drawSwrHistory(swrId);
-                        }
-                    } else if (field === 'metric') {
-                        // Single selector sets both fwd and ref to the same metric type
-                        cfg.fwdMetric = sel.value || 'avg';
-                        cfg.refMetric = sel.value || 'avg';
-                        const rec = this._getSwrRegistry().get(swrId);
-                        if (rec) { rec.fwdMetric = cfg.fwdMetric; rec.refMetric = cfg.refMetric; }
-                        this.saveConfig();
-                    } else {
-                        cfg[field] = sel.value || null;
-                        const rec = this._getSwrRegistry().get(swrId);
-                        if (rec) rec[field] = sel.value || null;
-                        this.saveConfig();
-                    }
-                }
-            }
         });
 
         board.addEventListener('keydown', (e) => {
@@ -310,6 +339,30 @@
             case 'remove':
                 this.removeSwrCard(swrId);
                 break;
+            case 'reset-best-worst': {
+                const rec = this._getSwrRegistry().get(swrId);
+                if (!rec?.state) break;
+                const st = rec.state;
+                // Require a valid last avg-based reading to reset to
+                const cfg     = (this.config.swrCards || []).find(c => c.id === swrId);
+                const fwdRec  = cfg?.fwdKey ? this.meterRegistry.get(cfg.fwdKey) : null;
+                const refRec  = cfg?.refKey ? this.meterRegistry.get(cfg.refKey) : null;
+                const fwdConn = fwdRec && fwdRec.connectionState === 'connected';
+                const refConn = refRec && refRec.connectionState === 'connected';
+                if (!fwdConn || !refConn) break; // silently ignore — meters not connected
+                const fwdSnap = fwdRec.state?.lastSnapshotRaw;
+                const refSnap = refRec.state?.lastSnapshotRaw;
+                const fwdAvgW = fwdSnap ? Number.parseFloat(fwdSnap['avg']) : NaN;
+                const refAvgW = refSnap ? Number.parseFloat(refSnap['avg']) : NaN;
+                const m = this._computeSwrMetrics(fwdAvgW, refAvgW);
+                if (!m) break; // no valid signal to reset to
+                st.bestSwr  = m.swr;
+                st.worstSwr = m.swr;
+                st.bestRl   = m.rl;
+                st.worstRl  = m.rl;
+                this._updateSwrChips(sid, st.lastComputed, st);
+                break;
+            }
             case 'view-gauges': {
                 const gaugesView  = document.getElementById(`swr-${sid}-gauges-view`);
                 const histView    = document.getElementById(`swr-${sid}-history-view`);

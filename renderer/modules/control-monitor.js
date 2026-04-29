@@ -639,22 +639,58 @@
             const sid = this.swrSafeId(cfg.id);
             const statusEl = document.getElementById(`swr-${sid}-status`);
 
-            if (!cfg.fwdKey || !cfg.refKey) {
-                if (statusEl) statusEl.textContent = 'Select forward and reflected power sources above.';
+            // Determine overlay message based on configuration / connection state
+            const fwdSet  = !!cfg.fwdKey;
+            const refSet  = !!cfg.refKey;
+            const fwdConn = fwdSet && fwdRec && fwdRec.connectionState === 'connected';
+            const refConn = refSet && refRec && refRec.connectionState === 'connected';
+
+            let overlayMsg = null;
+            if (!fwdSet && !refSet) {
+                overlayMsg = 'FWD & REV Not Set';
+            } else if (!fwdSet) {
+                overlayMsg = 'FWD Meter Not Set';
+            } else if (!refSet) {
+                overlayMsg = 'REV Meter Not Set';
+            } else if (!fwdConn && !refConn) {
+                overlayMsg = 'FWD & REV Not Connected';
+            } else if (!fwdConn) {
+                overlayMsg = 'FWD Meter Not Connected';
+            } else if (!refConn) {
+                overlayMsg = 'REV Meter Not Connected';
+            }
+
+            if (overlayMsg) {
+                if (statusEl) statusEl.textContent = '';
+                this._updateSwrChips(sid, null);
+                this._drawIdleSwrGaugesWithMsg(sid, overlayMsg);
                 continue;
             }
 
             const metrics = this._computeSwrMetrics(fwdW, refW);
             if (!metrics) {
-                if (statusEl) statusEl.textContent = 'No signal (forward power ≤ 0)';
-                this._updateSwrChips(sid, null);
+                if (statusEl) statusEl.textContent = '';
+                this._updateSwrChips(sid, null, null);
                 this._drawIdleSwrGauges(sid);
                 continue;
             }
 
+            // Track BEST / WORST using avg metric specifically
+            const fwdAvgW = fwdSnap ? Number.parseFloat(fwdSnap['avg']) : NaN;
+            const refAvgW = refSnap ? Number.parseFloat(refSnap['avg']) : NaN;
+            const avgMetrics = this._computeSwrMetrics(fwdAvgW, refAvgW);
+            const rec = this._getSwrRegistry().get(cfg.id);
+            if (avgMetrics && rec?.state) {
+                const st = rec.state;
+                if (st.bestSwr  === null || avgMetrics.swr < st.bestSwr)  st.bestSwr  = avgMetrics.swr;
+                if (st.worstSwr === null || avgMetrics.swr > st.worstSwr) st.worstSwr = avgMetrics.swr;
+                if (st.bestRl   === null || avgMetrics.rl  > st.bestRl)   st.bestRl   = avgMetrics.rl;
+                if (st.worstRl  === null || avgMetrics.rl  < st.worstRl)  st.worstRl  = avgMetrics.rl;
+            }
+
             // Update chips
             if (statusEl) statusEl.textContent = `Updated ${new Date().toLocaleTimeString()}`;
-            this._updateSwrChips(sid, metrics);
+            this._updateSwrChips(sid, metrics, rec?.state);
 
             // Draw gauges
             const swrCanvas = document.getElementById(`swr-${sid}-gauge-swr`);
@@ -677,24 +713,25 @@
                 const swrStr   = metrics.swr >= 999 ? '\u221e' : metrics.swr.toFixed(2) + ':1';
                 const swrTicks = SWR_ANCHORS.map((v, i) => ({
                     p:     i / SWR_N,
-                    label: `${v}:1`,
+                    label: `${v}`,
                     major: true,
                 }));
-                // SWR zones: green 1:1–2:1 (p=0–0.625), yellow 2:1–3:1 (p=0.625–0.75), red 3:1–10:1 (p=0.75–1)
+                // SWR zones aligned with RL scale: green SWR≤1.43 (RL≥15dB), yellow 1.43–1.93 (RL 10–15dB), red ≥1.93 (RL≤10dB)
+                // Piecewise boundaries: p≈0.472 (SWR 1.43) and p≈0.606 (SWR 1.93)
                 const swrZoneOpts = {
                     zonesDark:  [
-                        { from: 0,     to: 0.625, dim: '#14532d', bright: '#16a34a' },
-                        { from: 0.625, to: 0.75,  dim: '#78350f', bright: '#d97706' },
-                        { from: 0.75,  to: 1.00,  dim: '#7f1d1d', bright: '#ef4444' },
+                        { from: 0,     to: 0.472, dim: '#14532d', bright: '#16a34a' },
+                        { from: 0.472, to: 0.606, dim: '#78350f', bright: '#d97706' },
+                        { from: 0.606, to: 1.00,  dim: '#7f1d1d', bright: '#ef4444' },
                     ],
                     zonesLight: [
-                        { from: 0,     to: 0.625, dim: '#bbf7d0', bright: '#16a34a' },
-                        { from: 0.625, to: 0.75,  dim: '#fef08a', bright: '#ca8a04' },
-                        { from: 0.75,  to: 1.00,  dim: '#fecaca', bright: '#dc2626' },
+                        { from: 0,     to: 0.472, dim: '#bbf7d0', bright: '#16a34a' },
+                        { from: 0.472, to: 0.606, dim: '#fef08a', bright: '#ca8a04' },
+                        { from: 0.606, to: 1.00,  dim: '#fecaca', bright: '#dc2626' },
                     ],
-                    zoneLabel: dark => p => p >= 0.75 ? (dark ? '#fca5a5' : '#b91c1c') : p >= 0.625 ? (dark ? '#fde68a' : '#92400e') : (dark ? '#86efac' : '#166534'),
-                    zoneColor:  dark => p => p >= 0.75 ? (dark ? '#f87171' : '#dc2626') : p >= 0.625 ? (dark ? '#fbbf24' : '#d97706') : (dark ? '#4ade80' : '#16a34a'),
-                    dividers: [0.625, 0.75],
+                    zoneLabel: dark => p => p >= 0.606 ? (dark ? '#fca5a5' : '#b91c1c') : p >= 0.472 ? (dark ? '#fde68a' : '#92400e') : (dark ? '#86efac' : '#166534'),
+                    zoneColor:  dark => p => p >= 0.606 ? (dark ? '#f87171' : '#dc2626') : p >= 0.472 ? (dark ? '#fbbf24' : '#d97706') : (dark ? '#4ade80' : '#16a34a'),
+                    dividers: [0.472, 0.606],
                 };
                 this._drawSwrGauge(swrCanvas, swrPct, swrStr, 'SWR', swrTicks, swrZoneOpts);
             }
@@ -729,7 +766,6 @@
             }
 
             // Push and draw history
-            const rec = this._getSwrRegistry().get(cfg.id);
             if (rec?.state) {
                 rec.state.lastComputed = { ...metrics, ts: Date.now() };
             }
@@ -738,29 +774,53 @@
         }
     };
 
-    DWMControl.prototype._updateSwrChips = function(sid, metrics) {
+    DWMControl.prototype._updateSwrChips = function(sid, metrics, state) {
         const setChip = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+        const fmtSwr = v => (v === null || v === undefined) ? '—' : (v >= 999 ? '∞' : `${v.toFixed(2)}:1`);
+        const fmtRl  = v => (v === null || v === undefined) ? '—' : (v >= 60  ? '≥ 60 dB' : `${v.toFixed(1)} dB`);
         if (!metrics) {
             setChip(`swr-${sid}-val-swr`,   '—');
             setChip(`swr-${sid}-val-rl`,    '—');
             setChip(`swr-${sid}-val-gamma`, '—');
             setChip(`swr-${sid}-val-fwd`,   '—');
             setChip(`swr-${sid}-val-ref`,   '—');
+            // Keep best/worst chips if state exists
+            if (state) {
+                setChip(`swr-${sid}-val-best-swr`,  fmtSwr(state.bestSwr));
+                setChip(`swr-${sid}-val-best-rl`,   fmtRl(state.bestRl));
+                setChip(`swr-${sid}-val-worst-swr`, fmtSwr(state.worstSwr));
+                setChip(`swr-${sid}-val-worst-rl`,  fmtRl(state.worstRl));
+            }
             return;
         }
-        const swrStr = metrics.swr >= 999 ? '∞' : `${metrics.swr.toFixed(2)}:1`;
-        const rlStr  = metrics.rl  >= 60  ? '> 60 dB' : `${metrics.rl.toFixed(1)} dB`;
+        const swrStr = fmtSwr(metrics.swr);
+        const rlStr  = fmtRl(metrics.rl);
         setChip(`swr-${sid}-val-swr`,   swrStr);
         setChip(`swr-${sid}-val-rl`,    rlStr);
         setChip(`swr-${sid}-val-gamma`, metrics.gamma.toFixed(4));
         setChip(`swr-${sid}-val-fwd`,   this.formatPower(metrics.fwdW));
         setChip(`swr-${sid}-val-ref`,   this.formatPower(metrics.refW));
+        if (state) {
+            setChip(`swr-${sid}-val-best-swr`,  fmtSwr(state.bestSwr));
+            setChip(`swr-${sid}-val-best-rl`,   fmtRl(state.bestRl));
+            setChip(`swr-${sid}-val-worst-swr`, fmtSwr(state.worstSwr));
+            setChip(`swr-${sid}-val-worst-rl`,  fmtRl(state.worstRl));
+        }
     };
 
     DWMControl.prototype._drawIdleSwrGauges = function(sid) {
         const drawIdle = id => {
             const c = document.getElementById(id);
-            if (c) this._drawSwrGauge(c, 0, '\u2014', '\u2014', []);
+            if (c) this._drawSwrGauge(c, 0, '—', '—', [], undefined, 'No FWD Power');
+        };
+        drawIdle(`swr-${sid}-gauge-swr`);
+        drawIdle(`swr-${sid}-gauge-rl`);
+    };
+
+    DWMControl.prototype._drawIdleSwrGaugesWithMsg = function(sid, msg) {
+        const drawIdle = id => {
+            const c = document.getElementById(id);
+            if (c) this._drawSwrGauge(c, 0, '—', '—', [], undefined, msg);
         };
         drawIdle(`swr-${sid}-gauge-swr`);
         drawIdle(`swr-${sid}-gauge-rl`);
