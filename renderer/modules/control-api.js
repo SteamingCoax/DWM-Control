@@ -379,10 +379,12 @@
     DWMControl.prototype.saveDeviceName = async function(key) {
         const sid = this.meterSafeId(key);
         const inputEl = document.getElementById(`meter-${sid}-name-input`);
-        const name = inputEl ? inputEl.value.trim() : '';
+        // Sanitize: spaces → _, strip everything except letters/digits/_
+        const raw = (inputEl ? inputEl.value : '').replace(/ /g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+        const name = raw.slice(0, 20);
+        if (inputEl) inputEl.value = name; // reflect sanitized value back
 
         if (!name) { this.setMeterStatus(key, 'Enter a device name before saving.', 'warning'); return; }
-        if (/\s/.test(name)) { this.setMeterStatus(key, 'Device name cannot contain whitespace.', 'warning'); return; }
 
         try {
             const response = await this.sendApiCommand(key, 'sys.nset', { name });
@@ -391,7 +393,9 @@
             const displayName = response.dname || name;
 
             if (dnameEl) dnameEl.textContent = displayName;
-            if (headerNameEl) headerNameEl.textContent = displayName;
+            if (headerNameEl && !headerNameEl.querySelector('.meter-name-inline-input')) {
+                headerNameEl.textContent = displayName;
+            }
 
             const record = this.meterRegistry.get(key);
             if (record) record.friendlyName = displayName;

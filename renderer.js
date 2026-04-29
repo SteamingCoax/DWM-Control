@@ -76,6 +76,14 @@ class DWMControl {
             
             this.appendOutput('Application ready. Use the Control tab to connect to your device.');
             console.log('DWM Control: Initialization complete');
+
+            // Display app version in header
+            if (window.electronAPI?.getAppVersion) {
+                window.electronAPI.getAppVersion().then(v => {
+                    const el = document.getElementById('app-version');
+                    if (el) el.textContent = `v${v}`;
+                }).catch(() => {});
+            }
         } catch (error) {
             console.error('DWM Control: Initialization error:', error);
         }

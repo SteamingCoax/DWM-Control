@@ -1,5 +1,28 @@
-# Environment variables
+# Environment variables — never commit any .env file
 .env
+.env.*
+!.env.example
+!.env.template
+
+# Secret and credential files — global catch-all
+*.pem
+*.p12
+*.p8
+*.pfx
+*.key
+*.crt
+*.cer
+*.jks
+*.keystore
+*.mobileprovision
+*.provisionprofile
+
+# Apple notarization helpers
+private_keys/
+AuthKey_*.p8
+
+# npm auth tokens (if someone creates a local .npmrc with tokens)
+.npmrc
 
 # Build certificates (sensitive)
 build/certificates/

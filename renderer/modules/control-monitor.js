@@ -7,32 +7,43 @@
 
     DWMControl.prototype.startMeterMonitoring = async function(key) {
         const record = this.meterRegistry.get(key);
-        if (!record || !record.state || record.state.monitorTimer || record.connectionState !== 'connected') return;
+        if (!record || !record.state || record.state.monitorActive || record.connectionState !== 'connected') return;
+
+        record.state.monitorActive = true;
+
+        // Recursive setTimeout: schedule the next poll only AFTER the current one
+        // finishes. This prevents skipped polls when the API response takes longer
+        // than the interval (which setInterval + monitorBusy would silently drop).
+        const scheduleNext = () => {
+            if (!record.state || !record.state.monitorActive) return;
+            record.state.monitorTimer = window.setTimeout(async () => {
+                record.state.monitorTimer = null;
+                await this.pollMeterSnapshot(key);
+                scheduleNext();
+            }, record.state.pollIntervalMs);
+        };
 
         await this.pollMeterSnapshot(key);
-        record.state.monitorTimer = window.setInterval(() => {
-            this.pollMeterSnapshot(key);
-        }, record.state.pollIntervalMs);
+        scheduleNext();
         this.updateMeterCardUI(key);
     };
 
     DWMControl.prototype.stopMeterMonitoring = function(key, silent = false) {
         const record = this.meterRegistry.get(key);
         if (!record || !record.state) return;
+        record.state.monitorActive = false;
         if (record.state.monitorTimer) {
-            clearInterval(record.state.monitorTimer);
+            clearTimeout(record.state.monitorTimer);
             record.state.monitorTimer = null;
         }
-        record.state.monitorBusy = false;
         this.updateMeterCardUI(key);
         if (!silent) this.setMeterStatus(key, 'Snapshot polling stopped.', 'ready');
     };
 
     DWMControl.prototype.pollMeterSnapshot = async function(key) {
         const record = this.meterRegistry.get(key);
-        if (!record || !record.state || record.connectionState !== 'connected' || record.state.monitorBusy) return;
+        if (!record || !record.state || record.connectionState !== 'connected') return;
 
-        record.state.monitorBusy = true;
         try {
             await this.refreshPowerSnapshot(key, { quiet: true });
             record.state.consecutiveFailures = 0;
@@ -46,8 +57,6 @@
             if (record.state.consecutiveFailures >= 3 && !record._watchdogActive) {
                 this._triggerMeterWatchdogReconnect(key);
             }
-        } finally {
-            record.state.monitorBusy = false;
         }
     };
 
@@ -448,7 +457,7 @@
         }
 
         const sequence = [0, 8, 0, 8, 0, 8];
-        const wasPolling = !!record.state.monitorTimer;
+        const wasPolling = !!record.state.monitorActive;
         if (wasPolling) {
             this.setMeterStatus(key, 'Identify requested. Pausing polling in 500 ms…', 'active');
             await new Promise(resolve => setTimeout(resolve, 500));

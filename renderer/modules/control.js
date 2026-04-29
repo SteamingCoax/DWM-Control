@@ -16,6 +16,7 @@
             serialBuffer: '',
             pollIntervalMs: Number.parseInt(this.config.globalSampleIntervalMs || 250, 10),
             monitorTimer: null,
+            monitorActive: false,
             monitorBusy: false,
             snapshotScaleMax: 1,
             consecutiveFailures: 0,
@@ -99,12 +100,12 @@
 
     DWMControl.prototype._getGlobalTimingMs = function() {
         const cfg = this.config || {};
-        const candidates = [cfg.globalTimingMs, cfg.globalSampleIntervalMs, cfg.globalApiPacingMs, 250];
+        const candidates = [cfg.globalTimingMs, cfg.globalSampleIntervalMs, cfg.globalApiPacingMs, 100];
         for (const candidate of candidates) {
             const ms = Number.parseInt(candidate, 10);
             if (Number.isFinite(ms) && ms >= 50 && ms <= 2000) return ms;
         }
-        return 250;
+        return 100;
     };
 
     // Returns a palette object that adapts to the current light/dark theme.
@@ -177,7 +178,7 @@
 
     DWMControl.prototype._getGlobalGaugeSmoothing = function() {
         const raw = Number.parseInt(this.config?.globalGaugeSmoothingPct, 10);
-        if (!Number.isFinite(raw)) return 70;
+        if (!Number.isFinite(raw)) return 85;
         return Math.max(0, Math.min(95, raw));
     };
 
@@ -193,13 +194,8 @@
         for (const [key, record] of this.meterRegistry) {
             if (!record?.state) continue;
             record.state.pollIntervalMs = ms;
-            if (restartTimers && record.state.monitorTimer) {
-                clearInterval(record.state.monitorTimer);
-                record.state.monitorTimer = window.setInterval(() => {
-                    this.pollMeterSnapshot(key);
-                }, ms);
-                this.setMeterStatus(key, `${ms}ms polling active. Snapshot data is updating live.`, 'active');
-            }
+            // pollIntervalMs is read dynamically by scheduleNext() each cycle,
+            // so no timer restart is needed — the change takes effect on the next poll.
         }
 
         if (persist) this.saveConfig();
@@ -309,7 +305,7 @@
                         <input type="number" id="global-timing-ms" class="form-control form-control-sm"
                             min="10" max="2000" step="10" value="${timingMs}">
                     </div>
-                    <div class="meter-settings-group">
+                    <div class="meter-settings-group" style="display:none">
                         <label class="meter-global-toolbar-label" for="global-gauge-smoothing">Gauge Smoothing (%)</label>
                         <input type="range" id="global-gauge-smoothing" min="0" max="95" step="5" value="${smoothingPct}">
                         <span id="global-gauge-smoothing-value" class="meter-settings-value">${smoothingPct}%</span>
@@ -754,11 +750,11 @@
       <h4 class="meter-detail-heading">Device Name</h4>
       <div class="form-group">
         <div class="input-group">
-          <input id="meter-${sid}-name-input" class="form-input" type="text" placeholder="bench_meter_a" maxlength="64">
+          <input id="meter-${sid}-name-input" class="form-input" type="text" placeholder="bench_meter_a" maxlength="20" data-meter-name-key="${record.key}">
           <button class="btn btn-secondary btn-small" data-meter-action="load-name" ${!isConnected ? 'disabled' : ''}>Load</button>
           <button class="btn btn-primary btn-small" data-meter-action="save-name" ${!isConnected ? 'disabled' : ''}>Save</button>
         </div>
-        <p class="control-helper-text">No whitespace — USB API uses space-delimited tokens.</p>
+        <p class="control-helper-text">Letters, numbers, and _ only. Spaces auto-convert to _.</p>
       </div>
     </div>
 

@@ -148,9 +148,13 @@
             liveAnim.rafId = window.requestAnimationFrame(drawFrame);
         };
 
-        if (!anim.rafId) {
-            anim.rafId = window.requestAnimationFrame(drawFrame);
+        // Always cancel any in-flight animation and start fresh so every poll
+        // update triggers at least one new draw cycle.
+        if (anim.rafId) {
+            cancelAnimationFrame(anim.rafId);
+            anim.rafId = null;
         }
+        anim.rafId = window.requestAnimationFrame(drawFrame);
     };
     // ─── Semicircular RF Wattmeter Gauge ─────────────────────────────────────
 

@@ -5,12 +5,17 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Tag to publish (for manual runs), e.g. v1.2.3"
+        required: true
+        type: string
 
 permissions:
   contents: write
 
 env:
-  RELEASE_TAG: v1.1.1
+  RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag }}
 
 jobs:
   publish-mac:
@@ -39,6 +44,17 @@ jobs:
 
       - name: Ensure gh CLI is available
         run: brew install gh || true
+
+      - name: Ensure release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --repo "${{ github.repository }}" \
+              --title "DWM Control $RELEASE_TAG" \
+              --notes "Automated release for $RELEASE_TAG"
+          fi
 
       - name: Upload macOS assets to existing release
         env:
@@ -97,6 +113,18 @@ jobs:
           wineboot -u
           npm run build:win
 
+      - name: Ensure release exists
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --repo "${{ github.repository }}" \
+              --title "DWM Control $RELEASE_TAG" \
+              --notes "Automated release for $RELEASE_TAG"
+          fi
+
       - name: Upload Windows assets to existing release
         shell: bash
         env:
@@ -127,6 +155,17 @@ jobs:
 
       - name: Build Linux artifacts
         run: npm run build:linux
+
+      - name: Ensure release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$RELEASE_TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --repo "${{ github.repository }}" \
+              --title "DWM Control $RELEASE_TAG" \
+              --notes "Automated release for $RELEASE_TAG"
+          fi
 
       - name: Upload Linux assets to existing release
         env:

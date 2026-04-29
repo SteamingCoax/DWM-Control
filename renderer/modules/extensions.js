@@ -19,30 +19,97 @@
 
         let updateInfo = null;
         let isUpdateDownloaded = false;
+        let isCheckingForUpdates = false;
+        let isDownloadingUpdate = false;
+        let manualCheckRequested = false;
+
+        const removeProgressBar = () => {
+            const progressBar = updateButton.querySelector('.update-progress');
+            if (progressBar) {
+                progressBar.remove();
+            }
+        };
+
+        const setButtonState = (state, label) => {
+            updateButton.className = 'update-btn';
+            updateButton.disabled = false;
+
+            if (state !== 'downloading') {
+                removeProgressBar();
+            }
+
+            switch (state) {
+                case 'checking':
+                    isCheckingForUpdates = true;
+                    isDownloadingUpdate = false;
+                    updateButton.disabled = true;
+                    updateButton.classList.add('checking');
+                    updateText.textContent = label || 'Checking...';
+                    break;
+                case 'available':
+                    isCheckingForUpdates = false;
+                    isDownloadingUpdate = false;
+                    updateButton.classList.add('available');
+                    updateText.textContent = label || 'Download Update';
+                    break;
+                case 'downloading':
+                    isCheckingForUpdates = false;
+                    isDownloadingUpdate = true;
+                    updateButton.disabled = true;
+                    updateButton.classList.add('downloading');
+                    updateText.textContent = label || 'Downloading...';
+                    break;
+                case 'downloaded':
+                    isCheckingForUpdates = false;
+                    isDownloadingUpdate = false;
+                    updateButton.classList.add('ready-to-install');
+                    updateText.textContent = label || 'Restart to Update';
+                    break;
+                default:
+                    isCheckingForUpdates = false;
+                    isDownloadingUpdate = false;
+                    updateText.textContent = label || 'Check Updates';
+                    break;
+            }
+
+            updateIcon.textContent = '';
+        };
+
+        setButtonState('idle');
 
         window.electronAPI.onUpdateAvailable((event, info) => {
             updateInfo = info;
-            updatePanel.style.display = 'block';
-            updateText.textContent = 'Update Available';
-            updateIcon.textContent = '';
-            updateButton.className = 'update-btn';
+            manualCheckRequested = false;
+            setButtonState('available');
             this.appendOutput(` Update available: v${info.version}`);
+
+            if (window.confirm(`Version ${info.version} is available. Download and install it?`)) {
+                updateButton.click();
+            }
         });
 
         window.electronAPI.onUpdateNotAvailable(() => {
+            updateInfo = null;
+            isUpdateDownloaded = false;
+            setButtonState('idle');
             this.appendOutput(' You have the latest version');
+
+            if (manualCheckRequested) {
+                manualCheckRequested = false;
+                this.showUpdateNotification('Up to Date', 'You are already running the latest version.', 'success');
+            }
         });
 
         window.electronAPI.onUpdateError((event, error) => {
+            isUpdateDownloaded = false;
+            manualCheckRequested = false;
+            setButtonState(updateInfo ? 'available' : 'idle');
             this.appendOutput(` Update error: ${error}`);
-            updatePanel.style.display = 'none';
         });
 
         window.electronAPI.onUpdateDownloadProgress((event, progress) => {
             const percent = Math.round(progress.percent);
-            updateText.textContent = `Downloading ${percent}%`;
-            updateIcon.textContent = '';
-            updateButton.className = 'update-btn downloading';
+            setButtonState('downloading', `Downloading ${percent}%`);
 
             let progressBar = updateButton.querySelector('.update-progress');
             if (!progressBar) {
@@ -55,27 +122,57 @@
 
         window.electronAPI.onUpdateDownloaded(() => {
             isUpdateDownloaded = true;
-            updateText.textContent = 'Restart to Update';
-            updateIcon.textContent = '';
-            updateButton.className = 'update-btn ready-to-install';
-
-            const progressBar = updateButton.querySelector('.update-progress');
-            if (progressBar) {
-                progressBar.remove();
-            }
-
+            setButtonState('downloaded');
             this.appendOutput(' Update downloaded. Click to restart and install.');
+
+            if (window.confirm('The update has been downloaded. Restart now to install it?')) {
+                updateButton.click();
+            }
         });
 
         updateButton.addEventListener('click', async () => {
+            if (isCheckingForUpdates || isDownloadingUpdate) {
+                return;
+            }
+
             if (isUpdateDownloaded) {
                 this.appendOutput(' Installing update and restarting...');
                 await window.electronAPI.installUpdate();
             } else if (updateInfo) {
+                setButtonState('downloading');
                 this.appendOutput(' Downloading update...');
                 const result = await window.electronAPI.downloadUpdate();
                 if (!result.success) {
+                    setButtonState('available');
                     this.appendOutput(` Download failed: ${result.error}`);
+                }
+            } else {
+                manualCheckRequested = true;
+                setButtonState('checking');
+                this.appendOutput(' Checking for updates...');
+
+                try {
+                    const result = await window.electronAPI.checkForUpdates();
+                    if (!result.success) {
+                        manualCheckRequested = false;
+                        setButtonState('idle');
+                        this.appendOutput(` Update check failed: ${result.error}`);
+                    } else if (result.message && result.message.includes('Development mode')) {
+                        manualCheckRequested = false;
+                        setButtonState('idle');
+                        this.appendOutput(` Info: ${result.message}`);
+                    } else if (result.noUpdates) {
+                        const shouldNotify = manualCheckRequested;
+                        manualCheckRequested = false;
+                        setButtonState('idle');
+                        if (shouldNotify) {
+                            this.showUpdateNotification('Up to Date', result.message || 'You are already running the latest version.', 'success');
+                        }
+                    }
+                } catch (error) {
+                    manualCheckRequested = false;
+                    setButtonState('idle');
+                    this.appendOutput(` Update check error: ${error.message}`);
                 }
             }
         });

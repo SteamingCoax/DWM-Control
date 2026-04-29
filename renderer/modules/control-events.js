@@ -80,6 +80,48 @@
             if (key) this._resumePollingForElementProfile(key);
         });
 
+        // Delegated input handler for name inputs — live sanitize + auto-save
+        if (!this._nameInputThrottleMap) this._nameInputThrottleMap = new Map();
+        board.addEventListener('input', (e) => {
+            const el = e.target;
+            if (!el.dataset || !el.dataset.meterNameKey) return;
+            const key = el.dataset.meterNameKey;
+            const record = this.meterRegistry.get(key);
+            if (!record) return;
+
+            // Sanitize in-place: spaces → _, strip non-alphanumeric/_
+            const pos = el.selectionStart;
+            const clean = el.value.replace(/ /g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+            if (clean !== el.value) {
+                el.value = clean;
+                el.setSelectionRange(Math.min(pos, clean.length), Math.min(pos, clean.length));
+            }
+
+            // Update header name immediately (optimistic)
+            const sid = this.meterSafeId(key);
+            const headerNameEl = document.getElementById(`meter-${sid}-header-name`);
+            if (headerNameEl && !headerNameEl.querySelector('.meter-name-inline-input')) {
+                headerNameEl.textContent = clean || record.friendlyName || 'DWM V2';
+            }
+
+            if (record.connectionState !== 'connected') return;
+
+            // Throttle: at most one save per 2 s; if a save arrives sooner, queue it
+            const throttleState = this._nameInputThrottleMap.get(key) || { lastSentAt: 0, pendingTimer: null };
+            this._nameInputThrottleMap.set(key, throttleState);
+
+            const doSave = () => {
+                throttleState.pendingTimer = null;
+                throttleState.lastSentAt = Date.now();
+                this.saveDeviceName(key);
+            };
+
+            clearTimeout(throttleState.pendingTimer);
+            const elapsed = Date.now() - throttleState.lastSentAt;
+            const delay = elapsed >= 2000 ? 400 : 2000 - elapsed + 50; // 400 ms after last keystroke, or respect 2 s gap
+            throttleState.pendingTimer = setTimeout(doSave, delay);
+        });
+
         board.addEventListener('change', async (e) => {
             const sel = e.target;
 
@@ -455,11 +497,20 @@
         input.focus();
         input.select();
 
+        // Live-sanitize as the user types: spaces → _, strip invalid chars
+        input.addEventListener('input', () => {
+            const pos = input.selectionStart;
+            const clean = input.value.replace(/ /g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+            if (clean !== input.value) {
+                input.value = clean;
+                input.setSelectionRange(Math.min(pos, clean.length), Math.min(pos, clean.length));
+            }
+        });
         const commit = async () => {
             if (done) return;
             done = true;
             const raw = input.value.trim();
-            const newName = raw.replace(/\s+/g, '_').slice(0, 20) || originalName;
+            const newName = raw.replace(/ /g, '_').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 20) || originalName;
             spanEl.textContent = newName;
 
             if (newName !== originalName) {
@@ -582,7 +633,7 @@
         const sid = this.meterSafeId(key);
         const isConn = record.connectionState === 'connected';
         const state = record.state;
-        const isMonitoring = Boolean(state && state.monitorTimer);
+        const isMonitoring = Boolean(state && state.monitorActive);
 
         // Badge
         const badge = document.getElementById(`meter-${sid}-badge`);

@@ -17,7 +17,7 @@
         if (record.state.elementProfileMenuOpen) return;
 
         record.state.elementProfileMenuOpen = true;
-        record.state.resumePollingAfterElementProfile = Boolean(record.state.monitorTimer);
+        record.state.resumePollingAfterElementProfile = Boolean(record.state.monitorActive);
         if (record.state.resumePollingAfterElementProfile) {
             this.stopMeterMonitoring(key, true);
         }

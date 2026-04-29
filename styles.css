@@ -236,6 +236,13 @@ body {
   font-weight: var(--font-weight-medium);
 }
 
+.app-version-badge {
+  font-size: 0.85em;
+  opacity: 0.7;
+  font-weight: var(--font-weight-normal);
+  letter-spacing: 0.02em;
+}
+
 .header-status {
   display: flex;
   align-items: center;
@@ -287,38 +294,63 @@ body {
 
 .update-panel {
   margin-right: 1rem;
+  display: flex;
+  align-items: center;
 }
 
 .update-btn {
-  background: linear-gradient(135deg, #ff6b35, #f7931e);
-  color: white;
-  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-inverse);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   padding: 0.5rem 1rem;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(255, 107, 53, 0.2);
+  box-shadow: var(--shadow-sm);
   position: relative;
   overflow: hidden;
+  backdrop-filter: blur(10px);
+}
+
+.update-btn:disabled {
+  cursor: wait;
+  opacity: 0.85;
 }
 
 .update-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.28);
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(255, 107, 53, 0.3);
+  box-shadow: var(--shadow-md);
+}
+
+.update-btn.checking {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-info));
+  border-color: transparent;
+  box-shadow: var(--shadow-md);
+}
+
+.update-btn.available {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+  border-color: transparent;
+  box-shadow: var(--shadow-md);
 }
 
 .update-btn.downloading {
-  background: linear-gradient(135deg, #4CAF50, #45a049);
+  background: linear-gradient(135deg, var(--color-success), #2f9e44);
+  border-color: transparent;
   cursor: not-allowed;
 }
 
 .update-btn.ready-to-install {
-  background: linear-gradient(135deg, #2196F3, #1976D2);
+  background: linear-gradient(135deg, var(--color-info), var(--color-primary));
+  border-color: transparent;
   animation: pulse 2s infinite;
 }
 
