@@ -40,7 +40,10 @@ jobs:
           CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: npm run build:mac
+        run: |
+          MAC_OUT_DIR="${RUNNER_TEMP}/dwm-dist"
+          rm -rf "$MAC_OUT_DIR" || true
+          COPYFILE_DISABLE=1 npx electron-builder --mac --publish=never --config.directories.output="$MAC_OUT_DIR"
 
       - name: Ensure gh CLI is available
         run: brew install gh || true
@@ -60,10 +63,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          MAC_OUT_DIR="${RUNNER_TEMP}/dwm-dist"
           gh release upload "$RELEASE_TAG" \
-            dist/DWM-Control-*-macOS-Intel.dmg \
-            dist/DWM-Control-*-macOS-AppleSilicon.zip \
-            dist/latest-mac*.yml \
+            "$MAC_OUT_DIR"/DWM-Control-*-macOS-Intel.dmg \
+            "$MAC_OUT_DIR"/DWM-Control-*-macOS-AppleSilicon.zip \
+            "$MAC_OUT_DIR"/latest-mac*.yml \
             --repo "${{ github.repository }}" \
             --clobber
 
