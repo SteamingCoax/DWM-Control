@@ -43,7 +43,7 @@ jobs:
           set -euo pipefail
 
           if [ -z "${MAC_CERT_P12:-}" ] || [ -z "${MAC_CERT_PASSWORD:-}" ]; then
-            echo "Missing MAC_CERT_P12 or MAC_CERT_PASSWORD secret" >&2
+            echo "::error::MAC_CERT_P12 or MAC_CERT_PASSWORD secret is not set" >&2
             exit 1
           fi
 
@@ -53,11 +53,22 @@ jobs:
 
           echo "$MAC_CERT_P12" | base64 --decode > "$CERT_PATH"
 
+          # Validate the decoded P12 has content
+          if [ ! -s "$CERT_PATH" ]; then
+            echo "::error::Decoded P12 file is empty — MAC_CERT_P12 secret may not be valid base64" >&2
+            exit 1
+          fi
+
+          # Delete stale keychain from previous runs (self-hosted runner reuse)
+          security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
+
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
-          security default-keychain -s "$KEYCHAIN_PATH"
+
+          # Prepend our keychain to the search list while preserving existing ones
+          EXISTING_KEYCHAINS=$(security list-keychains -d user | tr -d '"' | tr -s ' ' '\n' | xargs)
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $EXISTING_KEYCHAINS
 
           security import "$CERT_PATH" \
             -k "$KEYCHAIN_PATH" \
@@ -69,13 +80,23 @@ jobs:
             -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
           echo "Available signing identities:"
+          IDENTITY_COUNT=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -c 'valid identities found' || true)
           security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
+          VALID=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -E '^[[:space:]]+[0-9]+\)' | wc -l | tr -d ' ')
+          if [ "$VALID" -eq 0 ]; then
+            echo "::error::No valid codesigning identities found after import. Check MAC_CERT_P12 and MAC_CERT_PASSWORD." >&2
+            exit 1
+          fi
+          echo "Found $VALID signing identity/identities."
 
       - name: Build macOS artifacts
         env:
-          CSC_LINK: ${{ runner.temp }}/mac-cert.p12
+          # Pass base64 cert directly — electron-builder accepts this for CSC_LINK
+          # and avoids any temp file path resolution issues
+          CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
-          CSC_IDENTITY_AUTO_DISCOVERY: "true"
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: |
           MAC_OUT_DIR="${RUNNER_TEMP}/dwm-dist"
           rm -rf "$MAC_OUT_DIR" || true
