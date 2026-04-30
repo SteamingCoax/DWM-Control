@@ -33,7 +33,7 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: npm install
+        run: SKIP_ELECTRON_BUILDER_INSTALL_APP_DEPS=1 npm install
 
       - name: Build macOS artifacts
         env:
@@ -82,7 +82,7 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: npm install
+        run: SKIP_ELECTRON_BUILDER_INSTALL_APP_DEPS=1 npm install
 
       - name: Prepare Wine runtime directory
         run: |
@@ -151,7 +151,7 @@ jobs:
           node-version: 20
 
       - name: Install dependencies
-        run: npm install
+        run: SKIP_ELECTRON_BUILDER_INSTALL_APP_DEPS=1 npm install
 
       - name: Build Linux artifacts
         run: npm run build:linux

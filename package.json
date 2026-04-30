@@ -12,7 +12,7 @@
     "dev:safe": "npx electron . --safe-mode --disable-gpu --no-sandbox",
     "dev:no-gpu": "npx electron . --disable-gpu",
     "rebuild": "electron-rebuild",
-    "postinstall": "electron-builder install-app-deps",
+    "postinstall": "node scripts/postinstall.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "package": "electron-forge package",
     "make": "electron-forge make",
