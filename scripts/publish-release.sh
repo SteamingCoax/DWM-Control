@@ -4,6 +4,7 @@ set -euo pipefail
 usage() {
   echo "Usage: $0 <version>"
   echo "Example: $0 1.2.3"
+  echo "Example: $0 1.2.3-republish.1"
   exit 1
 }
 
@@ -15,8 +16,10 @@ version_input="$1"
 version="${version_input#v}"
 tag="v${version}"
 
-if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "Error: version must be semantic format like 1.2.3"
+# Accept SemVer core, optional prerelease, optional build metadata.
+# Examples: 1.2.3, 1.2.3-republish.1, 1.2.3+build.7, 1.2.3-beta.2+sha.abc123
+if ! [[ "$version" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?(\+([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?$ ]]; then
+  echo "Error: version must be valid SemVer, e.g. 1.2.3 or 1.2.3-republish.1"
   exit 1
 fi
 
