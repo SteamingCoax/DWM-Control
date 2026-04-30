@@ -283,6 +283,7 @@
         const smoothingPct = this._getGlobalGaugeSmoothing();
         const panelVisible = Boolean(this.config.globalSettingsPanelVisible);
         const autoStartPolling = this.config.globalAutoStartPolling !== false;
+        const debugLoggingEnabled = this.config.globalDebugLoggingEnabled === true;
         panel.innerHTML = `
             <div class="meter-page-shell${panelVisible ? ' settings-open' : ''}" id="meter-page-shell">
                 <div class="meter-page-main">
@@ -315,6 +316,12 @@
                             <input type="checkbox" id="global-auto-start-poll" ${autoStartPolling ? 'checked' : ''}>
                             Auto-start polling when a meter connects
                         </label>
+                    </div>
+                    <div class="meter-settings-group">
+                      <label class="meter-settings-checkbox">
+                        <input type="checkbox" id="global-debug-logging" ${debugLoggingEnabled ? 'checked' : ''}>
+                        Enable serial debug logging
+                      </label>
                     </div>
                     <div class="meter-settings-group">
                         <div class="meter-settings-group-label">Derived Measurements</div>
@@ -371,6 +378,14 @@
                 this.config.globalAutoStartPolling = Boolean(autoStartInput.checked);
                 this.saveConfig();
             });
+        }
+
+        const debugLoggingInput = document.getElementById('global-debug-logging');
+        if (debugLoggingInput) {
+          debugLoggingInput.addEventListener('change', () => {
+            this.config.globalDebugLoggingEnabled = Boolean(debugLoggingInput.checked);
+            this.saveConfig();
+          });
         }
 
         const addSwrBtn = document.getElementById('add-swr-card-btn');
@@ -738,121 +753,15 @@
     </div>
 
     <div class="meter-detail-section">
-      <h4 class="meter-detail-heading">Identity</h4>
-      <div class="control-info-grid compact">
-        <div class="control-info-item"><span class="control-info-label">UID</span><span id="meter-${sid}-uid" class="control-info-value control-mono">-</span></div>
-        <div class="control-info-item"><span class="control-info-label">Device Name</span><span id="meter-${sid}-dname" class="control-info-value">-</span></div>
-        <div class="control-info-item"><span class="control-info-label">Last API Frame</span><span id="meter-${sid}-last-frame" class="control-info-value">No frames yet</span></div>
-      </div>
-    </div>
-
-    <div class="meter-detail-section">
       <h4 class="meter-detail-heading">Device Name</h4>
       <div class="form-group">
         <div class="input-group">
-          <input id="meter-${sid}-name-input" class="form-input" type="text" placeholder="bench_meter_a" maxlength="20" data-meter-name-key="${record.key}">
+          <input id="meter-${sid}-name-input" class="form-input" type="text" placeholder="bench_meter_a" maxlength="20" data-meter-name-key="${record.key}" style="width:180px;flex:none;">
           <button class="btn btn-secondary btn-small" data-meter-action="load-name" ${!isConnected ? 'disabled' : ''}>Load</button>
           <button class="btn btn-primary btn-small" data-meter-action="save-name" ${!isConnected ? 'disabled' : ''}>Save</button>
         </div>
         <p class="control-helper-text">Letters, numbers, and _ only. Spaces auto-convert to _.</p>
       </div>
-    </div>
-
-    <div class="meter-detail-section">
-      <h4 class="meter-detail-heading">Supported Commands</h4>
-      <button class="btn btn-secondary btn-small" data-meter-action="refresh-commands" ${!isConnected ? 'disabled' : ''}>
-        <span class="btn-icon">&#8635;</span> Read Commands
-      </button>
-      <div id="meter-${sid}-commands" class="control-chip-list">
-        <span class="control-chip muted">No command list loaded</span>
-      </div>
-    </div>
-
-    <div class="meter-detail-section">
-      <h4 class="meter-detail-heading">Power Configuration</h4>
-      <button class="btn btn-secondary btn-small" data-meter-action="refresh-power-info" style="margin-bottom:8px" ${!isConnected ? 'disabled' : ''}>Refresh</button>
-      <div class="control-info-grid compact">
-        <div class="control-info-item"><span class="control-info-label">Element</span><span id="meter-${sid}-pinfo-elem" class="control-info-value">-</span></div>
-        <div class="control-info-item"><span class="control-info-label">Type</span><span id="meter-${sid}-pinfo-etype" class="control-info-value">-</span></div>
-        <div class="control-info-item"><span class="control-info-label">Element Value</span><span id="meter-${sid}-pinfo-eval" class="control-info-value">-</span></div>
-        <div class="control-info-item"><span class="control-info-label">Range</span><span id="meter-${sid}-pinfo-range" class="control-info-value">-</span></div>
-        <div class="control-info-item"><span class="control-info-label">Averaging</span><span id="meter-${sid}-pinfo-avgw" class="control-info-value">-</span></div>
-      </div>
-    </div>
-
-    <div class="meter-detail-section">
-      <h4 class="meter-detail-heading">Metric Probe</h4>
-      <div class="input-group" style="margin-bottom:8px">
-        <select id="meter-${sid}-metric-select" class="form-select">
-          <option value="inst">instantaneous</option>
-          <option value="avg">average</option>
-          <option value="peak">peak</option>
-          <option value="max">maximum</option>
-          <option value="min">minimum</option>
-          <option value="dev">deviation</option>
-        </select>
-                <span id="meter-${sid}-metric-loading" class="control-helper-text" style="display:none; align-self:center; margin-left:8px;">Reading...</span>
-      </div>
-      <div class="control-metric-readout">
-        <span id="meter-${sid}-metric-name" class="control-metric-name">-</span>
-        <span id="meter-${sid}-metric-value" class="control-metric-value control-mono">-</span>
-      </div>
-    </div>
-
-    <div class="meter-detail-section">
-      <h4 class="meter-detail-heading">Power Snapshot</h4>
-      <div class="meter-snapshot-toolbar">
-        <button class="btn btn-secondary btn-small" data-meter-action="refresh-snapshot" ${!isConnected ? 'disabled' : ''}>Refresh</button>
-        <button class="btn btn-primary btn-small" data-meter-action="start-monitor" id="meter-${sid}-start-monitor" ${!isConnected ? 'disabled' : ''}>Start Poll</button>
-        <button class="btn btn-text btn-small" data-meter-action="stop-monitor" id="meter-${sid}-stop-monitor" disabled>Stop</button>
-      </div>
-            <div class="meter-snapshot-settings">
-                <label class="control-helper-text" for="meter-${sid}-pep-hold-select">PEP Hold Time</label>
-                <select id="meter-${sid}-pep-hold-select" class="form-select form-select-sm">
-                    ${this._renderPepHoldOptions(pepHoldMs)}
-                </select>
-            </div>
-      <div class="power-dashboard compact">
-        <div class="power-meters-grid">
-          ${['inst','avg','peak','max','min','dev'].map(m => `
-          <div class="power-meter">
-            <div class="power-meter-header">
-              <span class="power-meter-label">${m.toUpperCase()}</span>
-              <span class="power-meter-unit">W</span>
-            </div>
-            <div class="power-bar-container">
-              <div class="power-bar">
-                <div id="meter-${sid}-fill-${m}" class="power-bar-fill low-power" style="width:0%"></div>
-                <div class="power-bar-gradient"></div>
-              </div>
-              <span id="meter-${sid}-snap-${m}" class="power-value">0.000000</span>
-            </div>
-          </div>`).join('')}
-        </div>
-        <div class="control-snapshot-meta">
-          <div class="control-info-item"><span class="control-info-label">Power Voltage</span><span id="meter-${sid}-pvolt" class="control-info-value control-mono">-</span></div>
-          <div class="control-info-item"><span class="control-info-label">Supply Voltage</span><span id="meter-${sid}-svolt" class="control-info-value control-mono">-</span></div>
-          <div class="control-info-item"><span class="control-info-label">Element</span><span id="meter-${sid}-snap-elem" class="control-info-value control-mono">-</span></div>
-          <div class="control-info-item"><span class="control-info-label">Element Type</span><span id="meter-${sid}-snap-etype" class="control-info-value control-mono">-</span></div>
-          <div class="control-info-item"><span class="control-info-label">Element Value</span><span id="meter-${sid}-snap-eval" class="control-info-value control-mono">-</span></div>
-          <div class="control-info-item"><span class="control-info-label">Range</span><span id="meter-${sid}-snap-range" class="control-info-value control-mono">-</span></div>
-          <div class="control-info-item"><span class="control-info-label">Scale</span><span id="meter-${sid}-snap-scale" class="control-info-value control-mono">0.000000 W</span></div>
-          <div class="control-info-item"><span class="control-info-label">Updated</span><span id="meter-${sid}-snap-updated" class="control-info-value">Never</span></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="meter-detail-section">
-      <h4 class="meter-detail-heading">Configuration (cfg.set)</h4>
-      <div class="control-info-grid compact">
-        <div class="control-info-item"><span class="control-info-label">Backlight (0-10)</span></div>
-        <div class="control-info-item"><div class="input-group"><input id="meter-${sid}-cfg-bright" class="form-input" type="number" min="0" max="10" step="1" placeholder="0-10"><button class="btn btn-secondary btn-small" data-meter-action="cfg-bright" ${!isConnected ? 'disabled' : ''}>Set</button></div></div>
-                <div class="control-info-item"><span class="control-info-label">Max Range</span></div>
-                <div class="control-info-item"><div class="input-group"><select id="meter-${sid}-cfg-range-readonly" class="form-select" disabled><option value="0"${selectedRangeCfg === 0 ? ' selected' : ''}>2x</option><option value="1"${selectedRangeCfg === 1 ? ' selected' : ''}>4x</option></select><span class="control-helper-text">Set from the top bar.</span></div></div>
-        <div class="control-info-item"><span class="control-info-label">Averaging (0.5-10 s)</span></div>
-        <div class="control-info-item"><div class="input-group"><input id="meter-${sid}-cfg-avgw" class="form-input" type="number" min="0.5" max="10" step="0.5" placeholder="0.5-10"><button class="btn btn-secondary btn-small" data-meter-action="cfg-avgw" ${!isConnected ? 'disabled' : ''}>Set</button></div></div>
-      </div>
-      <p id="meter-${sid}-cfg-status" class="control-helper-text"></p>
     </div>
 
     <div class="meter-detail-section">
@@ -875,14 +784,41 @@
     </div>
 
     <div class="meter-detail-section">
+      <h4 class="meter-detail-heading">Brightness</h4>
+      <div class="control-info-grid compact">
+        <div class="control-info-item"><span class="control-info-label">Backlight (0-10)</span></div>
+        <div class="control-info-item"><div class="input-group"><input id="meter-${sid}-cfg-bright" class="form-input" type="number" min="0" max="10" step="1" placeholder="0-10" style="width:64px;flex:none;"><button class="btn btn-secondary btn-small" data-meter-action="cfg-bright" ${!isConnected ? 'disabled' : ''}>Set</button></div></div>
+      </div>
+      <p id="meter-${sid}-bright-status" class="control-helper-text"></p>
+    </div>
+
+    <div class="meter-detail-section">
+      <h4 class="meter-detail-heading">Averaging</h4>
+      <div class="control-info-grid compact">
+        <div class="control-info-item"><span class="control-info-label">Window (0.5-10 s)</span></div>
+        <div class="control-info-item"><div class="input-group"><input id="meter-${sid}-cfg-avgw" class="form-input" type="number" min="0.5" max="10" step="0.5" placeholder="0.5-10" style="width:74px;flex:none;"><button class="btn btn-secondary btn-small" data-meter-action="cfg-avgw" ${!isConnected ? 'disabled' : ''}>Set</button></div></div>
+      </div>
+      <p id="meter-${sid}-cfg-status" class="control-helper-text"></p>
+    </div>
+
+    <div class="meter-detail-section">
+      <h4 class="meter-detail-heading">Identity</h4>
+      <div class="control-info-grid compact">
+        <div class="control-info-item"><span class="control-info-label">UID</span><span id="meter-${sid}-uid" class="control-info-value control-mono">-</span></div>
+        <div class="control-info-item"><span class="control-info-label">Device Name</span><span id="meter-${sid}-dname" class="control-info-value">-</span></div>
+        <div class="control-info-item"><span class="control-info-label">Last API Frame</span><span id="meter-${sid}-last-frame" class="control-info-value">No frames yet</span></div>
+      </div>
+    </div>
+
+    <div class="meter-detail-section">
       <h4 class="meter-detail-heading">USB Debug Console</h4>
-            <div class="meter-raw-debug-toolbar">
-                <textarea id="meter-${sid}-raw-command" class="control-debug-input" spellcheck="false" placeholder="Paste a raw command here, e.g. proto=1 type=req cmd=sys.flt\r\n"></textarea>
-                <div class="meter-raw-debug-actions">
-                    <button class="btn btn-secondary btn-small" data-meter-action="send-raw" ${!isConnected ? 'disabled' : ''}>Send Raw</button>
-                    <span class="control-helper-text">Escapes like \r, \n, \t and \\ are decoded before send. RX appears below.</span>
-                </div>
-            </div>
+      <div class="meter-raw-debug-toolbar">
+        <textarea id="meter-${sid}-raw-command" class="control-debug-input" spellcheck="false" placeholder="Paste a raw command here, e.g. proto=1 type=req cmd=sys.flt\r\n"></textarea>
+        <div class="meter-raw-debug-actions">
+          <button class="btn btn-secondary btn-small" data-meter-action="send-raw" ${!isConnected ? 'disabled' : ''}>Send Raw</button>
+          <span class="control-helper-text">Escapes like \r, \n, \t and \\ are decoded before send. RX appears below.</span>
+        </div>
+      </div>
       <button class="btn btn-text btn-small" data-meter-action="debug-clear" style="margin-bottom:4px">Clear</button>
       <textarea id="meter-${sid}-debug" class="control-debug-console" readonly></textarea>
     </div>
@@ -933,7 +869,7 @@
         this.saveConfig();
     };
 
-    DWMControl.prototype._swrMeterOptions = function(selectedKey) {
+    DWMControl.prototype._swrMeterOptions = function(selectedKey, disabledKey) {
         let html = '<option value="">— Select meter —</option>';
         for (const [key, rec] of this.meterRegistry.entries()) {
             // Build a descriptive label: name + short port path
@@ -941,11 +877,26 @@
             const portShort = rec.portPath
                 ? rec.portPath.replace(/^\/dev\//, '')
                 : null;
-            const label = portShort ? `${name}  ·  ${portShort}` : name;
-            const sel = key === selectedKey ? ' selected' : '';
-            html += `<option value="${key}"${sel}>${label}</option>`;
+            const inUse = (key === disabledKey && key !== selectedKey);
+            const label = (portShort ? `${name}  ·  ${portShort}` : name) + (inUse ? '  (in use)' : '');
+            const sel  = key === selectedKey ? ' selected' : '';
+            const dis  = inUse ? ' disabled style="color:var(--text-muted,#888)"' : '';
+            html += `<option value="${key}"${sel}${dis}>${label}</option>`;
         }
         return html;
+    };
+
+    DWMControl.prototype._refreshSwrMeterSelects = function() {
+        const swrCards = Array.isArray(this.config.swrCards) ? this.config.swrCards : [];
+        for (const cfg of swrCards) {
+            const sid = this.swrSafeId(cfg.id);
+            const fwdSel = document.getElementById(`swr-${sid}-fwd-key`);
+            const refSel = document.getElementById(`swr-${sid}-ref-key`);
+            const fwdVal = fwdSel ? fwdSel.value : null;
+            const refVal = refSel ? refSel.value : null;
+            if (fwdSel) fwdSel.innerHTML = this._swrMeterOptions(fwdVal, refVal);
+            if (refSel) refSel.innerHTML = this._swrMeterOptions(refVal, fwdVal);
+        }
     };
 
     DWMControl.prototype._swrMetricOptions = function(selected) {
@@ -985,7 +936,7 @@
       <label class="swr-source-label">Forward Power</label>
       <div class="swr-source-selects">
         <select id="swr-${sid}-fwd-key" class="form-select form-select-sm" data-swr-id="${id}" data-swr-field="fwdKey">
-          ${this._swrMeterOptions(swrRec.fwdKey)}
+          ${this._swrMeterOptions(swrRec.fwdKey, swrRec.refKey)}
         </select>
       </div>
     </div>
@@ -994,7 +945,7 @@
       <label class="swr-source-label">Reflected Power</label>
       <div class="swr-source-selects">
         <select id="swr-${sid}-ref-key" class="form-select form-select-sm" data-swr-id="${id}" data-swr-field="refKey">
-          ${this._swrMeterOptions(swrRec.refKey)}
+          ${this._swrMeterOptions(swrRec.refKey, swrRec.fwdKey)}
         </select>
       </div>
     </div>
@@ -1087,6 +1038,11 @@
     // ─── Canvas resize / zoom repaint ─────────────────────────────────────────
 
     DWMControl.prototype._repaintAllCanvases = function() {
+      document.querySelectorAll('canvas.meter-gauge-radial-canvas, canvas.meter-history-canvas').forEach(canvas => {
+        delete canvas.dataset.cssWidth;
+        delete canvas.dataset.cssHeight;
+      });
+
         // Repaint all power meter gauge + history canvases
         for (const [key, record] of this.meterRegistry.entries()) {
             if (record.state?.lastSnapshotResponse) {

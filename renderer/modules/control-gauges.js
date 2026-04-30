@@ -64,9 +64,33 @@
         }
     };
 
+    DWMControl.prototype._getCachedCanvasSize = function(canvas, fallbackHeight, minHeight = 140) {
+        if (!canvas) return null;
+
+        const dpr = window.devicePixelRatio || 1;
+        let cssW = Number.parseFloat(canvas.dataset.cssWidth || '0');
+        if (!Number.isFinite(cssW) || cssW <= 0) {
+            cssW = canvas.clientWidth || 0;
+            if (!cssW) return null;
+            canvas.dataset.cssWidth = String(cssW);
+        }
+
+        let cssH = Number.parseFloat(canvas.dataset.cssHeight || '0');
+        if (!Number.isFinite(cssH) || cssH <= 0) {
+            cssH = Math.max(minHeight, canvas.clientHeight || fallbackHeight);
+            canvas.dataset.cssHeight = String(cssH);
+        }
+
+        return { cssW, cssH, dpr };
+    };
+
     DWMControl.prototype._updateMeterGauges = function(key, response) {
         const record   = this.meterRegistry.get(key);
         if (!record || !record.state) return;
+
+        // Avoid expensive canvas animation when the app is backgrounded.
+        if (document.hidden) return;
+
         record.state.lastSnapshotResponse = response;
         const sid       = this.meterSafeId(key);
         const maxPower  = record.state.maxPowerW || 0;
@@ -148,18 +172,16 @@
             liveAnim.rafId = window.requestAnimationFrame(drawFrame);
         };
 
-        // Always cancel any in-flight animation and start fresh so every poll
-        // update triggers at least one new draw cycle.
-        if (anim.rafId) {
-            cancelAnimationFrame(anim.rafId);
-            anim.rafId = null;
+        // If an animation loop is already running, only update targets above.
+        // This avoids restarting RAF every poll and reduces CPU overhead.
+        if (!anim.rafId) {
+            anim.rafId = window.requestAnimationFrame(drawFrame);
         }
-        anim.rafId = window.requestAnimationFrame(drawFrame);
     };
     // ─── Semicircular RF Wattmeter Gauge ─────────────────────────────────────
 
     DWMControl.prototype._drawSemiRadialGauge = function(canvas, pct, valStr, metricLabel, scaleMax) {
-        if (!canvas || canvas.offsetWidth === 0) return;
+        if (!canvas) return;
 
         const TRACK_W  = 14;
         const PAD_SIDE = 110;   // horizontal inset; keeps tick labels clear of canvas edges
@@ -167,14 +189,18 @@
         const DIG_H    = 110;
         const BOT_PAD  = 6;
 
-        const dpr    = window.devicePixelRatio || 1;
-        const cssW   = canvas.offsetWidth;
+        const sizeProbe = this._getCachedCanvasSize(canvas, 300, 140);
+        if (!sizeProbe) return;
+        const cssW   = sizeProbe.cssW;
         const radius = Math.max(30, Math.floor((cssW - PAD_SIDE * 2) / 2));
         const cx     = cssW / 2;
         const cy     = PAD_TOP + TRACK_W / 2 + radius;
-        const cssH   = cy + 14 + DIG_H + BOT_PAD;
+        const fallbackCssH = cy + 14 + DIG_H + BOT_PAD;
+        const size = this._getCachedCanvasSize(canvas, fallbackCssH, 140);
+        if (!size) return;
+        const cssH   = size.cssH;
+        const dpr    = size.dpr;
 
-        canvas.style.height = `${cssH}px`;
         if (canvas.width  !== Math.round(cssW * dpr) ||
             canvas.height !== Math.round(cssH * dpr)) {
             canvas.width  = Math.round(cssW * dpr);
@@ -343,13 +369,17 @@
     };
 
     DWMControl.prototype._drawLargePowerReadout = function(canvas, pct, valStr, metricLabel) {
-        if (!canvas || canvas.offsetWidth === 0) return;
+        if (!canvas) return;
 
-        const dpr  = window.devicePixelRatio || 1;
-        const cssW = canvas.offsetWidth;
-        const cssH = Math.max(190, Math.floor(cssW * 0.62));
+        const sizeProbe = this._getCachedCanvasSize(canvas, 220, 140);
+        if (!sizeProbe) return;
+        const cssW = sizeProbe.cssW;
+        const fallbackCssH = Math.max(190, Math.floor(cssW * 0.62));
+        const size = this._getCachedCanvasSize(canvas, fallbackCssH, 140);
+        if (!size) return;
+        const cssH = size.cssH;
+        const dpr  = size.dpr;
 
-        canvas.style.height = `${cssH}px`;
         if (canvas.width !== Math.round(cssW * dpr) || canvas.height !== Math.round(cssH * dpr)) {
             canvas.width = Math.round(cssW * dpr);
             canvas.height = Math.round(cssH * dpr);
@@ -396,7 +426,7 @@
      * @param {Array}    tickDefs     [{p, label, major}] tick descriptors; p is 0-1 normalized position
      */
     DWMControl.prototype._drawSwrGauge = function(canvas, pct, valStr, metricLabel, tickDefs, zoneOpts, overlayMsg) {
-        if (!canvas || canvas.offsetWidth === 0) return;
+        if (!canvas) return;
 
         const TRACK_W  = 14;
         const PAD_SIDE = 140;
@@ -404,14 +434,18 @@
         const DIG_H    = 110;
         const BOT_PAD  = 6;
 
-        const dpr  = window.devicePixelRatio || 1;
-        const cssW = canvas.offsetWidth;
+        const sizeProbe = this._getCachedCanvasSize(canvas, 300, 140);
+        if (!sizeProbe) return;
+        const cssW = sizeProbe.cssW;
         const radius = Math.max(30, Math.floor((cssW - PAD_SIDE * 2) / 2));
         const cx     = cssW / 2;
         const cy     = PAD_TOP + TRACK_W / 2 + radius;
-        const cssH   = cy + 14 + DIG_H + BOT_PAD;
+        const fallbackCssH = cy + 14 + DIG_H + BOT_PAD;
+        const size = this._getCachedCanvasSize(canvas, fallbackCssH, 140);
+        if (!size) return;
+        const cssH   = size.cssH;
+        const dpr    = size.dpr;
 
-        canvas.style.height = `${cssH}px`;
         if (canvas.width  !== Math.round(cssW * dpr) ||
             canvas.height !== Math.round(cssH * dpr)) {
             canvas.width  = Math.round(cssW * dpr);

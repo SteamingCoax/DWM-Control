@@ -132,10 +132,9 @@
 
         const dpr  = window.devicePixelRatio || 1;
         const cssW = canvas.clientWidth || canvas.offsetWidth || 400;
-        const cssH = 230;
+        const cssH = Math.max(180, canvas.clientHeight || 230);
         canvas.width  = Math.round(cssW * dpr);
         canvas.height = Math.round(cssH * dpr);
-        canvas.style.height = `${cssH}px`;
 
         const ctx = canvas.getContext('2d');
         ctx.scale(dpr, dpr);
@@ -341,10 +340,9 @@
 
         const dpr  = window.devicePixelRatio || 1;
         const cssW = canvas.clientWidth || canvas.offsetWidth || 400;
-        const cssH = 230;
+        const cssH = Math.max(180, canvas.clientHeight || 230);
         canvas.width  = Math.round(cssW * dpr);
         canvas.height = Math.round(cssH * dpr);
-        canvas.style.height = `${cssH}px`;
 
         const ctx = canvas.getContext('2d');
         ctx.scale(dpr, dpr);

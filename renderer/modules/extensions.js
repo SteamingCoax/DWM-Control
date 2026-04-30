@@ -540,6 +540,7 @@
             lastPort: null,
             lastBaud: 115200,
             globalSampleIntervalMs: 250,
+            globalDebugLoggingEnabled: false,
             meterCardOrder: [],
             meterCards: {},
             deembedPowerUnit: 'W',

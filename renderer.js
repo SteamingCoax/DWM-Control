@@ -349,7 +349,7 @@ class DWMControl {
         const nextRecord = {
             key,
             portPath: port.path,
-            friendlyName: port.friendlyName || 'DWM V2',
+            friendlyName: existing.friendlyName || port.friendlyName || 'DWM V2',
             fallbackUid: this.parseUsbModemUid(port.path),
             apiUid: existing.apiUid || null,
             connectionState: existing.connectionState || 'available',

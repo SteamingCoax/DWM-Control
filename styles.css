@@ -237,6 +237,8 @@ body {
 }
 
 .app-version-badge {
+  display: inline-block;
+  min-width: 64px;
   font-size: 0.85em;
   opacity: 0.7;
   font-weight: var(--font-weight-normal);
@@ -256,7 +258,6 @@ body {
   padding: var(--space-2) var(--space-4);
   background: rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-md);
-  backdrop-filter: blur(10px);
 }
 
 .status-dot {
@@ -303,6 +304,7 @@ body {
   color: var(--text-inverse);
   border: 1px solid rgba(255, 255, 255, 0.18);
   padding: 0.5rem 1rem;
+  min-width: 170px;
   border-radius: var(--radius-md);
   cursor: pointer;
   display: flex;
@@ -315,7 +317,12 @@ body {
   box-shadow: var(--shadow-sm);
   position: relative;
   overflow: hidden;
-  backdrop-filter: blur(10px);
+}
+
+.update-btn .update-text {
+  display: inline-block;
+  min-width: 108px;
+  text-align: left;
 }
 
 .update-btn:disabled {
@@ -351,10 +358,10 @@ body {
 .update-btn.ready-to-install {
   background: linear-gradient(135deg, var(--color-info), var(--color-primary));
   border-color: transparent;
-  animation: pulse 2s infinite;
+  animation: pulse-glow 2s 3;
 }
 
-@keyframes pulse {
+@keyframes pulse-glow {
   0% { box-shadow: 0 2px 4px rgba(33, 150, 243, 0.2); }
   50% { box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4); }
   100% { box-shadow: 0 2px 4px rgba(33, 150, 243, 0.2); }
@@ -498,7 +505,7 @@ body {
   flex-shrink: 0;
 }
 
-.update-text {
+.update-indicator .update-text {
   font-size: 14px;
   font-weight: 500;
   flex: 1;

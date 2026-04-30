@@ -1425,8 +1425,12 @@
 
 .meter-gauge-radial-canvas {
     width: 100%;
+  min-height: 300px;
+  aspect-ratio: 16 / 10;
+  height: auto;
     display: block;
     border-radius: 6px;
+  contain: layout paint;
 }
 
 [data-theme="light"] .gauge-metric-select {
@@ -1518,8 +1522,11 @@
 .meter-history-canvas {
     width: 100%;
     min-height: 220px;
+  aspect-ratio: 16 / 7;
+  height: auto;
     border-radius: 6px;
     display: block;
+  contain: layout paint;
 }
 
 .meter-history-legend {
@@ -2131,12 +2138,18 @@
     gap: 12px;
     flex-wrap: wrap;
 }
+
+.control-debug-input,
+.control-debug-console {
+  width: 100%;
+  box-sizing: border-box;
   border-radius: 8px;
   border: 1px solid var(--border-color);
   background: var(--input-bg, rgba(0, 0, 0, 0.2));
   color: var(--text-primary);
   padding: 10px 12px;
   font: 12px/1.45 monospace;
+  resize: vertical;
 }
 
 .control-debug-console {

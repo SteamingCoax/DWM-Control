@@ -11,20 +11,22 @@
 
         record.state.monitorActive = true;
 
-        // Recursive setTimeout: schedule the next poll only AFTER the current one
-        // finishes. This prevents skipped polls when the API response takes longer
-        // than the interval (which setInterval + monitorBusy would silently drop).
-        const scheduleNext = () => {
-            if (!record.state || !record.state.monitorActive) return;
-            record.state.monitorTimer = window.setTimeout(async () => {
-                record.state.monitorTimer = null;
-                await this.pollMeterSnapshot(key);
-                scheduleNext();
-            }, record.state.pollIntervalMs);
+        // Start-aligned scheduling: next poll fires pollIntervalMs after this poll STARTED,
+        // not after it finished. If the poll takes longer than the interval (e.g. slow device),
+        // the next poll fires immediately with 0ms delay — no overlap, no dropped cycles.
+        const runPollCycle = () => {
+            if (!record.state?.monitorActive) return;
+            const intervalMs = record.state.pollIntervalMs;
+            const cycleStart = Date.now();
+            this.pollMeterSnapshot(key).finally(() => {
+                if (!record.state?.monitorActive) return;
+                const elapsed = Date.now() - cycleStart;
+                const delay = Math.max(0, intervalMs - elapsed);
+                record.state.monitorTimer = window.setTimeout(runPollCycle, delay);
+            });
         };
 
-        await this.pollMeterSnapshot(key);
-        scheduleNext();
+        runPollCycle();
         this.updateMeterCardUI(key);
     };
 
@@ -45,7 +47,7 @@
         if (!record || !record.state || record.connectionState !== 'connected') return;
 
         try {
-            await this.refreshPowerSnapshot(key, { quiet: true });
+            await this.refreshPowerSnapshot(key, { quiet: true, pacingMs: 0 });
             record.state.consecutiveFailures = 0;
             record.state.lastSuccessfulPoll = Date.now();
             const ms = record.state.pollIntervalMs;
@@ -130,7 +132,9 @@
 
     DWMControl.prototype.refreshPowerSnapshot = async function(key, options = {}) {
         try {
-            const response = await this.sendApiCommand(key, 'pwr.snap');
+            const cmdOptions = {};
+            if (Number.isFinite(options.pacingMs)) cmdOptions.pacingMs = options.pacingMs;
+            const response = await this.sendApiCommand(key, 'pwr.snap', {}, cmdOptions);
             // Expand compact d=CSV into named fields.
             // Fixed order: inst, avg, peak, max, min, dev, pvolt(mV), svolt(V)
             const D_KEYS = ['inst','avg','peak','max','min','dev','pvolt','svolt'];
@@ -183,7 +187,7 @@
                 const etypeSelect = document.getElementById(`meter-${sid}-cfg-etype`);
                 const rangeSelect = document.getElementById(`meter-${sid}-cfg-range`);
                 const rangeReadOnly = document.getElementById(`meter-${sid}-cfg-range-readonly`);
-                if (elemSelect && Number.isFinite(record.elementId) && !(record.state && record.state.elementProfileMenuOpen)) {
+                if (elemSelect && Number.isFinite(record.elementId) && !(record.state && record.state.elementProfileMenuOpen) && document.activeElement !== elemSelect) {
                     elemSelect.innerHTML = this._renderElementProfileOptions(record, record.elementId);
                     elemSelect.value = String(record.elementId);
                 }
@@ -274,8 +278,8 @@
         const inputEl = document.getElementById(`meter-${sid}-cfg-bright`);
         if (inputEl && Number.isFinite(bright)) inputEl.value = String(Math.max(0, Math.min(10, bright)));
 
-        const statusEl = document.getElementById(`meter-${sid}-cfg-status`);
-        if (statusEl && Number.isFinite(bright)) statusEl.textContent = `Read bright = ${Math.max(0, Math.min(10, bright))}`;
+        const statusEl = document.getElementById(`meter-${sid}-bright-status`);
+        if (statusEl) statusEl.textContent = '';
 
         return val;
     };
@@ -526,6 +530,8 @@
     };
 
     DWMControl.prototype.appendMeterDebug = function(key, direction, payload) {
+        if (this.config?.globalDebugLoggingEnabled !== true) return;
+
         const record = this.meterRegistry.get(key);
         if (!record || !record.state) return;
 
@@ -533,7 +539,9 @@
         const debugEl = document.getElementById(`meter-${sid}-debug`);
         if (!debugEl) return;
 
-        const stamp = new Date().toLocaleTimeString();
+        const now = new Date();
+        const ms = String(now.getMilliseconds()).padStart(3, '0');
+        const stamp = `${now.toLocaleTimeString()}.${ms}`;
         const text = String(payload).replace(/\r/g, '\\r').replace(/\n/g, '\\n\n');
         record.state.debugLines.push(`[${stamp}] ${direction}: ${text}`);
         if (record.state.debugLines.length > record.state.debugMaxLines) {

@@ -169,6 +169,9 @@
                         const rec = this._getSwrRegistry().get(swrId);
                         if (rec) rec[field] = sel.value || null;
                         this.saveConfig();
+                        if (field === 'fwdKey' || field === 'refKey') {
+                            this._refreshSwrMeterSelects();
+                        }
                     }
                 }
                 return;

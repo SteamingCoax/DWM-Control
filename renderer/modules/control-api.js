@@ -117,7 +117,6 @@
                 }
 
                 const response = await responsePromise;
-                if (pacingMs > 0) await this._delayMs(pacingMs);
                 return response;
             } finally {
                 if (!prevMonitorBusy) state.monitorBusy = false;
@@ -367,6 +366,7 @@
                 if (record) record.friendlyName = response.dname;
             }
 
+            this._refreshSwrMeterSelects();
             if (!options.quiet) this.setMeterStatus(key, 'Device name loaded from firmware.', 'ready');
             return response;
         } catch (error) {
@@ -400,6 +400,7 @@
             const record = this.meterRegistry.get(key);
             if (record) record.friendlyName = displayName;
 
+            this._refreshSwrMeterSelects();
             this.setMeterStatus(key, `Stored device name: ${displayName}`, 'ready');
         } catch (error) {
             this.appendOutput(`Name update failed: ${error.message}`);
@@ -464,7 +465,7 @@
                 const etypeSelect = document.getElementById(`meter-${sid}-cfg-etype`);
                 const rangeSelect = document.getElementById(`meter-${sid}-cfg-range`);
                 const rangeReadOnly = document.getElementById(`meter-${sid}-cfg-range-readonly`);
-                if (elemSelect && Number.isFinite(record.elementId) && !(record.state && record.state.elementProfileMenuOpen)) {
+                if (elemSelect && Number.isFinite(record.elementId) && !(record.state && record.state.elementProfileMenuOpen) && document.activeElement !== elemSelect) {
                     elemSelect.innerHTML = this._renderElementProfileOptions(record, record.elementId);
                     elemSelect.value = String(record.elementId);
                 }

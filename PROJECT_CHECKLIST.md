@@ -32,6 +32,8 @@
 - [x] Ensure that no code files are getting to large and see if they should be subdivided.
 - [x] Design a card for using the data from two meter cards for returnloss/SWR metering and graphing. The meters cards used for forward power and reflected power are to be selectable.
 - [x] Make the expandable Global Settings bar arrow button work for the entire vertical range of the window along the bar.
+- [ ] Reset Power Statistics (Setup on meter side API first).
+- [ ] Add in meter version detection and recommend firmware update.
 
 ## Hardware Validation
 - [x] Connect to real DWM device over serial
