@@ -59,8 +59,9 @@ if [[ "$REPUBLISH" == "true" ]]; then
     exit 1
   fi
 
-  echo "Triggering workflow dispatch on $tag"
-  gh workflow run release.yml --ref "$tag" --field release_tag="$tag"
+  workflow_ref="${WORKFLOW_REF:-main}"
+  echo "Triggering workflow dispatch from ref $workflow_ref for release $tag"
+  gh workflow run release.yml --ref "$workflow_ref" --field release_tag="$tag"
 
   echo ""
   echo "CI rebuild triggered for $tag."
