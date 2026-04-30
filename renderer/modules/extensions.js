@@ -169,6 +169,21 @@
                     setButtonState('downloaded');
                     this.appendOutput(` Install failed: ${installResult.error || 'Unknown error'}`);
                     this.showUpdateNotification('Install Failed', installResult.error || 'Could not install update.', 'error');
+                } else {
+                    // If the app does not quit for update shortly after success,
+                    // restore the button so the user is not stuck on "Installing...".
+                    setTimeout(() => {
+                        if (isInstallingUpdate) {
+                            isInstallingUpdate = false;
+                            setButtonState('downloaded');
+                            this.appendOutput(' Install did not restart automatically. Verify this is a packaged app and in /Applications, then try again.');
+                            this.showUpdateNotification(
+                                'Install Not Completed',
+                                'The app did not restart to apply the update. Ensure you are running the packaged app from /Applications and try again.',
+                                'error'
+                            );
+                        }
+                    }, 12000);
                 }
             } else if (updateInfo) {
                 setButtonState('downloading');

@@ -35,6 +35,7 @@ let mainWindow;
 
 let updateCheckStarted = false;
 let updateInstallInProgress = false;
+let updateDownloadedReady = false;
 
 function isMacAppInstalledInApplications() {
   if (process.platform !== 'darwin') return true;
@@ -66,6 +67,7 @@ autoUpdater.on('update-available', (info) => {
 
 autoUpdater.on('update-not-available', (info) => {
   console.log('Update not available.');
+  updateDownloadedReady = false;
   if (mainWindow) {
     mainWindow.webContents.send('update-not-available');
   }
@@ -109,6 +111,7 @@ autoUpdater.on('download-progress', (progressObj) => {
 
 autoUpdater.on('update-downloaded', (info) => {
   console.log('Update downloaded');
+  updateDownloadedReady = true;
   if (mainWindow) {
     mainWindow.webContents.send('update-downloaded');
   }
@@ -1183,6 +1186,8 @@ function convertHexToBin(hexFilePath) {
 // IPC handlers for manual update checking
 ipcMain.handle('check-for-updates', async () => {
   try {
+    updateDownloadedReady = false;
+
     // Simple and reliable development mode detection
     // Only consider it development if explicitly set or if running from source
     const isExplicitDev = process.env.NODE_ENV === 'development';
@@ -1240,16 +1245,32 @@ ipcMain.handle('check-for-updates', async () => {
 ipcMain.handle('download-update', async () => {
   try {
     await autoUpdater.downloadUpdate();
+    updateDownloadedReady = true;
     return { success: true };
   } catch (error) {
+    updateDownloadedReady = false;
     return { success: false, error: error.message };
   }
 });
 
 ipcMain.handle('install-update', async () => {
   try {
+    if (!app.isPackaged) {
+      return {
+        success: false,
+        error: 'Install update is only available in a packaged app build.'
+      };
+    }
+
     if (updateInstallInProgress) {
       return { success: true, message: 'Update installation already in progress' };
+    }
+
+    if (!updateDownloadedReady) {
+      return {
+        success: false,
+        error: 'No downloaded update is ready to install yet.'
+      };
     }
 
     if (process.platform === 'darwin' && !isMacAppInstalledInApplications()) {
@@ -1260,6 +1281,7 @@ ipcMain.handle('install-update', async () => {
     }
 
     updateInstallInProgress = true;
+    updateDownloadedReady = false;
     // Parameters: isSilent=false (show installer behavior), isForceRunAfter=true
     autoUpdater.quitAndInstall(false, true);
     return { success: true };
