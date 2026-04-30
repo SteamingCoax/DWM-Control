@@ -29,6 +29,7 @@
     "publish:linux": "electron-builder --linux --publish=always",
     "publish:all": "COPYFILE_DISABLE=1 electron-builder --mac --win --linux --publish=always",
     "release:publish": "./scripts/publish-release.sh",
+    "release:republish": "./scripts/publish-release.sh --republish",
     "dist:mac": "npm run build:mac",
     "dist:win": "npm run build:win",
     "dist:linux": "npm run build:linux",
