@@ -22,6 +22,7 @@
         let isCheckingForUpdates = false;
         let isDownloadingUpdate = false;
         let isInstallingUpdate = false;
+        let hasMacSignatureError = false;
         let manualCheckRequested = false;
 
         const removeProgressBar = () => {
@@ -92,6 +93,7 @@
             if (isInstallingUpdate) {
                 return;
             }
+            hasMacSignatureError = false;
             updateInfo = info;
             manualCheckRequested = false;
             setButtonState('available');
@@ -106,6 +108,7 @@
             if (isInstallingUpdate) {
                 return;
             }
+            hasMacSignatureError = false;
             updateInfo = null;
             isUpdateDownloaded = false;
             setButtonState('idle');
@@ -118,6 +121,8 @@
         });
 
         window.electronAPI.onUpdateError((event, error) => {
+            const isMacSignatureError = typeof error === 'string' && error.includes('not signed for macOS auto-update');
+            hasMacSignatureError = isMacSignatureError;
             if (isInstallingUpdate) {
                 setButtonState('installing', 'Install failed');
             }
@@ -127,6 +132,10 @@
                 setButtonState(updateInfo ? 'available' : 'idle');
             }
             this.appendOutput(` Update error: ${error}`);
+
+            if (isMacSignatureError) {
+                this.showUpdateNotification('Signed Build Required', 'This app install is not signed for macOS auto-update. Install an official signed release build first.', 'error');
+            }
         });
 
         window.electronAPI.onUpdateDownloadProgress((event, progress) => {
@@ -143,7 +152,7 @@
         });
 
         window.electronAPI.onUpdateDownloaded(() => {
-            if (isInstallingUpdate) {
+            if (isInstallingUpdate || hasMacSignatureError) {
                 return;
             }
             isUpdateDownloaded = true;

@@ -45,6 +45,20 @@ jobs:
           rm -rf "$MAC_OUT_DIR" || true
           COPYFILE_DISABLE=1 npx electron-builder --mac --publish=never --config.directories.output="$MAC_OUT_DIR"
 
+      - name: Verify macOS app signature
+        run: |
+          MAC_OUT_DIR="${RUNNER_TEMP}/dwm-dist"
+          APP_PATH="$(find "$MAC_OUT_DIR" -type d -name "DWM Control.app" | head -n 1)"
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app bundle found in $MAC_OUT_DIR" >&2
+            find "$MAC_OUT_DIR" -maxdepth 3 -print || true
+            exit 1
+          fi
+
+          echo "Verifying signature: $APP_PATH"
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          codesign -dv --verbose=4 "$APP_PATH"
+
       - name: Ensure gh CLI is available
         run: brew install gh || true
 

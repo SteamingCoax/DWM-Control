@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
-const { spawn, exec } = require('child_process');
+const { spawn, exec, execFile } = require('child_process');
 const fs = require('fs');
 const https = require('https');
 const { SerialPort } = require('serialport');
@@ -45,6 +45,41 @@ function isMacAppInstalledInApplications() {
   return execPath.startsWith('/Applications/') || execPath.startsWith(homeApps);
 }
 
+function getMacCodeSignatureStatus() {
+  return new Promise((resolve) => {
+    if (process.platform !== 'darwin') {
+      resolve({ valid: true, reason: 'not-macos' });
+      return;
+    }
+
+    // app.getPath('exe') resolves to .../DWM Control.app/Contents/MacOS/DWM Control
+    const exePath = app.getPath('exe');
+    const appBundlePath = path.resolve(exePath, '..', '..', '..');
+
+    execFile('codesign', ['-dv', '--verbose=4', appBundlePath], (error, stdout, stderr) => {
+      if (error) {
+        resolve({
+          valid: false,
+          reason: 'codesign-command-failed',
+          details: (stderr || stdout || error.message || '').trim()
+        });
+        return;
+      }
+
+      // `codesign -dv` writes metadata to stderr on success.
+      const details = String(stderr || stdout || '').trim();
+      const hasSignatureMetadata = /Authority=|TeamIdentifier=|Identifier=/.test(details);
+
+      if (!hasSignatureMetadata) {
+        resolve({ valid: false, reason: 'signature-metadata-missing', details });
+        return;
+      }
+
+      resolve({ valid: true, reason: 'ok', details });
+    });
+  });
+}
+
 // Configure auto-updater (only check in production)
 if (app.isPackaged && process.env.NODE_ENV !== 'development') {
   // Manual UI flow handles update download/install actions.
@@ -75,9 +110,16 @@ autoUpdater.on('update-not-available', (info) => {
 
 autoUpdater.on('error', (err) => {
   console.log('Error in auto-updater. ' + err);
+  const msg = err?.message || String(err || 'Unknown updater error');
+
+  if (msg.includes('Could not get code signature for running application')) {
+    updateInstallInProgress = false;
+    updateDownloadedReady = false;
+  }
+
   if (mainWindow) {
     // Handle the case where no update metadata is available (normal when up-to-date)
-    if (err.message.includes('latest-mac.yml') || err.message.includes('latest.yml')) {
+    if (msg.includes('latest-mac.yml') || msg.includes('latest.yml')) {
       // Don't send an error for this case - it means no updates are available
       mainWindow.webContents.send('update-not-available');
       return;
@@ -86,11 +128,13 @@ autoUpdater.on('error', (err) => {
     // Handle actual errors
     let userMessage = 'Update check failed';
     
-    if (err.message.includes('404') || err.message.includes('HttpError')) {
+    if (msg.includes('Could not get code signature for running application')) {
+      userMessage = 'Install failed: this app build is not signed for macOS auto-update. Install a signed release build and try again.';
+    } else if (msg.includes('404') || msg.includes('HttpError')) {
       userMessage = 'Update server not available';
-    } else if (err.message.includes('network') || err.message.includes('ENOTFOUND')) {
+    } else if (msg.includes('network') || msg.includes('ENOTFOUND')) {
       userMessage = 'Network error - check internet connection';
-    } else if (err.message.includes('rate limit')) {
+    } else if (msg.includes('rate limit')) {
       userMessage = 'Too many requests - try again later';
     }
     
@@ -1278,6 +1322,16 @@ ipcMain.handle('install-update', async () => {
         success: false,
         error: 'Please move DWM Control to /Applications (or ~/Applications) before installing updates, then try again.'
       };
+    }
+
+    if (process.platform === 'darwin') {
+      const signature = await getMacCodeSignatureStatus();
+      if (!signature.valid) {
+        return {
+          success: false,
+          error: 'This app build is not signed for macOS auto-update. Install an official signed release build and try again.'
+        };
+      }
     }
 
     updateInstallInProgress = true;
