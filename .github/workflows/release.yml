@@ -39,8 +39,13 @@ jobs:
         env:
           CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
-          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          DEBUG: "electron-builder"
         run: |
+          if [ -z "${CSC_LINK:-}" ] || [ -z "${CSC_KEY_PASSWORD:-}" ]; then
+            echo "MAC_CERT_P12 or MAC_CERT_PASSWORD secret is missing" >&2
+            exit 1
+          fi
+
           MAC_OUT_DIR="${RUNNER_TEMP}/dwm-dist"
           rm -rf "$MAC_OUT_DIR" || true
           COPYFILE_DISABLE=1 npx electron-builder --mac --publish=never --config.directories.output="$MAC_OUT_DIR"
