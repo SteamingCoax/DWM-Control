@@ -53,18 +53,6 @@ jobs:
             exit 1
           fi
 
-          echo "Validating P12 and printing certificate subject..."
-          openssl pkcs12 -in "$CERT_PATH" -clcerts -nokeys -passin pass:"$CSC_KEY_PASSWORD" \
-            | openssl x509 -noout -subject -issuer >/tmp/mac-cert-info.txt
-          cat /tmp/mac-cert-info.txt
-
-          CERT_SUBJECT="$(grep '^subject=' /tmp/mac-cert-info.txt | head -n 1 || true)"
-          CERT_CN="$(echo "$CERT_SUBJECT" | sed -E 's/^subject=.*CN\s*=\s*([^,/]+).*/\1/' | xargs)"
-          if [ -n "$CERT_CN" ] && [ "$CERT_CN" != "$CERT_SUBJECT" ]; then
-            echo "Using signing identity from certificate CN: $CERT_CN"
-            export CSC_NAME="$CERT_CN"
-          fi
-
           MAC_OUT_DIR="${RUNNER_TEMP}/dwm-dist"
           rm -rf "$MAC_OUT_DIR" || true
           COPYFILE_DISABLE=1 npx electron-builder --mac --publish=never --config.directories.output="$MAC_OUT_DIR"
