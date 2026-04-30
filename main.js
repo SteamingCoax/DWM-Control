@@ -6,6 +6,7 @@ const fs = require('fs');
 const https = require('https');
 const { SerialPort } = require('serialport');
 const ss = require('simple-statistics');
+const os = require('os');
 
 // Disable GPU acceleration IMMEDIATELY if safe-mode flag is present
 // This must be done before app.whenReady()
@@ -32,9 +33,22 @@ if (process.platform === 'win32') {
 // Keep a global reference of the window object
 let mainWindow;
 
+let updateCheckStarted = false;
+let updateInstallInProgress = false;
+
+function isMacAppInstalledInApplications() {
+  if (process.platform !== 'darwin') return true;
+
+  const execPath = process.execPath || '';
+  const homeApps = path.join(os.homedir(), 'Applications') + path.sep;
+  return execPath.startsWith('/Applications/') || execPath.startsWith(homeApps);
+}
+
 // Configure auto-updater (only check in production)
 if (app.isPackaged && process.env.NODE_ENV !== 'development') {
-  autoUpdater.checkForUpdatesAndNotify();
+  // Manual UI flow handles update download/install actions.
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
 }
 
 // Auto-updater event handlers
@@ -100,6 +114,11 @@ autoUpdater.on('update-downloaded', (info) => {
   }
 });
 
+autoUpdater.on('before-quit-for-update', () => {
+  console.log('Updater is quitting to install update...');
+  updateInstallInProgress = true;
+});
+
 function createWindow() {
   // Create the browser window with modern styling
   mainWindow = new BrowserWindow({
@@ -134,12 +153,17 @@ function createWindow() {
       mainWindow.moveTop();
     }
     
-    // Check for updates after a short delay (skip in development)
-    setTimeout(() => {
-      if (process.env.NODE_ENV !== 'development' && app.isPackaged) {
-        autoUpdater.checkForUpdatesAndNotify();
-      }
-    }, 3000);
+    // Check for updates once after startup (skip in development)
+    if (!updateCheckStarted) {
+      updateCheckStarted = true;
+      setTimeout(() => {
+        if (process.env.NODE_ENV !== 'development' && app.isPackaged) {
+          autoUpdater.checkForUpdates().catch((err) => {
+            console.warn('Startup update check failed:', err?.message || err);
+          });
+        }
+      }, 3000);
+    }
   });
 
   // Handle window closed
@@ -1223,7 +1247,26 @@ ipcMain.handle('download-update', async () => {
 });
 
 ipcMain.handle('install-update', async () => {
-  autoUpdater.quitAndInstall();
+  try {
+    if (updateInstallInProgress) {
+      return { success: true, message: 'Update installation already in progress' };
+    }
+
+    if (process.platform === 'darwin' && !isMacAppInstalledInApplications()) {
+      return {
+        success: false,
+        error: 'Please move DWM Control to /Applications (or ~/Applications) before installing updates, then try again.'
+      };
+    }
+
+    updateInstallInProgress = true;
+    // Parameters: isSilent=false (show installer behavior), isForceRunAfter=true
+    autoUpdater.quitAndInstall(false, true);
+    return { success: true };
+  } catch (error) {
+    updateInstallInProgress = false;
+    return { success: false, error: error.message || 'Failed to install update' };
+  }
 });
 
 ipcMain.handle('get-app-version', async () => {

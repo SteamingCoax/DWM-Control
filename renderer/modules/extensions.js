@@ -21,6 +21,7 @@
         let isUpdateDownloaded = false;
         let isCheckingForUpdates = false;
         let isDownloadingUpdate = false;
+        let isInstallingUpdate = false;
         let manualCheckRequested = false;
 
         const removeProgressBar = () => {
@@ -62,12 +63,22 @@
                 case 'downloaded':
                     isCheckingForUpdates = false;
                     isDownloadingUpdate = false;
+                    isInstallingUpdate = false;
                     updateButton.classList.add('ready-to-install');
                     updateText.textContent = label || 'Restart to Update';
+                    break;
+                case 'installing':
+                    isCheckingForUpdates = false;
+                    isDownloadingUpdate = false;
+                    isInstallingUpdate = true;
+                    updateButton.disabled = true;
+                    updateButton.classList.add('checking');
+                    updateText.textContent = label || 'Installing...';
                     break;
                 default:
                     isCheckingForUpdates = false;
                     isDownloadingUpdate = false;
+                    isInstallingUpdate = false;
                     updateText.textContent = label || 'Check Updates';
                     break;
             }
@@ -78,6 +89,9 @@
         setButtonState('idle');
 
         window.electronAPI.onUpdateAvailable((event, info) => {
+            if (isInstallingUpdate) {
+                return;
+            }
             updateInfo = info;
             manualCheckRequested = false;
             setButtonState('available');
@@ -89,6 +103,9 @@
         });
 
         window.electronAPI.onUpdateNotAvailable(() => {
+            if (isInstallingUpdate) {
+                return;
+            }
             updateInfo = null;
             isUpdateDownloaded = false;
             setButtonState('idle');
@@ -101,9 +118,14 @@
         });
 
         window.electronAPI.onUpdateError((event, error) => {
+            if (isInstallingUpdate) {
+                setButtonState('installing', 'Install failed');
+            }
             isUpdateDownloaded = false;
             manualCheckRequested = false;
-            setButtonState(updateInfo ? 'available' : 'idle');
+            if (!isInstallingUpdate) {
+                setButtonState(updateInfo ? 'available' : 'idle');
+            }
             this.appendOutput(` Update error: ${error}`);
         });
 
@@ -121,6 +143,9 @@
         });
 
         window.electronAPI.onUpdateDownloaded(() => {
+            if (isInstallingUpdate) {
+                return;
+            }
             isUpdateDownloaded = true;
             setButtonState('downloaded');
             this.appendOutput(' Update downloaded. Click to restart and install.');
@@ -131,13 +156,20 @@
         });
 
         updateButton.addEventListener('click', async () => {
-            if (isCheckingForUpdates || isDownloadingUpdate) {
+            if (isCheckingForUpdates || isDownloadingUpdate || isInstallingUpdate) {
                 return;
             }
 
             if (isUpdateDownloaded) {
                 this.appendOutput(' Installing update and restarting...');
-                await window.electronAPI.installUpdate();
+                setButtonState('installing', 'Installing...');
+                const installResult = await window.electronAPI.installUpdate();
+                if (installResult && installResult.success === false) {
+                    isInstallingUpdate = false;
+                    setButtonState('downloaded');
+                    this.appendOutput(` Install failed: ${installResult.error || 'Unknown error'}`);
+                    this.showUpdateNotification('Install Failed', installResult.error || 'Could not install update.', 'error');
+                }
             } else if (updateInfo) {
                 setButtonState('downloading');
                 this.appendOutput(' Downloading update...');
