@@ -38,7 +38,6 @@
   },
   "build": {
     "afterPack": "build/before-sign-cleanup.js",
-    "afterSign": "build/notarize.js",
     "appId": "com.steamingcoax.dwmcontrol",
     "productName": "DWM Control",
     "copyright": "Copyright © 2025 SteamingCoax",
@@ -114,6 +113,7 @@
       "artifactName": "DWM-Control-${version}-macOS-AppleSilicon.${ext}",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
+      "notarize": { "teamId": "49BG97UMPP" },
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "target": [
