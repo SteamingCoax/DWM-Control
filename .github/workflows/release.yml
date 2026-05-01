@@ -60,13 +60,24 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$MAC_CERT_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import Apple intermediate CA certificates so codesign can build the trust chain
+          curl -sSL "https://www.apple.com/certificateauthority/DeveloperIDCA.cer" -o "${RUNNER_TEMP}/DeveloperIDCA.cer"
+          curl -sSL "https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer" -o "${RUNNER_TEMP}/DeveloperIDG2CA.cer"
+          security import "${RUNNER_TEMP}/DeveloperIDCA.cer" -k "$KEYCHAIN_PATH" 2>/dev/null || true
+          security import "${RUNNER_TEMP}/DeveloperIDG2CA.cer" -k "$KEYCHAIN_PATH" 2>/dev/null || true
+
           security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
 
+          echo "SIGNING_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
           rm -f "$CERT_PATH"
 
       - name: Build macOS artifacts
         env:
           DEBUG: "electron-builder"
+          # Tell electron-builder to use our pre-configured keychain instead of creating its own temp one.
+          # Without this it creates /tmp/xxx.keychain without set-key-partition-list, causing errSecInternalComponent.
+          CSC_KEYCHAIN: ${{ env.SIGNING_KEYCHAIN }}
         run: |
           MAC_OUT_DIR="${RUNNER_TEMP}/dwm-dist"
           rm -rf "$MAC_OUT_DIR" || true
