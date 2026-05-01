@@ -113,7 +113,7 @@
       "artifactName": "DWM-Control-${version}-macOS-AppleSilicon.${ext}",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
-      "notarize": { "teamId": "49BG97UMPP" },
+      "notarize": true,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "target": [
