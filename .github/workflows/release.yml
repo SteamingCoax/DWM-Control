@@ -69,22 +69,41 @@ jobs:
           # Grant codesign non-interactive access to the private key (required on macOS 12+)
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          # Download Apple Developer ID intermediate CA certs and mark them as TRUSTED
-          # On macOS 13+ the chain-to-root warning is a hard failure (errSecInternalComponent).
-          # security import only puts certs in the keychain; add-trusted-cert is required to trust them.
+          # Download Apple CA certs needed to build the trust chain for Developer ID G2 certs.
+          # Two separate operations are required:
+          #   1. security import  → puts the cert in the keychain so codesign can find it
+          #      when walking the chain from leaf → intermediate → root.
+          #   2. security add-trusted-cert → marks it as trusted in the USER trust domain
+          #      (no -d = user domain, no admin required; codesign checks user trust settings).
+          # Both are needed. import alone = cert is findable but untrusted.
+          # add-trusted-cert alone = trusted setting recorded but cert may not be in keychain.
           curl -sSfL "https://www.apple.com/certificateauthority/DeveloperIDCA.cer" \
             -o "${RUNNER_TEMP}/DeveloperIDCA.cer"
           curl -sSfL "https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer" \
             -o "${RUNNER_TEMP}/DeveloperIDG2CA.cer"
-          security add-trusted-cert -d -r trustAsRoot \
-            -k "$KEYCHAIN_PATH" "${RUNNER_TEMP}/DeveloperIDCA.cer"
-          security add-trusted-cert -d -r trustAsRoot \
-            -k "$KEYCHAIN_PATH" "${RUNNER_TEMP}/DeveloperIDG2CA.cer"
+
+          # Also fetch Apple Root CA G2 — the self-signed root that Developer ID G2 chains to.
+          # On a fresh runner user account this may not yet be in any accessible trust store.
+          curl -sSfL "https://www.apple.com/appleca/AppleRootCA-G2.cer" \
+            -o "${RUNNER_TEMP}/AppleRootCAG2.cer" || true
+
+          for CACERT in DeveloperIDCA.cer DeveloperIDG2CA.cer AppleRootCAG2.cer; do
+            CAPATH="${RUNNER_TEMP}/${CACERT}"
+            [ -s "$CAPATH" ] || continue
+            # Import into build keychain (chain building)
+            security import "$CAPATH" -k "$KEYCHAIN_PATH" 2>/dev/null || true
+            # Mark as trusted in user domain (trust evaluation)
+            security add-trusted-cert -r trustAsRoot \
+              -k "$HOME/Library/Keychains/login.keychain-db" "$CAPATH" 2>/dev/null || true
+          done
 
           # Prepend build keychain to the existing search list (preserves System.keychain etc.)
           security default-keychain -s "$KEYCHAIN_PATH"
           security list-keychains -d user -s "$KEYCHAIN_PATH" \
             $(security list-keychains -d user | xargs)
+
+          echo "=== Certs in build keychain after setup ==="
+          security find-certificate -a "$KEYCHAIN_PATH" | grep "labl" || true
 
           echo "SIGNING_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
           echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> "$GITHUB_ENV"
@@ -97,9 +116,8 @@ jobs:
           security list-keychains -d user
           echo "=== Identities in build keychain ==="
           security find-identity -v "$SIGNING_KEYCHAIN"
-          echo "=== Cert chain verification ==="
-          security find-certificate -c "Developer ID Application: COAXON Systemes Inc" \
-            -p "$SIGNING_KEYCHAIN" | openssl x509 -noout -issuer -subject || true
+          echo "=== All certs in build keychain ==="
+          security find-certificate -a "$SIGNING_KEYCHAIN" | grep "labl" || true
           echo "=== Direct codesign test ==="
           cp /bin/ls "${RUNNER_TEMP}/test-sign-bin"
           codesign --sign "8263089E2FDBBF70732F3561BB71D82323ADCFE5" \
