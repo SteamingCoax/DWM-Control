@@ -62,38 +62,39 @@ jobs:
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          # Import private key + cert; -T grants codesign access at import time
-          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$MAC_CERT_PASSWORD" \
-            -T /usr/bin/codesign -T /usr/bin/security -f pkcs12
+          # Import private key + cert; -A = no ACL restrictions on the private key
+          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$MAC_CERT_PASSWORD" -A -f pkcs12
 
           # Grant codesign non-interactive access to the private key (required on macOS 12+)
           security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
           # Download Apple CA certs needed to build the trust chain for Developer ID G2 certs.
-          # Two separate operations are required:
-          #   1. security import  → puts the cert in the keychain so codesign can find it
-          #      when walking the chain from leaf → intermediate → root.
-          #   2. security add-trusted-cert → marks it as trusted in the USER trust domain
-          #      (no -d = user domain, no admin required; codesign checks user trust settings).
-          # Both are needed. import alone = cert is findable but untrusted.
-          # add-trusted-cert alone = trusted setting recorded but cert may not be in keychain.
-          curl -sSfL "https://www.apple.com/certificateauthority/DeveloperIDCA.cer" \
-            -o "${RUNNER_TEMP}/DeveloperIDCA.cer"
+          # Both security import AND add-trusted-cert are required:
+          #   import      → puts the cert in the keychain so codesign can locate it while
+          #                  walking the chain leaf → intermediate → root
+          #   add-trusted-cert → marks it trusted in the user trust domain so codesign
+          #                  accepts it (no -d = user domain; codesign checks this first)
+          #
+          # Correct Apple PKI URLs (all under /certificateauthority/):
+          #   G2 intermediate: DeveloperIDG2CA.cer
+          #   G1 intermediate: DeveloperIDCA.cer
+          #   G2 root:         AppleRootCA-G2.cer   ← self-signed root; REQUIRED for chain
+          echo "--- Downloading Apple CA certs ---"
           curl -sSfL "https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer" \
             -o "${RUNNER_TEMP}/DeveloperIDG2CA.cer"
+          curl -sSfL "https://www.apple.com/certificateauthority/DeveloperIDCA.cer" \
+            -o "${RUNNER_TEMP}/DeveloperIDCA.cer"
+          # Apple Root CA G2 — the self-signed root that Developer ID G2 intermediate chains to
+          curl -sSfL "https://www.apple.com/certificateauthority/AppleRootCA-G2.cer" \
+            -o "${RUNNER_TEMP}/AppleRootCAG2.cer"
 
-          # Also fetch Apple Root CA G2 — the self-signed root that Developer ID G2 chains to.
-          # On a fresh runner user account this may not yet be in any accessible trust store.
-          curl -sSfL "https://www.apple.com/appleca/AppleRootCA-G2.cer" \
-            -o "${RUNNER_TEMP}/AppleRootCAG2.cer" || true
-
-          for CACERT in DeveloperIDCA.cer DeveloperIDG2CA.cer AppleRootCAG2.cer; do
-            CAPATH="${RUNNER_TEMP}/${CACERT}"
-            [ -s "$CAPATH" ] || continue
-            # Import into build keychain (chain building)
+          for CAFILE in DeveloperIDG2CA.cer DeveloperIDCA.cer AppleRootCAG2.cer; do
+            CAPATH="${RUNNER_TEMP}/${CAFILE}"
+            echo "  Installing $CAFILE ($(wc -c < "$CAPATH") bytes)"
+            # Import into build keychain so it can be found during chain building
             security import "$CAPATH" -k "$KEYCHAIN_PATH" 2>/dev/null || true
-            # Mark as trusted in user domain (trust evaluation)
-            security add-trusted-cert -r trustAsRoot \
+            # Mark as trusted in user domain trust settings
+            security add-trusted-cert -r trustRoot \
               -k "$HOME/Library/Keychains/login.keychain-db" "$CAPATH" 2>/dev/null || true
           done
 
