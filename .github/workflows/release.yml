@@ -85,13 +85,9 @@ jobs:
           security import "${RUNNER_TEMP}/DeveloperIDG2CA.cer" -k "$KEYCHAIN_PATH" 2>/dev/null || true
           security import "${RUNNER_TEMP}/AppleRootCAG2.cer"   -k "$KEYCHAIN_PATH" 2>/dev/null || true
 
-          # Mark the root as trusted in the BUILD keychain trust settings.
-          # We write to the build keychain (which is unlocked) NOT to login.keychain-db
-          # (which may be locked and silently reject add-trusted-cert).
-          echo "--- Setting trust on Apple Root CA G2 in build keychain ---"
-          security add-trusted-cert -r trustRoot \
-            -k "$KEYCHAIN_PATH" "${RUNNER_TEMP}/AppleRootCAG2.cer" 2>/dev/null || \
-            echo "  (add-trusted-cert skipped — system trust store will be used)"
+          # Apple Root CA G2 is already trusted in the system store on macos-15.
+          # Importing it into the build keychain (above) is sufficient for chain walking.
+          # Do NOT call add-trusted-cert — it hangs waiting for system authorization.
 
           # Prepend build keychain to the existing search list (preserves System.keychain etc.)
           security default-keychain -s "$KEYCHAIN_PATH"
