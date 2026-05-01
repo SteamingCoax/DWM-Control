@@ -35,27 +35,47 @@ jobs:
       - name: Install dependencies
         run: SKIP_ELECTRON_BUILDER_INSTALL_APP_DEPS=1 npm install
 
-      - name: Build macOS artifacts
+      - name: Import signing certificate
         env:
-          CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
-          DEBUG: "electron-builder"
+          MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
+          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
         run: |
-          if [ -z "${CSC_LINK:-}" ] || [ -z "${CSC_KEY_PASSWORD:-}" ]; then
+          if [ -z "${MAC_CERT_P12:-}" ] || [ -z "${MAC_CERT_PASSWORD:-}" ]; then
             echo "MAC_CERT_P12 or MAC_CERT_PASSWORD secret is missing" >&2
             exit 1
           fi
 
           CERT_PATH="${RUNNER_TEMP}/mac-signing-cert.p12"
-          echo "$CSC_LINK" | base64 --decode > "$CERT_PATH"
+          KEYCHAIN_PATH="${RUNNER_TEMP}/build.keychain"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
+
+          echo "$MAC_CERT_P12" | base64 --decode > "$CERT_PATH"
           if [ ! -s "$CERT_PATH" ]; then
             echo "Decoded MAC_CERT_P12 is empty or invalid base64" >&2
             exit 1
           fi
 
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$MAC_CERT_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+
+          rm -f "$CERT_PATH"
+
+      - name: Build macOS artifacts
+        env:
+          DEBUG: "electron-builder"
+        run: |
           MAC_OUT_DIR="${RUNNER_TEMP}/dwm-dist"
           rm -rf "$MAC_OUT_DIR" || true
           COPYFILE_DISABLE=1 npx electron-builder --mac --publish=never --config.directories.output="$MAC_OUT_DIR"
+
+      - name: Remove build keychain
+        if: always()
+        run: |
+          security delete-keychain "${RUNNER_TEMP}/build.keychain" 2>/dev/null || true
 
       - name: Verify macOS app signature
         run: |
