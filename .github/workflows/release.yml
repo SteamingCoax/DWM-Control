@@ -64,21 +64,38 @@ jobs:
           security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$MAC_CERT_PASSWORD" -A -f pkcs12
           security set-key-partition-list -S apple-tool:,apple:,codesign: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-          # Import Apple intermediate CA certificates so codesign can build the trust chain
+          # Import Apple intermediate CA certificates into login keychain for trust chain evaluation.
+          # Codesign uses the system trust store for chain building — our build keychain alone is not enough.
           curl -sSL "https://www.apple.com/certificateauthority/DeveloperIDCA.cer" -o "${RUNNER_TEMP}/DeveloperIDCA.cer"
           curl -sSL "https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer" -o "${RUNNER_TEMP}/DeveloperIDG2CA.cer"
-          security import "${RUNNER_TEMP}/DeveloperIDCA.cer" -k "$KEYCHAIN_PATH" 2>/dev/null || true
-          security import "${RUNNER_TEMP}/DeveloperIDG2CA.cer" -k "$KEYCHAIN_PATH" 2>/dev/null || true
+          security import "${RUNNER_TEMP}/DeveloperIDCA.cer" -k "$HOME/Library/Keychains/login.keychain-db" 2>/dev/null || true
+          security import "${RUNNER_TEMP}/DeveloperIDG2CA.cer" -k "$HOME/Library/Keychains/login.keychain-db" 2>/dev/null || true
 
-          # Set as the default keychain and add to the search list
+          # Set as the default keychain and prepend to the EXISTING search list (preserve System.keychain etc.)
           security default-keychain -s "$KEYCHAIN_PATH"
-          security list-keychains -d user -s "$KEYCHAIN_PATH" "$HOME/Library/Keychains/login.keychain-db"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
 
           # Export password and path so the build step can re-unlock if needed
           echo "SIGNING_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
           echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> "$GITHUB_ENV"
           echo "CSC_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
           rm -f "$CERT_PATH"
+
+      - name: Verify codesign works with build keychain
+        run: |
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$SIGNING_KEYCHAIN"
+          echo "=== Keychain search list ==="
+          security list-keychains -d user
+          echo "=== Identities in build keychain ==="
+          security find-identity -v "$SIGNING_KEYCHAIN"
+          echo "=== Direct codesign test ==="
+          cp /bin/ls "${RUNNER_TEMP}/test-sign-bin"
+          codesign --sign "8263089E2FDBBF70732F3561BB71D82323ADCFE5" \
+            --keychain "$SIGNING_KEYCHAIN" \
+            --force \
+            --timestamp \
+            --options runtime \
+            "${RUNNER_TEMP}/test-sign-bin" && echo "SUCCESS" || echo "FAILED (exit $?)"
 
       - name: Build macOS artifacts
         env:
