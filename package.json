@@ -71,7 +71,6 @@
       "!node_modules/@serialport/bindings-cpp/prebuilds/android-*/**/*",
       "!node_modules/@serialport/bindings-cpp/prebuilds/linux-*/**/*",
       "!node_modules/@serialport/bindings-cpp/prebuilds/win32-*/**/*",
-      "!node_modules/@serialport/bindings-cpp/prebuilds/darwin-x64+arm64/**/*",
       "node_modules/electron-squirrel-startup/**/*",
       "node_modules/intel-hex/**/*",
       "node_modules/intelhex/**/*",
