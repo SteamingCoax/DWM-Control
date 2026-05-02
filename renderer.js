@@ -323,14 +323,39 @@ class DWMControl {
     }
 
     isMeterPort(port) {
-        const path = (port?.path || '').toLowerCase();
+        // Primary match: exact VID/PID for DWM V2 (STM32 CDC, VID 0483 PID 5740)
+        // serialport exposes these as vendorId / productId on all platforms.
+        const vid = (port?.vendorId || '').toLowerCase().replace(/^0x/, '');
+        const pid = (port?.productId || '').toLowerCase().replace(/^0x/, '');
+        if (vid === '0483' && pid === '5740') return true;
+
+        // Windows fallback: pnpId contains VID_0483&PID_5740
+        const pnpId = (port?.pnpId || '');
+        if (/VID_0483/i.test(pnpId) && /PID_5740/i.test(pnpId)) return true;
+
+        // Explicit DWM V2 label (covers custom firmware with different VID/PID)
         const friendlyName = `${port?.friendlyName || ''} ${port?.manufacturer || ''}`.toLowerCase();
-        return path.includes('usbmodem') || friendlyName.includes('dwm v2');
+        if (friendlyName.includes('dwm v2')) return true;
+
+        // macOS legacy fallback: usbmodem path (macOS CDC serial devices)
+        const path = (port?.path || '').toLowerCase();
+        if (path.includes('usbmodem')) return true;
+
+        return false;
     }
 
     buildMeterKey(port) {
+        // macOS: use the usbmodem UID from the path
         const fallbackUid = this.parseUsbModemUid(port?.path);
-        return fallbackUid ? `usbmodem:${fallbackUid}` : `port:${port?.path || 'unknown'}`;
+        if (fallbackUid) return `usbmodem:${fallbackUid}`;
+
+        // Windows / Linux: prefer the USB serial number from pnpId for a stable key
+        // pnpId format: USB\VID_xxxx&PID_xxxx\SERIAL  (last backslash-separated segment)
+        const pnpId = port?.pnpId || '';
+        const snMatch = pnpId.match(/\\([A-Za-z0-9]+)$/);
+        if (snMatch && snMatch[1].length >= 4) return `usbserial:${snMatch[1]}`;
+
+        return `port:${port?.path || 'unknown'}`;
     }
 
     getMeterRecordByPortPath(portPath) {
