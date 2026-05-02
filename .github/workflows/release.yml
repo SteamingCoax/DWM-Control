@@ -197,8 +197,8 @@ jobs:
         run: |
           MAC_OUT_DIR="${RUNNER_TEMP}/dwm-dist"
           gh release upload "$RELEASE_TAG" \
-            "$MAC_OUT_DIR"/DWM-Control-*-macOS-Intel.dmg \
-            "$MAC_OUT_DIR"/DWM-Control-*-macOS-AppleSilicon.zip \
+            "$MAC_OUT_DIR"/DWM-Control-*-macOS-*.dmg \
+            "$MAC_OUT_DIR"/DWM-Control-*-macOS-*.zip \
             "$MAC_OUT_DIR"/latest-mac*.yml \
             --repo "${{ github.repository }}" \
             --clobber
@@ -308,8 +308,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release upload "$RELEASE_TAG" \
-            dist/DWM-Control-*-Linux.AppImage \
-            dist/DWM-Control-*-Linux.deb \
-            dist/latest-linux.yml \
+            dist/DWM-Control-*-Linux-*.AppImage \
+            dist/DWM-Control-*-Linux-*.deb \
+            dist/latest-linux*.yml \
             --repo "${{ github.repository }}" \
             --clobber

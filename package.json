@@ -69,8 +69,6 @@
       "!node_modules/@serialport/**/bin/**",
       "node_modules/@serialport/bindings-cpp/prebuilds/**/*",
       "!node_modules/@serialport/bindings-cpp/prebuilds/android-*/**/*",
-      "!node_modules/@serialport/bindings-cpp/prebuilds/linux-*/**/*",
-      "!node_modules/@serialport/bindings-cpp/prebuilds/win32-*/**/*",
       "node_modules/electron-squirrel-startup/**/*",
       "node_modules/intel-hex/**/*",
       "node_modules/intelhex/**/*",
@@ -109,7 +107,7 @@
     "mac": {
       "category": "public.app-category.developer-tools",
       "icon": "assets/icon.icns",
-      "artifactName": "DWM-Control-${version}-macOS-AppleSilicon.${ext}",
+      "artifactName": "DWM-Control-${version}-macOS-${arch}.${ext}",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "notarize": true,
@@ -119,12 +117,14 @@
         {
           "target": "dmg",
           "arch": [
-            "x64"
+            "x64",
+            "arm64"
           ]
         },
         {
           "target": "zip",
           "arch": [
+            "x64",
             "arm64"
           ]
         }
@@ -140,7 +140,7 @@
       ]
     },
     "dmg": {
-      "artifactName": "DWM-Control-${version}-macOS-Intel.${ext}",
+      "artifactName": "DWM-Control-${version}-macOS-${arch}.${ext}",
       "title": "${productName} ${version}",
       "icon": "assets/icon.icns",
       "window": {
@@ -204,13 +204,17 @@
         {
           "target": "AppImage",
           "arch": [
-            "x64"
+            "x64",
+            "arm64",
+            "armv7l"
           ]
         },
         {
           "target": "deb",
           "arch": [
-            "x64"
+            "x64",
+            "arm64",
+            "armv7l"
           ]
         }
       ],
@@ -222,11 +226,11 @@
       "maintainer": "SteamingCoax"
     },
     "appImage": {
-      "artifactName": "DWM-Control-${version}-Linux.${ext}",
+      "artifactName": "DWM-Control-${version}-Linux-${arch}.${ext}",
       "category": "Development"
     },
     "deb": {
-      "artifactName": "DWM-Control-${version}-Linux.${ext}",
+      "artifactName": "DWM-Control-${version}-Linux-${arch}.${ext}",
       "depends": [
         "libusb-1.0-0",
         "dfu-util"
