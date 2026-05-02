@@ -323,23 +323,25 @@ class DWMControl {
     }
 
     isMeterPort(port) {
-        // Primary match: exact VID/PID for DWM V2 (STM32 CDC, VID 0483 PID 5740)
-        // serialport exposes these as vendorId / productId on all platforms.
+        // Primary match: USB product string "DWM V2 ComPort" — set on all DWM V2 devices.
+        // serialport exposes it via the manufacturer field on all platforms.
+        const manufacturer = (port?.manufacturer || '').toLowerCase();
+        if (manufacturer.includes('dwm v2')) return true;
+
+        // Secondary match: Windows friendly name may also carry the product string.
+        const friendlyName = (port?.friendlyName || '').toLowerCase();
+        if (friendlyName.includes('dwm v2')) return true;
+
+        // Tertiary: VID 0483 + PID 5740 (STM32 CDC) with a USB-origin pnpId on Windows,
+        // or vendorId/productId fields on macOS/Linux — guards against other STM32 devices
+        // by requiring both the correct VID and PID together.
         const vid = (port?.vendorId || '').toLowerCase().replace(/^0x/, '');
         const pid = (port?.productId || '').toLowerCase().replace(/^0x/, '');
         if (vid === '0483' && pid === '5740') return true;
 
-        // Windows fallback: pnpId contains VID_0483&PID_5740
+        // Windows fallback when vendorId/productId fields are unpopulated
         const pnpId = (port?.pnpId || '');
         if (/VID_0483/i.test(pnpId) && /PID_5740/i.test(pnpId)) return true;
-
-        // Explicit DWM V2 label (covers custom firmware with different VID/PID)
-        const friendlyName = `${port?.friendlyName || ''} ${port?.manufacturer || ''}`.toLowerCase();
-        if (friendlyName.includes('dwm v2')) return true;
-
-        // macOS legacy fallback: usbmodem path (macOS CDC serial devices)
-        const path = (port?.path || '').toLowerCase();
-        if (path.includes('usbmodem')) return true;
 
         return false;
     }
