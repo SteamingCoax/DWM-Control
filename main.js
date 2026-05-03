@@ -1186,11 +1186,22 @@ function getDfuUtilPath() {
     console.log('getDfuUtilPath - Using system dfu-util');
     return 'dfu-util';
   } else {
-    // For Linux, try the bundled version first, fallback to system
-    const bundledPath = path.join(basePath, 'Programs', 'dfu-util', 'dfu-util');
+    // For Linux, use an arch-specific bundled binary.
+    // process.arch is 'x64', 'arm64', or 'arm' (for armv7l/armhf).
+    const arch = process.arch;
+    const bundledPath = path.join(basePath, 'Programs', 'dfu-util', `linux-${arch}`, 'dfu-util');
+    console.log('getDfuUtilPath - Linux arch:', arch);
+    console.log('getDfuUtilPath - Linux bundled path:', bundledPath);
     if (fs.existsSync(bundledPath)) {
+      try {
+        fs.chmodSync(bundledPath, 0o755);
+      } catch (e) {
+        console.log('getDfuUtilPath - chmod failed:', e.message);
+      }
+      console.log('getDfuUtilPath - Using bundled dfu-util');
       return bundledPath;
     }
+    console.log('getDfuUtilPath - Bundled dfu-util not found, falling back to system');
     return 'dfu-util';
   }
 }

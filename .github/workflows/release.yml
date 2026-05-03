@@ -289,6 +289,35 @@ jobs:
       - name: Install dependencies
         run: SKIP_ELECTRON_BUILDER_INSTALL_APP_DEPS=1 npm install
 
+      - name: Bundle dfu-util for all Linux architectures
+        run: |
+          # Add foreign arch support so apt can download arm64 and armhf packages
+          sudo dpkg --add-architecture arm64
+          sudo dpkg --add-architecture armhf
+          sudo apt-get update -qq
+
+          mkdir -p Programs/dfu-util/linux-x64 Programs/dfu-util/linux-arm64 Programs/dfu-util/linux-arm
+
+          # Download packages to /tmp (apt-get download writes to cwd)
+          pushd /tmp
+          apt-get download dfu-util:amd64 dfu-util:arm64 dfu-util:armhf
+          dpkg-deb -x dfu-util*amd64*.deb  dfu-x64
+          dpkg-deb -x dfu-util*arm64*.deb  dfu-arm64
+          dpkg-deb -x dfu-util*armhf*.deb  dfu-arm
+          popd
+
+          cp /tmp/dfu-x64/usr/bin/dfu-util    Programs/dfu-util/linux-x64/dfu-util
+          cp /tmp/dfu-arm64/usr/bin/dfu-util  Programs/dfu-util/linux-arm64/dfu-util
+          cp /tmp/dfu-arm/usr/bin/dfu-util    Programs/dfu-util/linux-arm/dfu-util
+          chmod +x Programs/dfu-util/linux-x64/dfu-util \
+                   Programs/dfu-util/linux-arm64/dfu-util \
+                   Programs/dfu-util/linux-arm/dfu-util
+
+          # Verify downloaded binaries
+          file Programs/dfu-util/linux-x64/dfu-util \
+               Programs/dfu-util/linux-arm64/dfu-util \
+               Programs/dfu-util/linux-arm/dfu-util
+
       - name: Build Linux artifacts
         run: npm run build:linux
 

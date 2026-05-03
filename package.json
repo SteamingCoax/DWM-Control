@@ -205,13 +205,17 @@
         {
           "target": "AppImage",
           "arch": [
-            "x64"
+            "x64",
+            "arm64",
+            "armv7l"
           ]
         },
         {
           "target": "deb",
           "arch": [
-            "x64"
+            "x64",
+            "arm64",
+            "armv7l"
           ]
         }
       ],
@@ -223,24 +227,17 @@
       "maintainer": "SteamingCoax"
     },
     "asarUnpack": [
-      "node_modules/@serialport/bindings-cpp/prebuilds/**/*.node"
+      "node_modules/@serialport/bindings-cpp/prebuilds/**/*.node",
+      "Programs/dfu-util/**/*"
     ],
     "appImage": {
       "artifactName": "DWM-Control-${version}-Linux-${arch}.${ext}",
       "category": "Development"
     },
     "deb": {
-      "artifactName": "DWM-Control-${version}-Linux-${arch}.${ext}",
-      "depends": [
-        "libusb-1.0-0",
-        "dfu-util"
-      ]
+      "artifactName": "DWM-Control-${version}-Linux-${arch}.${ext}"
     },
     "rpm": {
-      "depends": [
-        "libusb1",
-        "dfu-util"
-      ]
     },
     "publish": {
       "provider": "github",

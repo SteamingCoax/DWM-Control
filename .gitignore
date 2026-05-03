@@ -116,6 +116,10 @@ check-*.js
 Programs/dfu-util/dfu-util
 Programs/dfu-util/*.dylib
 Programs/dfu-util/*.so
+# Linux arch-specific binaries — downloaded by CI, not committed
+Programs/dfu-util/linux-x64/dfu-util
+Programs/dfu-util/linux-arm64/dfu-util
+Programs/dfu-util/linux-arm/dfu-util
 
 # Batch and PowerShell test files
 test-*.bat
