@@ -612,9 +612,12 @@
       <span class="meter-badge meter-badge-${badgeClass}" id="meter-${sid}-badge">${badgeText}</span>
       <button class="btn btn-primary btn-small" data-meter-action="connect" ${isConnected ? 'disabled' : ''}>Connect</button>
       <button class="btn btn-secondary btn-small" data-meter-action="disconnect" ${!isConnected ? 'disabled' : ''}>Disconnect</button>
+      <button class="btn btn-secondary btn-small" data-meter-action="check-updates" ${!isConnected ? 'disabled' : ''}>Check Updates</button>
             <button class="btn btn-secondary btn-small" data-meter-action="identify-meter" ${!isConnected ? 'disabled' : ''}>Identify</button>
     </div>
   </div>
+
+  <div id="meter-${sid}-fw-update-notice" class="meter-fw-update-notice" style="display:none"></div>
 
   <div class="meter-live-section" id="meter-${sid}-readings-bar" style="${isConnected ? '' : 'display:none'}">
     <div class="meter-live-toolbar">

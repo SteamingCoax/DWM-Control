@@ -9,9 +9,11 @@
 
     DWMControl.prototype.refreshDfuDevices = async function() {
         const deviceCombo = document.getElementById('device-combo');
-        const uploadButton = document.getElementById('upload-btn');
+        const installDriverBtn = document.getElementById('install-driver-btn');
 
         if (!deviceCombo) { return; }
+
+        if (installDriverBtn) installDriverBtn.style.display = 'none';
 
         try {
             const result = await window.electronAPI.getDfuDevices();
@@ -25,6 +27,10 @@
                 option.disabled = true;
                 deviceCombo.appendChild(option);
                 this.selectedDevice = null;
+
+                if (result && result.windowsHelp && installDriverBtn) {
+                    installDriverBtn.style.display = '';
+                }
             } else {
                 const devices = result.devices || [];
                 if (devices.length === 0) {
@@ -54,15 +60,26 @@
         this.updateUploadButton();
     };
 
-    DWMControl.prototype.launchZadig = async function() {
-        if (window.electronAPI && window.electronAPI.launchZadig) {
-            try {
-                await window.electronAPI.launchZadig();
-            } catch (error) {
-                this.appendOutput(`Failed to launch Zadig: ${error.message}`);
+    DWMControl.prototype.installUsbDriver = async function() {
+        const btn = document.getElementById('install-driver-btn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Installing…'; }
+
+        this.appendOutput('Installing WinUSB driver for DFU device…');
+        this.appendOutput('A UAC prompt will appear — please click Yes to allow the installation.');
+
+        try {
+            const result = await window.electronAPI.installWinUsbDriver();
+            if (result && result.success) {
+                this.appendOutput('Driver installed successfully. Scanning for devices…');
+                await this.refreshDfuDevices();
+            } else {
+                const msg = (result && result.error) ? result.error : 'Driver installation failed.';
+                this.appendOutput(`Driver installation failed: ${msg}`);
+                if (btn) { btn.disabled = false; btn.textContent = 'Install USB Driver'; }
             }
-        } else {
-            this.appendOutput('Zadig launcher is not available on this platform.');
+        } catch (error) {
+            this.appendOutput(`Driver installation error: ${error.message}`);
+            if (btn) { btn.disabled = false; btn.textContent = 'Install USB Driver'; }
         }
     };
 

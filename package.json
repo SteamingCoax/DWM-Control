@@ -1,6 +1,6 @@
 {
   "name": "dwm-control",
-  "version": "1.2.7",
+  "version": "1.2.1-republish.1",
   "description": "DWM V2 Updater & Interfacing Application",
   "license": "MIT",
   "author": "SteamingCoax",
@@ -69,6 +69,9 @@
       "!node_modules/@serialport/**/bin/**",
       "node_modules/@serialport/bindings-cpp/prebuilds/**/*",
       "!node_modules/@serialport/bindings-cpp/prebuilds/android-*/**/*",
+      "!node_modules/@serialport/bindings-cpp/prebuilds/linux-*/**/*",
+      "!node_modules/@serialport/bindings-cpp/prebuilds/win32-*/**/*",
+      "!node_modules/@serialport/bindings-cpp/prebuilds/darwin-x64+arm64/**/*",
       "node_modules/electron-squirrel-startup/**/*",
       "node_modules/intel-hex/**/*",
       "node_modules/intelhex/**/*",
@@ -107,24 +110,21 @@
     "mac": {
       "category": "public.app-category.developer-tools",
       "icon": "assets/icon.icns",
-      "artifactName": "DWM-Control-${version}-macOS-${arch}.${ext}",
+      "artifactName": "DWM-Control-${version}-macOS-AppleSilicon.${ext}",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
-      "notarize": true,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "target": [
         {
           "target": "dmg",
           "arch": [
-            "x64",
-            "arm64"
+            "x64"
           ]
         },
         {
           "target": "zip",
           "arch": [
-            "x64",
             "arm64"
           ]
         }
@@ -140,7 +140,7 @@
       ]
     },
     "dmg": {
-      "artifactName": "DWM-Control-${version}-macOS-${arch}.${ext}",
+      "artifactName": "DWM-Control-${version}-macOS-Intel.${ext}",
       "title": "${productName} ${version}",
       "icon": "assets/icon.icns",
       "window": {
@@ -171,7 +171,8 @@
         }
       ],
       "icon": "assets/icon.ico",
-      "signAndEditExecutable": false,
+      "signAndEditExecutable": true,
+      "sign": null,
       "verifyUpdateCodeSignature": false,
       "requestedExecutionLevel": "asInvoker",
       "extraResources": [
@@ -204,17 +205,13 @@
         {
           "target": "AppImage",
           "arch": [
-            "x64",
-            "arm64",
-            "armv7l"
+            "x64"
           ]
         },
         {
           "target": "deb",
           "arch": [
-            "x64",
-            "arm64",
-            "armv7l"
+            "x64"
           ]
         }
       ],
@@ -226,11 +223,11 @@
       "maintainer": "SteamingCoax"
     },
     "appImage": {
-      "artifactName": "DWM-Control-${version}-Linux-${arch}.${ext}",
+      "artifactName": "DWM-Control-${version}-Linux.${ext}",
       "category": "Development"
     },
     "deb": {
-      "artifactName": "DWM-Control-${version}-Linux-${arch}.${ext}",
+      "artifactName": "DWM-Control-${version}-Linux.${ext}",
       "depends": [
         "libusb-1.0-0",
         "dfu-util"
@@ -257,7 +254,6 @@
     "@electron-forge/plugin-auto-unpack-natives": "^7.8.1",
     "@electron-forge/plugin-fuses": "^7.8.1",
     "@electron/fuses": "^1.8.0",
-    "@electron/notarize": "^2.5.0",
     "electron": "^37.5.1",
     "electron-builder": "^25.1.8",
     "electron-rebuild": "^3.2.9"

@@ -9,6 +9,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectHexFile: () => ipcRenderer.invoke('select-hex-file'),
   getFileStats: (filePath) => ipcRenderer.invoke('get-file-stats', filePath),
   downloadLatestFirmware: () => ipcRenderer.invoke('download-latest-firmware'),
+  getLatestFirmwareVersion: () => ipcRenderer.invoke('get-latest-firmware-version'),
+  checkWinUsbDriver: () => ipcRenderer.invoke('check-winusb-driver'),
+  installWinUsbDriver: () => ipcRenderer.invoke('install-winusb-driver'),
   
   // Serial port functionality
   getSerialPorts: () => ipcRenderer.invoke('get-serial-ports'),

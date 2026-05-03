@@ -244,11 +244,11 @@ class DWMControl {
             await this.refreshDfuDevices();
         });
 
-        // Launch Zadig button (Windows-only optional control)
-        const launchZadigBtn = document.getElementById('launch-zadig-btn');
-        if (launchZadigBtn) {
-            launchZadigBtn.addEventListener('click', async () => {
-                await this.launchZadig();
+        // Install USB Driver button (Windows-only, shown when no DFU driver found)
+        const installDriverBtn = document.getElementById('install-driver-btn');
+        if (installDriverBtn) {
+            installDriverBtn.addEventListener('click', async () => {
+                await this.installUsbDriver();
             });
         }
 

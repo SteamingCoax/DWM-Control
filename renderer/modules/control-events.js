@@ -472,6 +472,8 @@
             case 'sys-save': this.systemSave(key); break;
             case 'sys-rst':  this.systemReset(key); break;
             case 'sys-dfu':  this.systemDfu(key); break;
+            case 'check-updates': this.checkFirmwareUpdate(key); break;
+            case 'enter-dfu-from-update': this.enterDfuForUpdate(key); break;
             case 'debug-clear': this.clearMeterDebug(key); break;
             case 'cfg-bright': this.setCfgValue(key, 'bright', `meter-${this.meterSafeId(key)}-cfg-bright`); break;
             case 'cfg-elem':  this.setCfgValue(key, 'elem',  `meter-${this.meterSafeId(key)}-cfg-elem`);  break;
@@ -678,7 +680,7 @@
                 'refresh-power-info','read-metric','refresh-snapshot',
                 'start-poll','start-monitor','send-raw',
                 'cfg-bright','cfg-elem','cfg-eval','cfg-etype','cfg-range','cfg-avgw',
-                'sys-save','sys-rst','sys-dfu','identify-meter',
+                'sys-save','sys-rst','sys-dfu','identify-meter','check-updates','enter-dfu-from-update',
             ];
             detailDependent.forEach(action => {
                 cardEl.querySelectorAll(`[data-meter-action="${action}"]`).forEach(b => { b.disabled = !isConn; });

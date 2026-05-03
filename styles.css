@@ -1205,6 +1205,17 @@ label {
   box-shadow: var(--shadow-md);
 }
 
+.btn-warning {
+  background: var(--color-warning);
+  color: var(--text-inverse);
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: var(--color-warning-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
 .btn-text {
   background: transparent;
   color: var(--text-secondary);

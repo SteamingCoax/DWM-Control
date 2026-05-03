@@ -2562,3 +2562,62 @@
 [data-theme="light"] .swr-chip-worst-val { color: #b91c1c; }
 [data-theme="light"] .swr-history-toolbar { color: rgba(100, 70, 170, 0.70); }
 
+/* ─── Firmware update notice on meter card ──────────────────────────────── */
+.meter-fw-update-notice {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--color-border, rgba(255,255,255,0.1));
+}
+
+.meter-fw-update-available {
+    background: var(--color-warning-light);
+    border: 1px solid var(--color-warning);
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.meter-fw-update-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.meter-fw-update-icon {
+    font-size: 1.1em;
+    color: var(--color-warning);
+    flex-shrink: 0;
+}
+
+.meter-fw-update-text {
+    font-size: 0.875rem;
+    color: var(--color-warning);
+}
+
+.meter-fw-update-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.meter-fw-update-note {
+    font-size: 0.75rem;
+    color: var(--color-warning);
+    margin: 0;
+    opacity: 0.9;
+}
+
+.meter-fw-up-to-date {
+    background: rgba(22, 163, 74, 0.15);
+    border: 1px solid #16a34a;
+    border-radius: 6px;
+    padding: 8px 14px;
+    font-size: 0.875rem;
+    color: #4ade80;
+}
+
+[data-theme="light"] .meter-fw-up-to-date {
+    color: #15803d;
+}
+

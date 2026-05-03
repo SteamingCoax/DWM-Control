@@ -280,6 +280,105 @@ app.on('web-contents-created', (event, contents) => {
   });
 });
 
+// WinUSB driver installation for DFU devices (Windows only)
+// Uses pnputil + an unsigned USBDevice-class INF — no catalog/signature required on Win10 1903+
+const DFU_VID = '0483';
+const DFU_PID = 'DF11';
+const DFU_HARDWARE_ID = `USB\\VID_${DFU_VID}&PID_${DFU_PID}`;
+
+ipcMain.handle('check-winusb-driver', async () => {
+  if (process.platform !== 'win32') return { installed: true };
+  return new Promise((resolve) => {
+    // pnputil /enum-drivers lists all 3rd-party INF files; if ours is present the driver is installed.
+    // We also check pnputil /enum-devices to see if the HW ID is currently bound to WinUSB.
+    const { spawn } = require('child_process');
+    const child = spawn('pnputil', ['/enum-devices', '/connected'], { windowsHide: true });
+    let out = '';
+    child.stdout.on('data', d => { out += d.toString(); });
+    child.stderr.on('data', () => {});
+    child.on('close', () => {
+      // If "DFU in FS Mode" appears bound to WinUSB, driver is installed
+      const installed = /WinUSB/i.test(out) && new RegExp(DFU_VID, 'i').test(out);
+      resolve({ installed });
+    });
+    child.on('error', () => resolve({ installed: false }));
+  });
+});
+
+ipcMain.handle('install-winusb-driver', async () => {
+  if (process.platform !== 'win32') return { success: false, error: 'Not Windows' };
+
+  const os   = require('os');
+  const path = require('path');
+  const fs   = require('fs');
+
+  const infDir  = path.join(os.tmpdir(), 'dwm-winusb');
+  const infPath = path.join(infDir, 'dwm-dfu-winusb.inf');
+
+  try {
+    fs.mkdirSync(infDir, { recursive: true });
+  } catch (e) { /* already exists */ }
+
+  // Date string for DriverVer
+  const now = new Date();
+  const driverDate = `${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}/${now.getFullYear()}`;
+
+  const infContent = [
+    '[Version]',
+    'Signature   = "$Windows NT$"',
+    'Class       = USBDevice',
+    'ClassGuid   = {88BAE032-5A81-49f0-BC3D-A4FF138216D6}',
+    'Provider    = %ProviderName%',
+    `DriverVer   = ${driverDate},1.0.0.0`,
+    'CatalogFile = dwm-dfu-winusb.cat',
+    '',
+    '[Manufacturer]',
+    '%DeviceName% = DeviceList, NTamd64, NTarm64',
+    '',
+    '[DeviceList.NTamd64]',
+    `%DeviceName% = USB_Install, ${DFU_HARDWARE_ID}`,
+    '',
+    '[DeviceList.NTarm64]',
+    `%DeviceName% = USB_Install, ${DFU_HARDWARE_ID}`,
+    '',
+    '[USB_Install]',
+    'Include = winusb.inf',
+    'Needs   = WINUSB.NT',
+    '',
+    '[USB_Install.Services]',
+    'Include    = winusb.inf',
+    'Needs      = WINUSB.NT.Services',
+    '',
+    '[Strings]',
+    'ProviderName = "COAXON Systemes Inc"',
+    'DeviceName   = "DWM V2 DFU"',
+  ].join('\r\n');
+
+  fs.writeFileSync(infPath, infContent, 'utf8');
+
+  // pnputil requires elevation; launch a self-elevating PowerShell process.
+  // We use Start-Process with -Verb RunAs so UAC is shown to the user.
+  const psCmd = [
+    `$r = Start-Process pnputil -ArgumentList '/add-driver','${infPath}','/install' `,
+    `-Verb RunAs -Wait -PassThru; exit $r.ExitCode`,
+  ].join('');
+
+  return new Promise((resolve) => {
+    const { spawn } = require('child_process');
+    const ps = spawn('powershell.exe', ['-NoProfile', '-Command', psCmd], { windowsHide: true });
+    let stderr = '';
+    ps.stderr.on('data', d => { stderr += d.toString(); });
+    ps.on('close', (code) => {
+      if (code === 0) {
+        resolve({ success: true });
+      } else {
+        resolve({ success: false, error: `pnputil exited with code ${code}. ${stderr}`.trim() });
+      }
+    });
+    ps.on('error', (err) => resolve({ success: false, error: err.message }));
+  });
+});
+
 // IPC Handlers for DFU functionality
 ipcMain.handle('get-dfu-devices', async () => {
   return new Promise((resolve, reject) => {
@@ -711,6 +810,25 @@ ipcMain.handle('sample-voltage', async () => {
       success: false,
       error: error.message
     };
+  }
+});
+
+// Get latest firmware version tag from GitHub (without downloading)
+ipcMain.handle('get-latest-firmware-version', async () => {
+  try {
+    const releaseInfo = await fetchLatestRelease();
+    if (!releaseInfo) {
+      throw new Error('No releases found');
+    }
+    return {
+      success: true,
+      tag_name: releaseInfo.tag_name,
+      name: releaseInfo.name,
+      published_at: releaseInfo.published_at,
+    };
+  } catch (error) {
+    console.error('Firmware version check error:', error);
+    throw new Error(`Failed to fetch firmware version: ${error.message}`);
   }
 });
 
