@@ -20,7 +20,7 @@ env:
 jobs:
   publish-mac:
     name: Publish macOS
-    runs-on: [self-hosted, macOS]
+    runs-on: macos-15
     timeout-minutes: 90
 
     steps:
@@ -35,27 +35,139 @@ jobs:
       - name: Install dependencies
         run: SKIP_ELECTRON_BUILDER_INSTALL_APP_DEPS=1 npm install
 
-      - name: Build macOS artifacts
+      - name: Import signing certificate
         env:
-          CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
-          DEBUG: "electron-builder"
+          MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
+          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
         run: |
-          if [ -z "${CSC_LINK:-}" ] || [ -z "${CSC_KEY_PASSWORD:-}" ]; then
+          if [ -z "${MAC_CERT_P12:-}" ] || [ -z "${MAC_CERT_PASSWORD:-}" ]; then
             echo "MAC_CERT_P12 or MAC_CERT_PASSWORD secret is missing" >&2
             exit 1
           fi
 
           CERT_PATH="${RUNNER_TEMP}/mac-signing-cert.p12"
-          echo "$CSC_LINK" | base64 --decode > "$CERT_PATH"
+          KEYCHAIN_PATH="${RUNNER_TEMP}/build.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
+
+          # Clean up any leftover keychain from a previous failed run
+          security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
+
+          echo "$MAC_CERT_P12" | base64 --decode > "$CERT_PATH"
           if [ ! -s "$CERT_PATH" ]; then
             echo "Decoded MAC_CERT_P12 is empty or invalid base64" >&2
             exit 1
           fi
 
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import private key + cert; -A = no ACL restrictions on the private key
+          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$MAC_CERT_PASSWORD" -A -f pkcs12
+
+          # Grant codesign non-interactive access to the private key (required on macOS 12+)
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Download Apple CA certs needed to build the trust chain.
+          echo "--- Downloading Apple CA certs ---"
+          curl -sSfL "https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer" \
+            -o "${RUNNER_TEMP}/DeveloperIDG2CA.cer"
+          curl -sSfL "https://www.apple.com/certificateauthority/AppleRootCA-G2.cer" \
+            -o "${RUNNER_TEMP}/AppleRootCAG2.cer"
+          echo "  DeveloperIDG2CA: $(wc -c < "${RUNNER_TEMP}/DeveloperIDG2CA.cer") bytes"
+          echo "  AppleRootCAG2:   $(wc -c < "${RUNNER_TEMP}/AppleRootCAG2.cer") bytes"
+
+          # Print fingerprints so we can verify we downloaded the right certs
+          openssl x509 -inform DER -in "${RUNNER_TEMP}/DeveloperIDG2CA.cer" -noout -fingerprint -sha256 || true
+          openssl x509 -inform DER -in "${RUNNER_TEMP}/AppleRootCAG2.cer"   -noout -fingerprint -sha256 || true
+
+          # Import into the BUILD keychain (so codesign can locate them during chain walking)
+          security import "${RUNNER_TEMP}/DeveloperIDG2CA.cer" -k "$KEYCHAIN_PATH" 2>/dev/null || true
+          security import "${RUNNER_TEMP}/AppleRootCAG2.cer"   -k "$KEYCHAIN_PATH" 2>/dev/null || true
+
+          # Apple Root CA G2 is already trusted in the system store on macos-15.
+          # Importing it into the build keychain (above) is sufficient for chain walking.
+          # Do NOT call add-trusted-cert — it hangs waiting for system authorization.
+
+          # Prepend build keychain to the existing search list (preserves System.keychain etc.)
+          security default-keychain -s "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" \
+            $(security list-keychains -d user | xargs)
+
+          echo "=== Certs in build keychain after setup ==="
+          security find-certificate -a "$KEYCHAIN_PATH" | grep "labl" || true
+
+          echo "SIGNING_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> "$GITHUB_ENV"
+          rm -f "$CERT_PATH"
+
+      - name: Verify codesign works with build keychain
+        run: |
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$SIGNING_KEYCHAIN"
+
+          echo "=== macOS version ==="
+          sw_vers
+
+          echo "=== Keychain search list ==="
+          security list-keychains -d user
+
+          echo "=== Identities in build keychain ==="
+          security find-identity -v "$SIGNING_KEYCHAIN"
+
+          echo "=== All certs in build keychain ==="
+          security find-certificate -a "$SIGNING_KEYCHAIN" | grep "labl"
+
+          echo "=== Signing cert validity dates ==="
+          security find-certificate -c "Developer ID Application: COAXON Systemes Inc" \
+            -p "$SIGNING_KEYCHAIN" \
+            | openssl x509 -noout -subject -issuer -dates
+
+          echo "=== User trust settings (Apple Root CA) ==="
+          security dump-trust-settings 2>&1 | grep -A3 "Apple Root" || echo "(none)"
+
+          echo "=== verify-cert for signing cert ==="
+          security find-certificate -c "Developer ID Application: COAXON Systemes Inc" \
+            -p "$SIGNING_KEYCHAIN" > "${RUNNER_TEMP}/leaf.pem"
+          security verify-cert -c "${RUNNER_TEMP}/leaf.pem" -p codesign \
+            -k "$SIGNING_KEYCHAIN" 2>&1 || true
+
+          cp /bin/ls "${RUNNER_TEMP}/test-bin"
+
+          echo "=== TEST 1: basic sign (no options, no timestamp) ==="
+          codesign --sign "8263089E2FDBBF70732F3561BB71D82323ADCFE5" \
+            --keychain "$SIGNING_KEYCHAIN" --force \
+            "${RUNNER_TEMP}/test-bin" 2>&1 \
+            && echo "TEST 1: PASSED" || echo "TEST 1: FAILED"
+
+          echo "=== TEST 2: sign + --options runtime (no timestamp) ==="
+          codesign --sign "8263089E2FDBBF70732F3561BB71D82323ADCFE5" \
+            --keychain "$SIGNING_KEYCHAIN" --force --options runtime \
+            "${RUNNER_TEMP}/test-bin" 2>&1 \
+            && echo "TEST 2: PASSED" || echo "TEST 2: FAILED"
+
+          echo "=== TEST 3: sign + --options runtime + --timestamp (what electron-builder does) ==="
+          codesign --sign "8263089E2FDBBF70732F3561BB71D82323ADCFE5" \
+            --keychain "$SIGNING_KEYCHAIN" --force --options runtime --timestamp \
+            "${RUNNER_TEMP}/test-bin" 2>&1 \
+            && echo "TEST 3: PASSED" || { echo "TEST 3: FAILED"; exit 1; }
+
+      - name: Build macOS artifacts
+        env:
+          DEBUG: "electron-builder"
+          CSC_KEYCHAIN: ${{ env.SIGNING_KEYCHAIN }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$SIGNING_KEYCHAIN"
           MAC_OUT_DIR="${RUNNER_TEMP}/dwm-dist"
           rm -rf "$MAC_OUT_DIR" || true
           COPYFILE_DISABLE=1 npx electron-builder --mac --publish=never --config.directories.output="$MAC_OUT_DIR"
+
+      - name: Remove build keychain
+        if: always()
+        run: |
+          security delete-keychain "${RUNNER_TEMP}/build.keychain-db" 2>/dev/null || true
 
       - name: Verify macOS app signature
         run: |
@@ -63,16 +175,10 @@ jobs:
           APP_PATH="$(find "$MAC_OUT_DIR" -type d -name "DWM Control.app" | head -n 1)"
           if [ -z "$APP_PATH" ]; then
             echo "No .app bundle found in $MAC_OUT_DIR" >&2
-            find "$MAC_OUT_DIR" -maxdepth 3 -print || true
             exit 1
           fi
-
-          echo "Verifying signature: $APP_PATH"
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
           codesign -dv --verbose=4 "$APP_PATH"
-
-      - name: Ensure gh CLI is available
-        run: brew install gh || true
 
       - name: Ensure release exists
         env:
@@ -91,8 +197,8 @@ jobs:
         run: |
           MAC_OUT_DIR="${RUNNER_TEMP}/dwm-dist"
           gh release upload "$RELEASE_TAG" \
-            "$MAC_OUT_DIR"/DWM-Control-*-macOS-Intel.dmg \
-            "$MAC_OUT_DIR"/DWM-Control-*-macOS-AppleSilicon.zip \
+            "$MAC_OUT_DIR"/DWM-Control-*-macOS-*.dmg \
+            "$MAC_OUT_DIR"/DWM-Control-*-macOS-*.zip \
             "$MAC_OUT_DIR"/latest-mac*.yml \
             --repo "${{ github.repository }}" \
             --clobber
