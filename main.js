@@ -311,12 +311,15 @@ ipcMain.handle('install-winusb-driver', async () => {
   const os   = require('os');
   const path = require('path');
   const fs   = require('fs');
+  const { spawn } = require('child_process');
 
-  const infDir  = path.join(os.tmpdir(), 'dwm-winusb');
-  const infPath = path.join(infDir, 'dwm-dfu-winusb.inf');
+  const workDir    = path.join(os.tmpdir(), 'dwm-winusb');
+  const infPath    = path.join(workDir, 'dwm-dfu-winusb.inf');
+  const helperPath = path.join(workDir, 'install.ps1');
+  const outPath    = path.join(workDir, 'pnputil-out.txt');
 
   try {
-    fs.mkdirSync(infDir, { recursive: true });
+    fs.mkdirSync(workDir, { recursive: true });
   } catch (e) { /* already exists */ }
 
   // Date string for DriverVer
@@ -355,29 +358,52 @@ ipcMain.handle('install-winusb-driver', async () => {
 
   fs.writeFileSync(infPath, infContent, 'utf8');
 
-  // pnputil requires elevation; launch a self-elevating PowerShell process.
-  // We use Start-Process with -Verb RunAs so UAC is shown to the user.
-  // The INF path is wrapped in escaped double-quotes to handle spaces in usernames/paths.
+  // PS single-quote escape (only ' needs to become '')
+  const psq = s => s.replace(/'/g, "''");
+
+  // Helper script runs elevated: installs driver, captures output, then
+  // calls pnputil /scan-devices so Windows re-binds without requiring a replug.
+  const helperContent = [
+    `$inf     = '${psq(infPath)}'`,
+    `$outFile = '${psq(outPath)}'`,
+    `$result  = & pnputil /add-driver $inf /install 2>&1`,
+    `$code    = $LASTEXITCODE`,
+    `$result | Out-File -FilePath $outFile -Encoding UTF8 -Force`,
+    `if ($code -eq 0) {`,
+    `    '' | Add-Content -Path $outFile`,
+    `    'Scanning for new hardware...' | Add-Content -Path $outFile`,
+    `    & pnputil /scan-devices 2>&1 | Add-Content -Path $outFile`,
+    `}`,
+    `exit $code`,
+  ].join('\r\n');
+
+  fs.writeFileSync(helperPath, helperContent, 'utf8');
+
+  // Outer (non-elevated) PS command: elevates the helper script via UAC.
+  // The script path is passed as a PS variable so backslashes need no escaping.
   // $r.ExitCode can be null if UAC is cancelled — treat null as failure.
-  const psInfPath = infPath.replace(/'/g, "''"); // escape single quotes for PS string
   const psCmd = [
-    `$p = '${psInfPath}';`,
-    `$r = Start-Process pnputil -ArgumentList @('/add-driver',"\`"$p\`"",'/install')`,
+    `$script = '${psq(helperPath)}';`,
+    `$r = Start-Process powershell`,
+    `-ArgumentList @('-ExecutionPolicy','Bypass','-NonInteractive','-File',$script)`,
     `-Verb RunAs -Wait -PassThru;`,
     `if ($r -eq $null -or $r.ExitCode -eq $null) { exit 1 };`,
     `exit $r.ExitCode`,
   ].join(' ');
 
   return new Promise((resolve) => {
-    const { spawn } = require('child_process');
     const ps = spawn('powershell.exe', ['-NoProfile', '-Command', psCmd], { windowsHide: true });
     let stderr = '';
     ps.stderr.on('data', d => { stderr += d.toString(); });
     ps.on('close', (code) => {
+      // Read back pnputil output for diagnostics
+      let pnpOutput = '';
+      try { pnpOutput = fs.readFileSync(outPath, 'utf8').trim(); } catch (e) {}
       if (code === 0) {
-        resolve({ success: true });
+        resolve({ success: true, output: pnpOutput });
       } else {
-        resolve({ success: false, error: `pnputil exited with code ${code}. ${stderr}`.trim() });
+        const msg = pnpOutput || stderr || `pnputil exited with code ${code}`;
+        resolve({ success: false, error: msg.trim() });
       }
     });
     ps.on('error', (err) => resolve({ success: false, error: err.message }));

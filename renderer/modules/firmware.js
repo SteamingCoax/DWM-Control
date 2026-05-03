@@ -70,12 +70,14 @@
         try {
             const result = await window.electronAPI.installWinUsbDriver();
             if (result && result.success) {
-                this.appendOutput('Driver installed successfully.');
-                this.appendOutput('Unplug and reconnect the USB cable, then click Refresh.');
+                this.appendOutput('Driver installed successfully. Click Refresh to detect the device.');
                 if (btn) { btn.disabled = false; btn.textContent = 'Install USB Driver'; }
+                // Auto-refresh after a short delay to give Windows time to bind the driver
+                setTimeout(() => this.refreshDfuDevices(), 1500);
             } else {
                 const msg = (result && result.error) ? result.error : 'Driver installation failed.';
                 this.appendOutput(`Driver installation failed: ${msg}`);
+                this.appendOutput('If this keeps failing, try installing the driver manually using Zadig (https://zadig.akeo.ie).');
                 if (btn) { btn.disabled = false; btn.textContent = 'Install USB Driver'; }
             }
         } catch (error) {
