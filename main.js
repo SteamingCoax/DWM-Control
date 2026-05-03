@@ -330,7 +330,6 @@ ipcMain.handle('install-winusb-driver', async () => {
     'ClassGuid   = {88BAE032-5A81-49f0-BC3D-A4FF138216D6}',
     'Provider    = %ProviderName%',
     `DriverVer   = ${driverDate},1.0.0.0`,
-    'CatalogFile = dwm-dfu-winusb.cat',
     '',
     '[Manufacturer]',
     '%DeviceName% = DeviceList, NTamd64, NTarm64',
@@ -358,10 +357,16 @@ ipcMain.handle('install-winusb-driver', async () => {
 
   // pnputil requires elevation; launch a self-elevating PowerShell process.
   // We use Start-Process with -Verb RunAs so UAC is shown to the user.
+  // The INF path is wrapped in escaped double-quotes to handle spaces in usernames/paths.
+  // $r.ExitCode can be null if UAC is cancelled — treat null as failure.
+  const psInfPath = infPath.replace(/'/g, "''"); // escape single quotes for PS string
   const psCmd = [
-    `$r = Start-Process pnputil -ArgumentList '/add-driver','${infPath}','/install' `,
-    `-Verb RunAs -Wait -PassThru; exit $r.ExitCode`,
-  ].join('');
+    `$p = '${psInfPath}';`,
+    `$r = Start-Process pnputil -ArgumentList @('/add-driver',"\`"$p\`"",'/install')`,
+    `-Verb RunAs -Wait -PassThru;`,
+    `if ($r -eq $null -or $r.ExitCode -eq $null) { exit 1 };`,
+    `exit $r.ExitCode`,
+  ].join(' ');
 
   return new Promise((resolve) => {
     const { spawn } = require('child_process');

@@ -70,8 +70,9 @@
         try {
             const result = await window.electronAPI.installWinUsbDriver();
             if (result && result.success) {
-                this.appendOutput('Driver installed successfully. Scanning for devices…');
-                await this.refreshDfuDevices();
+                this.appendOutput('Driver installed successfully.');
+                this.appendOutput('Unplug and reconnect the USB cable, then click Refresh.');
+                if (btn) { btn.disabled = false; btn.textContent = 'Install USB Driver'; }
             } else {
                 const msg = (result && result.error) ? result.error : 'Driver installation failed.';
                 this.appendOutput(`Driver installation failed: ${msg}`);
