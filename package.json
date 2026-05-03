@@ -107,21 +107,24 @@
     "mac": {
       "category": "public.app-category.developer-tools",
       "icon": "assets/icon.icns",
-      "artifactName": "DWM-Control-${version}-macOS-AppleSilicon.${ext}",
+      "artifactName": "DWM-Control-${version}-macOS-${arch}.${ext}",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
+      "notarize": true,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "target": [
         {
           "target": "dmg",
           "arch": [
-            "x64"
+            "x64",
+            "arm64"
           ]
         },
         {
           "target": "zip",
           "arch": [
+            "x64",
             "arm64"
           ]
         }
@@ -137,7 +140,7 @@
       ]
     },
     "dmg": {
-      "artifactName": "DWM-Control-${version}-macOS-Intel.${ext}",
+      "artifactName": "DWM-Control-${version}-macOS-${arch}.${ext}",
       "title": "${productName} ${version}",
       "icon": "assets/icon.icns",
       "window": {
