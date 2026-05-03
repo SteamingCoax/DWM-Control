@@ -305,22 +305,29 @@ jobs:
 
           pushd /tmp
 
-          # Download amd64 package — no sudo required
+          # --- amd64: download via apt (no sudo needed) ---
           apt-get download dfu-util
-          AMD64_DEB=$(ls dfu-util_*_amd64.deb | head -1)
-          DFU_VERSION=$(dpkg-deb --field "$AMD64_DEB" Version)
-          echo "dfu-util version: $DFU_VERSION"
+          AMD64_DEB=$(ls dfu-util_*_amd64.deb 2>/dev/null | head -1)
+          [ -z "$AMD64_DEB" ] && { echo "ERROR: apt-get download produced no amd64 deb" >&2; exit 1; }
+          echo "amd64 package: $AMD64_DEB"
 
-          # Download arm64 and armhf directly from the Ubuntu ports mirror — no sudo required
-          POOL="http://ports.ubuntu.com/ubuntu-ports/pool/universe/d/dfu-util"
-          ARM64_DEB="dfu-util_${DFU_VERSION}_arm64.deb"
-          ARMHF_DEB="dfu-util_${DFU_VERSION}_armhf.deb"
-          curl -fsSL "${POOL}/${ARM64_DEB}" -o "$ARM64_DEB"
-          curl -fsSL "${POOL}/${ARMHF_DEB}"  -o "$ARMHF_DEB"
+          # --- arm64 + armhf: query Debian's Packages index to get exact filenames ---
+          # Uses deb.debian.org (CDN-backed, no sudo, no foreign-arch registration needed).
+          MIRROR="http://deb.debian.org/debian"
+          SUITE="bookworm"
+          for ARCH in arm64 armhf; do
+            echo "Fetching Debian ${SUITE}/${ARCH} Packages index..."
+            FILENAME=$(curl -fsSL "${MIRROR}/dists/${SUITE}/main/binary-${ARCH}/Packages.gz" \
+              | gzip -dc \
+              | awk '/^Package: dfu-util$/{found=1} found && /^Filename:/{print $2; found=0; exit}')
+            [ -z "$FILENAME" ] && { echo "ERROR: dfu-util not found in Debian ${SUITE} ${ARCH}" >&2; exit 1; }
+            echo "Downloading ${ARCH}: ${FILENAME}"
+            curl -fsSL "${MIRROR}/${FILENAME}" -o "dfu-util-${ARCH}.deb"
+          done
 
-          dpkg-deb -x "$AMD64_DEB" dfu-x64
-          dpkg-deb -x "$ARM64_DEB" dfu-arm64
-          dpkg-deb -x "$ARMHF_DEB" dfu-arm
+          dpkg-deb -x "$AMD64_DEB"        dfu-x64
+          dpkg-deb -x dfu-util-arm64.deb  dfu-arm64
+          dpkg-deb -x dfu-util-armhf.deb  dfu-arm
 
           popd
 
@@ -331,7 +338,7 @@ jobs:
                    Programs/dfu-util/linux-arm64/dfu-util \
                    Programs/dfu-util/linux-arm/dfu-util
 
-          # Verify downloaded binaries
+          # Verify
           file Programs/dfu-util/linux-x64/dfu-util \
                Programs/dfu-util/linux-arm64/dfu-util \
                Programs/dfu-util/linux-arm/dfu-util
