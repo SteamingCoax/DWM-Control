@@ -151,6 +151,16 @@ jobs:
             "${RUNNER_TEMP}/test-bin" 2>&1 \
             && echo "TEST 3: PASSED" || { echo "TEST 3: FAILED"; exit 1; }
 
+      - name: Strip pre-existing code signatures from native binaries
+        run: |
+          # Replacing an existing signature + --timestamp in one codesign call can fail
+          # intermittently with "A timestamp was expected but was not found" when Apple's
+          # TSA is slow. Stripping first lets electron-builder sign them fresh.
+          find node_modules \( -name "*.node" -o -name "*.dylib" \) -print0 \
+            | xargs -0 -I{} codesign --remove-signature {} 2>/dev/null || true
+          codesign --remove-signature Programs/dfu-util/dfu-util 2>/dev/null || true
+          codesign --remove-signature Programs/dfu-util/libusb-1.0.0.dylib 2>/dev/null || true
+
       - name: Build macOS artifacts
         env:
           DEBUG: "electron-builder"
