@@ -69,15 +69,27 @@
 
         try {
             const result = await window.electronAPI.installWinUsbDriver();
+
+            // Always show pnputil output for diagnostics
+            if (result && result.output) {
+                result.output.split('\n').forEach(line => {
+                    const trimmed = line.trim();
+                    if (trimmed) this.appendOutput(trimmed);
+                });
+            }
+
             if (result && result.success) {
-                this.appendOutput('Driver installed successfully. Click Refresh to detect the device.');
+                this.appendOutput('Driver installed. Refreshing device list…');
                 if (btn) { btn.disabled = false; btn.textContent = 'Install USB Driver'; }
-                // Auto-refresh after a short delay to give Windows time to bind the driver
-                setTimeout(() => this.refreshDfuDevices(), 1500);
+                // Give Windows 3 s to finish binding the driver before rescanning
+                setTimeout(() => this.refreshDfuDevices(), 3000);
             } else {
                 const msg = (result && result.error) ? result.error : 'Driver installation failed.';
-                this.appendOutput(`Driver installation failed: ${msg}`);
-                this.appendOutput('If this keeps failing, try installing the driver manually using Zadig (https://zadig.akeo.ie).');
+                if (!result || !result.output) {
+                    // Only show the error text if we didn't already print pnputil output
+                    this.appendOutput(`Error: ${msg}`);
+                }
+                this.appendOutput('If this keeps failing, install the driver manually using Zadig: https://zadig.akeo.ie');
                 if (btn) { btn.disabled = false; btn.textContent = 'Install USB Driver'; }
             }
         } catch (error) {

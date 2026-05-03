@@ -358,34 +358,78 @@ ipcMain.handle('install-winusb-driver', async () => {
 
   fs.writeFileSync(infPath, infContent, 'utf8');
 
-  // PS single-quote escape (only ' needs to become '')
+  // PS single-quote escape
   const psq = s => s.replace(/'/g, "''");
 
-  // Helper script runs elevated: installs driver, captures output, then
-  // calls pnputil /scan-devices so Windows re-binds without requiring a replug.
-  const helperContent = [
-    `$inf     = '${psq(infPath)}'`,
-    `$outFile = '${psq(outPath)}'`,
-    `$result  = & pnputil /add-driver $inf /install 2>&1`,
-    `$code    = $LASTEXITCODE`,
-    `$result | Out-File -FilePath $outFile -Encoding UTF8 -Force`,
-    `if ($code -eq 0) {`,
-    `    '' | Add-Content -Path $outFile`,
-    `    'Scanning for new hardware...' | Add-Content -Path $outFile`,
-    `    & pnputil /scan-devices 2>&1 | Add-Content -Path $outFile`,
-    `}`,
-    `exit $code`,
-  ].join('\r\n');
+  // The helper script runs elevated.
+  // Step 1: Stage the driver in the Windows driver store.
+  // Step 2: Enumerate connected devices to find our VID/PID instance ID.
+  //         pnputil /add-driver /install can fail to bind when the device is
+  //         already enumerated as "Unknown Device". We must explicitly call
+  //         pnputil /install-device <instance-id> to force-bind.
+  // Step 3: If no connected device found, driver is staged and will auto-bind
+  //         on next plug-in — exit 0 (staged successfully).
+  // All output is written to outFile so the app can display diagnostics.
+  const helperContent = `
+$inf     = '${psq(infPath)}'
+$outFile = '${psq(outPath)}'
+
+function Log($msg) { $msg | Add-Content -Path $outFile }
+
+'[1/3] Staging WinUSB driver...' | Out-File -FilePath $outFile -Encoding UTF8 -Force
+$addOut = & pnputil /add-driver $inf 2>&1
+$addCode = $LASTEXITCODE
+$addOut | ForEach-Object { Log $_ }
+Log "  Stage exit code: $addCode"
+
+if ($addCode -ne 0) {
+    Log 'ERROR: pnputil failed to stage the driver.'
+    exit $addCode
+}
+
+Log ''
+Log '[2/3] Searching for connected DFU device (VID_0483 PID_DF11)...'
+$enumLines = (& pnputil /enum-devices /ids 2>&1) -split '\r?\n'
+
+$instanceId = $null
+$currentId  = $null
+foreach ($line in $enumLines) {
+    if ($line -match 'Instance ID:\s+(.+)') {
+        $currentId = $Matches[1].Trim()
+    }
+    if ($line -match 'VID_0483' -and $line -match 'PID_DF11' -and $currentId) {
+        $instanceId = $currentId
+        Log "  Found device instance: $instanceId"
+        break
+    }
+}
+
+if (-not $instanceId) {
+    Log '  No connected device found.'
+    Log '  Driver staged — will auto-install when device is plugged in.'
+    exit 0
+}
+
+Log ''
+Log "[3/3] Installing driver on device: $instanceId"
+$instOut = & pnputil /install-device $instanceId 2>&1
+$instCode = $LASTEXITCODE
+$instOut | ForEach-Object { Log $_ }
+Log "  Install exit code: $instCode"
+
+exit $instCode
+`.trimStart();
 
   fs.writeFileSync(helperPath, helperContent, 'utf8');
 
-  // Outer (non-elevated) PS command: elevates the helper script via UAC.
-  // The script path is passed as a PS variable so backslashes need no escaping.
-  // $r.ExitCode can be null if UAC is cancelled — treat null as failure.
+  // Non-elevated outer command: elevates the helper via UAC (-Verb RunAs).
+  // Script path stored in a PS variable to avoid backslash escaping issues.
+  // $r.ExitCode is null when UAC is cancelled — treat as failure.
+  const psq2 = psq; // alias for clarity below
   const psCmd = [
-    `$script = '${psq(helperPath)}';`,
+    `$s = '${psq2(helperPath)}';`,
     `$r = Start-Process powershell`,
-    `-ArgumentList @('-ExecutionPolicy','Bypass','-NonInteractive','-File',$script)`,
+    `-ArgumentList @('-ExecutionPolicy','Bypass','-NonInteractive','-File',$s)`,
     `-Verb RunAs -Wait -PassThru;`,
     `if ($r -eq $null -or $r.ExitCode -eq $null) { exit 1 };`,
     `exit $r.ExitCode`,
@@ -396,13 +440,12 @@ ipcMain.handle('install-winusb-driver', async () => {
     let stderr = '';
     ps.stderr.on('data', d => { stderr += d.toString(); });
     ps.on('close', (code) => {
-      // Read back pnputil output for diagnostics
       let pnpOutput = '';
       try { pnpOutput = fs.readFileSync(outPath, 'utf8').trim(); } catch (e) {}
       if (code === 0) {
         resolve({ success: true, output: pnpOutput });
       } else {
-        const msg = pnpOutput || stderr || `pnputil exited with code ${code}`;
+        const msg = pnpOutput || stderr || `Exit code ${code}`;
         resolve({ success: false, error: msg.trim() });
       }
     });
@@ -1169,11 +1212,11 @@ function getDfuUtilPath() {
   if (process.platform === 'win32') {
     // Try multiple possible paths for Windows
     const possiblePaths = [
+      path.join(basePath, 'app.asar.unpacked', 'Programs', 'dfu-util', 'dfu-util.exe'),
       path.join(basePath, 'Programs', 'dfu-util', 'dfu-util.exe'),
       path.join(basePath, 'app', 'Programs', 'dfu-util', 'dfu-util.exe'),
+      path.join(basePath, 'resources', 'app.asar.unpacked', 'Programs', 'dfu-util', 'dfu-util.exe'),
       path.join(basePath, 'resources', 'Programs', 'dfu-util', 'dfu-util.exe'),
-      path.join(basePath, 'resources', 'app', 'Programs', 'dfu-util', 'dfu-util.exe'),
-      path.join(path.dirname(basePath), 'Programs', 'dfu-util', 'dfu-util.exe')
     ];
     
     for (const testPath of possiblePaths) {
@@ -1189,43 +1232,56 @@ function getDfuUtilPath() {
     console.log('getDfuUtilPath - No dfu-util found, using default:', defaultPath);
     return defaultPath;
   } else if (process.platform === 'darwin') {
-    // On macOS, try bundled version first when packaged, then system
+    // On macOS, try bundled version first when packaged, then system.
+    // asarUnpack files land in app.asar.unpacked/, NOT directly under resourcesPath.
     if (!isDev) {
-      const bundledPath = path.join(basePath, 'Programs', 'dfu-util', 'dfu-util');
-      console.log('getDfuUtilPath - macOS bundled path:', bundledPath);
-      if (fs.existsSync(bundledPath)) {
-        // Make sure the bundled dfu-util is executable
-        try {
-          fs.chmodSync(bundledPath, 0o755);
-          console.log('getDfuUtilPath - Using bundled dfu-util for installed app');
-          return bundledPath;
-        } catch (error) {
-          console.log('Failed to set executable permissions on bundled dfu-util:', error);
+      const possiblePaths = [
+        // Correct location for asarUnpacked files (should always be here when packaged)
+        path.join(basePath, 'app.asar.unpacked', 'Programs', 'dfu-util', 'dfu-util'),
+        // Legacy fallback — older builds or non-asar packaging
+        path.join(basePath, 'Programs', 'dfu-util', 'dfu-util'),
+      ];
+      for (const testPath of possiblePaths) {
+        console.log('getDfuUtilPath - macOS testing path:', testPath);
+        if (fs.existsSync(testPath)) {
+          try {
+            fs.chmodSync(testPath, 0o755);
+          } catch (error) {
+            console.log('getDfuUtilPath - chmod failed:', error.message);
+          }
+          console.log('getDfuUtilPath - Using bundled dfu-util:', testPath);
+          return testPath;
         }
-      } else {
-        console.log('getDfuUtilPath - Bundled dfu-util not found, falling back to system');
       }
+      console.log('getDfuUtilPath - Bundled dfu-util not found, falling back to system');
     } else {
       console.log('getDfuUtilPath - Development mode, using system dfu-util');
     }
-    // Fallback to system dfu-util
+    // Fallback to system dfu-util (dev mode, or bundled binary missing)
     console.log('getDfuUtilPath - Using system dfu-util');
     return 'dfu-util';
   } else {
     // For Linux, use an arch-specific bundled binary.
     // process.arch is 'x64', 'arm64', or 'arm' (for armv7l/armhf).
     const arch = process.arch;
-    const bundledPath = path.join(basePath, 'Programs', 'dfu-util', `linux-${arch}`, 'dfu-util');
     console.log('getDfuUtilPath - Linux arch:', arch);
-    console.log('getDfuUtilPath - Linux bundled path:', bundledPath);
-    if (fs.existsSync(bundledPath)) {
-      try {
-        fs.chmodSync(bundledPath, 0o755);
-      } catch (e) {
-        console.log('getDfuUtilPath - chmod failed:', e.message);
+    const possiblePaths = [
+      // Correct location for asarUnpacked files
+      path.join(basePath, 'app.asar.unpacked', 'Programs', 'dfu-util', `linux-${arch}`, 'dfu-util'),
+      // Legacy fallback
+      path.join(basePath, 'Programs', 'dfu-util', `linux-${arch}`, 'dfu-util'),
+    ];
+    for (const testPath of possiblePaths) {
+      console.log('getDfuUtilPath - Linux testing path:', testPath);
+      if (fs.existsSync(testPath)) {
+        try {
+          fs.chmodSync(testPath, 0o755);
+        } catch (e) {
+          console.log('getDfuUtilPath - chmod failed:', e.message);
+        }
+        console.log('getDfuUtilPath - Using bundled dfu-util:', testPath);
+        return testPath;
       }
-      console.log('getDfuUtilPath - Using bundled dfu-util');
-      return bundledPath;
     }
     console.log('getDfuUtilPath - Bundled dfu-util not found, falling back to system');
     return 'dfu-util';
