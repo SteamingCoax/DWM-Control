@@ -1,6 +1,6 @@
 {
   "name": "dwm-control",
-  "version": "1.2.8",
+  "version": "1.2.9",
   "description": "DWM V2 Updater & Interfacing Application",
   "license": "MIT",
   "author": "SteamingCoax",
@@ -237,8 +237,7 @@
     "deb": {
       "artifactName": "DWM-Control-${version}-Linux-${arch}.${ext}"
     },
-    "rpm": {
-    },
+    "rpm": {},
     "publish": {
       "provider": "github",
       "owner": "SteamingCoax",
