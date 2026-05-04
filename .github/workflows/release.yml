@@ -265,7 +265,7 @@ jobs:
           WINEARCH: win64
           WINEPREFIX: ${{ runner.temp }}/wine64
         run: |
-          export ELECTRON_CACHE="$HOME/electron-cache"
+          export ELECTRON_CACHE="$(dirname "$GITHUB_WORKSPACE")/electron-cache"
           mkdir -p "$ELECTRON_CACHE"
           mkdir -p "$RUNNER_TEMP/bin"
           WINE_BIN="$(command -v wine64 || command -v wine || true)"
@@ -378,7 +378,7 @@ jobs:
 
       - name: Build Linux artifacts
         run: |
-          export ELECTRON_CACHE="$HOME/electron-cache"
+          export ELECTRON_CACHE="$(dirname "$GITHUB_WORKSPACE")/electron-cache"
           mkdir -p "$ELECTRON_CACHE"
           npm run build:linux
 
