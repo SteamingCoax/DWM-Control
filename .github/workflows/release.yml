@@ -35,6 +35,15 @@ jobs:
       - name: Install dependencies
         run: SKIP_ELECTRON_BUILDER_INSTALL_APP_DEPS=1 npm install
 
+      - name: Cache Electron binaries
+        uses: actions/cache@v4
+        with:
+          path: /tmp/electron-cache
+          key: electron-mac-${{ hashFiles('package.json') }}
+
+      - name: Set Electron cache path
+        run: echo "ELECTRON_CACHE=/tmp/electron-cache" >> $GITHUB_ENV
+
       - name: Import signing certificate
         env:
           MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
@@ -255,7 +264,9 @@ jobs:
           DISPLAY: ":99"
           WINEARCH: win64
           WINEPREFIX: ${{ runner.temp }}/wine64
+          ELECTRON_CACHE: /opt/electron-cache
         run: |
+          mkdir -p /opt/electron-cache
           mkdir -p "$RUNNER_TEMP/bin"
           WINE_BIN="$(command -v wine64 || command -v wine || true)"
           if [ -z "$WINE_BIN" ]; then
@@ -366,7 +377,11 @@ jobs:
                Programs/dfu-util/linux-arm/dfu-util
 
       - name: Build Linux artifacts
-        run: npm run build:linux
+        env:
+          ELECTRON_CACHE: /opt/electron-cache
+        run: |
+          mkdir -p /opt/electron-cache
+          npm run build:linux
 
       - name: Ensure release exists
         env:

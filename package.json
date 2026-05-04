@@ -50,9 +50,6 @@
     "nodeGypRebuild": false,
     "compression": "maximum",
     "removePackageScripts": true,
-    "electronDownload": {
-      "cache": "./electron-cache"
-    },
     "files": [
       "main.js",
       "preload.js",
