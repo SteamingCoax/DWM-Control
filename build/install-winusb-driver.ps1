@@ -17,10 +17,12 @@ if (-not (Test-Path $InfPath)) {
 
 Write-Host "INF: $InfPath"
 Write-Host ''
-Write-Host 'Running pnputil /add-driver ...'
+$pnputil = "$env:SystemRoot\System32\pnputil.exe"
+
+Write-Host "Running: pnputil /add-driver ..."
 Write-Host ''
 
-$output = & pnputil.exe /add-driver $InfPath /install 2>&1
+$output = & $pnputil /add-driver $InfPath /install 2>&1
 $exitCode = $LASTEXITCODE
 $output | ForEach-Object { Write-Host $_ }
 

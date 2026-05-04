@@ -368,8 +368,9 @@ ipcMain.handle('install-winusb-driver', async () => {
 
   if (isAdmin) {
     // Already elevated — run pnputil directly. No UAC dance needed.
+    const pnputilPath = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'pnputil.exe');
     return new Promise((resolve) => {
-      const child = spawn('pnputil.exe', ['/add-driver', infPath, '/install'], { windowsHide: true });
+      const child = spawn(pnputilPath, ['/add-driver', infPath, '/install'], { windowsHide: true });
       let out = '';
       child.stdout.on('data', d => { out += d.toString(); });
       child.stderr.on('data', d => { out += d.toString(); });
