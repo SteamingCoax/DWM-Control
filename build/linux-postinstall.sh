@@ -5,24 +5,19 @@ set -e
 
 RULES_FILE="/etc/udev/rules.d/49-dwm-dfu.rules"
 
-# Install udev rules so non-root users in the 'plugdev' group can access the DFU device
+# Install udev rule for DWM V2 DFU device (VID_0483 PID_DF11 "DFU in FS Mode").
+# TAG+="uaccess" grants the currently logged-in session user direct access via
+# systemd-logind — no 'plugdev' group membership or re-login required on
+# systemd-based systems (Debian 9+, Raspberry Pi OS Buster+).
 cat > "$RULES_FILE" << 'EOF'
-# STM32 DFU mode — DWM V2 device (VID 0483 PID DF11)
+# DWM V2 DFU device — STM32 in DFU mode (VID 0483 PID DF11)
 SUBSYSTEM=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="df11", MODE="0664", GROUP="plugdev", TAG+="uaccess"
 EOF
 
 chmod 644 "$RULES_FILE"
 
-# Reload udev rules immediately (non-fatal if udevadm not available)
+# Reload and trigger udev rules immediately so already-connected devices are covered
 if command -v udevadm > /dev/null 2>&1; then
     udevadm control --reload-rules 2>/dev/null || true
-    udevadm trigger 2>/dev/null || true
+    udevadm trigger --subsystem-match=usb 2>/dev/null || true
 fi
-
-echo ""
-echo "DWM Control: USB device rules installed to $RULES_FILE"
-echo ""
-echo "ACTION REQUIRED: Add your user to the 'plugdev' group to access DFU devices:"
-echo "  sudo usermod -aG plugdev \$USER"
-echo "  (Then log out and back in)"
-echo ""
