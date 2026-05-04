@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const { spawn, exec, execFile } = require('child_process');
@@ -308,156 +308,19 @@ ipcMain.handle('check-winusb-driver', async () => {
 ipcMain.handle('install-winusb-driver', async () => {
   if (process.platform !== 'win32') return { success: false, error: 'Not Windows' };
 
-  const os   = require('os');
-  const path = require('path');
-  const fs   = require('fs');
-  const { spawn, spawnSync } = require('child_process');
+  const zadigPath = path.join(path.dirname(process.execPath), 'zadig.exe');
 
-  const workDir    = path.join(os.tmpdir(), 'dwm-winusb');
-  const infPath    = path.join(workDir, 'dwm-dfu-winusb.inf');
-  const helperPath = path.join(workDir, 'install.ps1');
-  const outPath    = path.join(workDir, 'pnputil-out.txt');
-
-  try {
-    fs.mkdirSync(workDir, { recursive: true });
-  } catch (e) { /* already exists */ }
-
-  // Delete stale log file so we never read old output on failure
-  try { fs.unlinkSync(outPath); } catch (e) {}
-
-  // Date string for DriverVer
-  const now = new Date();
-  const driverDate = `${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}/${now.getFullYear()}`;
-
-  const infContent = [
-    '[Version]',
-    'Signature   = "$Windows NT$"',
-    'Class       = USBDevice',
-    'ClassGuid   = {88BAE032-5A81-49f0-BC3D-A4FF138216D6}',
-    'Provider    = %ProviderName%',
-    `DriverVer   = ${driverDate},1.0.0.0`,
-    '',
-    '[Manufacturer]',
-    '%DeviceName% = DeviceList, NTamd64, NTarm64',
-    '',
-    '[DeviceList.NTamd64]',
-    `%DeviceName% = USB_Install, ${DFU_HARDWARE_ID}`,
-    '',
-    '[DeviceList.NTarm64]',
-    `%DeviceName% = USB_Install, ${DFU_HARDWARE_ID}`,
-    '',
-    '[USB_Install]',
-    'Include = winusb.inf',
-    'Needs   = WINUSB.NT',
-    '',
-    '[USB_Install.Services]',
-    'Include    = winusb.inf',
-    'Needs      = WINUSB.NT.Services',
-    '',
-    '[Strings]',
-    'ProviderName = "COAXON Systemes Inc"',
-    'DeviceName   = "DWM V2 DFU"',
-  ].join('\r\n');
-
-  fs.writeFileSync(infPath, infContent, 'utf8');
-
-  // Detect if this process is already running as Administrator.
-  // 'net session' requires admin rights; exit 0 means we are admin.
-  const adminCheck = spawnSync('net', ['session'], { windowsHide: true, stdio: 'ignore' });
-  const isAdmin = adminCheck.status === 0;
-
-  if (isAdmin) {
-    // Already elevated — run pnputil directly. No UAC dance needed.
-    const pnputilPath = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'pnputil.exe');
-    return new Promise((resolve) => {
-      const child = spawn(pnputilPath, ['/add-driver', infPath, '/install'], { windowsHide: true });
-      let out = '';
-      child.stdout.on('data', d => { out += d.toString(); });
-      child.stderr.on('data', d => { out += d.toString(); });
-      child.on('close', (code) => {
-        const suffix = '\r\n\r\nDriver staged. If the device is already in DFU mode, unplug and replug it now.';
-        if (code === 0) {
-          resolve({ success: true, output: out.trim() + suffix });
-        } else {
-          resolve({ success: false, error: out.trim() || `pnputil failed (exit ${code})`, output: out.trim() });
-        }
-      });
-      child.on('error', (err) => resolve({ success: false, error: `Failed to run pnputil: ${err.message}` }));
-    });
+  if (!fs.existsSync(zadigPath)) {
+    return { success: false, error: `Zadig not found at ${zadigPath}. Please reinstall DWM Control.` };
   }
 
-  // Not admin — write an elevated helper script and invoke it via UAC.
-  // The helper uses Write-Host (visible in the PS window) AND writes a log
-  // file so the app can show the result after the elevated process exits.
-  const psq = s => s.replace(/'/g, "''");
-
-  const helperContent = `
-$inf     = '${psq(infPath)}'
-$logFile = '${psq(outPath)}'
-
-function Log($msg) {
-    Write-Host $msg
-    Add-Content -Path $logFile -Value $msg
-}
-
-'' | Out-File -FilePath $logFile -Encoding UTF8 -Force
-
-Write-Host ''
-Write-Host 'DWM Control - WinUSB Driver Installation' -ForegroundColor Cyan
-Write-Host '=========================================' -ForegroundColor Cyan
-Write-Host ''
-Log 'Installing WinUSB driver for DFU device (VID_0483 PID_DF11)...'
-Write-Host ''
-
-$result = & pnputil /add-driver $inf /install 2>&1
-$code   = $LASTEXITCODE
-$result | ForEach-Object { Log $_ }
-Log ''
-
-if ($code -eq 0) {
-    Log 'SUCCESS: Driver staged/installed.'
-    Log 'If the device is already in DFU mode, unplug and replug it now.'
-    Write-Host '' ; Write-Host 'Done.' -ForegroundColor Green
-} else {
-    Log "ERROR: pnputil exited with code $code"
-    Write-Host '' ; Write-Host 'Installation failed.' -ForegroundColor Red
-}
-
-Write-Host ''
-Write-Host 'This window will close in 6 seconds...'
-Start-Sleep 6
-exit $code
-`.trimStart();
-
-  fs.writeFileSync(helperPath, helperContent, 'utf8');
-
-  // Outer (non-elevated) PS launches the helper elevated via UAC (-Verb RunAs).
-  // -Wait means the outer PS blocks until the elevated child exits.
-  const psCmd = [
-    `$s = '${psq(helperPath)}';`,
-    `$r = Start-Process powershell`,
-    `-ArgumentList @('-ExecutionPolicy','Bypass','-File',$s)`,
-    `-Verb RunAs -Wait -PassThru;`,
-    `if ($r -eq $null -or $r.ExitCode -eq $null) { exit 1 };`,
-    `exit $r.ExitCode`,
-  ].join(' ');
-
-  return new Promise((resolve) => {
-    const ps = spawn('powershell.exe', ['-NoProfile', '-Command', psCmd], { windowsHide: true });
-    let stderr = '';
-    ps.stderr.on('data', d => { stderr += d.toString(); });
-    ps.on('close', (code) => {
-      let pnpOutput = '';
-      try { pnpOutput = fs.readFileSync(outPath, 'utf8').trim(); } catch (e) {}
-      if (code === 0) {
-        resolve({ success: true, output: pnpOutput });
-      } else {
-        const msg = pnpOutput || stderr || `Installation failed (exit code ${code})`;
-        resolve({ success: false, error: msg.trim(), output: pnpOutput });
-      }
-    });
-    ps.on('error', (err) => resolve({ success: false, error: err.message }));
-  });
+  try {
+    const err = await shell.openPath(zadigPath);
+    if (err) return { success: false, error: err };
+    return { success: true, launched: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
 });
 
 // IPC Handlers for DFU functionality

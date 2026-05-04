@@ -4,25 +4,22 @@
   ; Create desktop shortcut
   CreateShortCut "$DESKTOP\DWM Control.lnk" "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
 
-  ; Copy WinUSB driver files to the install directory
+  ; Bundle Zadig (pre-signed WinUSB driver installer tool)
   SetOutPath "$INSTDIR"
-  File "${BUILD_RESOURCES_DIR}\dwm-dfu-winusb.inf"
-  File "${BUILD_RESOURCES_DIR}\install-winusb-driver.ps1"
+  File "${BUILD_RESOURCES_DIR}\zadig.exe"
 
-  ; Ask the user — Yes is the default button
-  MessageBox MB_YESNO|MB_ICONQUESTION "Install WinUSB driver for DFU firmware updates?$\r$\n$\r$\nThis driver is required to upload firmware to the DWM V2 device.$\r$\nA User Account Control prompt will appear — click Yes to allow.$\r$\n$\r$\nInstall now?" IDNO skip_driver
+  ; Ask the user if they want to install the USB driver now
+  MessageBox MB_YESNO|MB_ICONQUESTION "Install WinUSB driver for DFU firmware updates?$\r$\n$\r$\nThis will open Zadig, a free driver installation tool.$\r$\nIn Zadig: select 'STM32 BOOTLOADER' or 'DFU in FS Mode', choose WinUSB, and click Install Driver.$\r$\n$\r$\nOpen Zadig now?" IDNO skip_driver
 
-  ; Launch PowerShell elevated via UAC — runs install-winusb-driver.ps1
-  ; $\" is NSIS syntax for an embedded literal double-quote character
-  ExecShell "runas" "powershell.exe" "-ExecutionPolicy Bypass -NoProfile -File $\"$INSTDIR\install-winusb-driver.ps1$\""
+  ; Launch Zadig — it requests its own elevation via its manifest
+  ExecShell "open" "$INSTDIR\zadig.exe"
 
   skip_driver:
 !macroend
 
 !macro customUnInstall
   Delete "$DESKTOP\DWM Control.lnk"
-  Delete "$INSTDIR\dwm-dfu-winusb.inf"
-  Delete "$INSTDIR\install-winusb-driver.ps1"
+  Delete "$INSTDIR\zadig.exe"
 !macroend
 
 ; Welcome page

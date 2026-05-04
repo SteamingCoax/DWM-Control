@@ -62,38 +62,25 @@
 
     DWMControl.prototype.installUsbDriver = async function() {
         const btn = document.getElementById('install-driver-btn');
-        if (btn) { btn.disabled = true; btn.textContent = 'Installing…'; }
+        if (btn) { btn.disabled = true; btn.textContent = 'Opening Zadig…'; }
 
-        this.appendOutput('Installing WinUSB driver for DFU device…');
-        this.appendOutput('A UAC prompt will appear — please click Yes to allow the installation.');
+        this.appendOutput('Launching Zadig driver installer…');
 
         try {
             const result = await window.electronAPI.installWinUsbDriver();
 
-            // Always show pnputil output for diagnostics
-            if (result && result.output) {
-                result.output.split('\n').forEach(line => {
-                    const trimmed = line.trim();
-                    if (trimmed) this.appendOutput(trimmed);
-                });
-            }
-
-            if (result && result.success) {
-                this.appendOutput('Driver installed. Refreshing device list…');
-                if (btn) { btn.disabled = false; btn.textContent = 'Install USB Driver'; }
-                // Give Windows 3 s to finish binding the driver before rescanning
-                setTimeout(() => this.refreshDfuDevices(), 3000);
+            if (result && result.launched) {
+                this.appendOutput('Zadig is open.');
+                this.appendOutput('In Zadig: select "STM32 BOOTLOADER" or "DFU in FS Mode", choose WinUSB, and click Install Driver.');
+                this.appendOutput('Once installed, unplug and replug the device, then click Refresh.');
             } else {
-                const msg = (result && result.error) ? result.error : 'Driver installation failed.';
-                if (!result || !result.output) {
-                    // Only show the error text if we didn't already print pnputil output
-                    this.appendOutput(`Error: ${msg}`);
-                }
-                this.appendOutput('If this keeps failing, install the driver manually using Zadig: https://zadig.akeo.ie');
-                if (btn) { btn.disabled = false; btn.textContent = 'Install USB Driver'; }
+                const msg = (result && result.error) ? result.error : 'Failed to launch Zadig.';
+                this.appendOutput(`Error: ${msg}`);
+                this.appendOutput('You can install Zadig manually from https://zadig.akeo.ie');
             }
         } catch (error) {
-            this.appendOutput(`Driver installation error: ${error.message}`);
+            this.appendOutput(`Error: ${error.message}`);
+        } finally {
             if (btn) { btn.disabled = false; btn.textContent = 'Install USB Driver'; }
         }
     };
