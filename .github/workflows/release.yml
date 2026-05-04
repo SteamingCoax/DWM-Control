@@ -264,9 +264,9 @@ jobs:
           DISPLAY: ":99"
           WINEARCH: win64
           WINEPREFIX: ${{ runner.temp }}/wine64
-          ELECTRON_CACHE: ${{ runner.home }}/electron-cache
         run: |
-          mkdir -p "$HOME/electron-cache"
+          export ELECTRON_CACHE="$HOME/electron-cache"
+          mkdir -p "$ELECTRON_CACHE"
           mkdir -p "$RUNNER_TEMP/bin"
           WINE_BIN="$(command -v wine64 || command -v wine || true)"
           if [ -z "$WINE_BIN" ]; then
@@ -377,10 +377,9 @@ jobs:
                Programs/dfu-util/linux-arm/dfu-util
 
       - name: Build Linux artifacts
-        env:
-          ELECTRON_CACHE: ${{ runner.home }}/electron-cache
         run: |
-          mkdir -p "$HOME/electron-cache"
+          export ELECTRON_CACHE="$HOME/electron-cache"
+          mkdir -p "$ELECTRON_CACHE"
           npm run build:linux
 
       - name: Ensure release exists
