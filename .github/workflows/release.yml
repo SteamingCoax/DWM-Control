@@ -206,14 +206,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           MAC_OUT_DIR="${RUNNER_TEMP}/dwm-dist"
-          # Delete any pre-existing assets with the same names (handles re-runs)
+          REPO="${{ github.repository }}"
+          RELEASE_ID=$(gh api "repos/${REPO}/releases/tags/${RELEASE_TAG}" --jq '.id')
+          # Delete any pre-existing assets by name via REST API (handles re-runs reliably)
           for f in "$MAC_OUT_DIR"/DWM-Control-*-macOS-*.dmg \
                    "$MAC_OUT_DIR"/DWM-Control-*-macOS-*.zip \
                    "$MAC_OUT_DIR"/latest-mac*.yml; do
             [ -f "$f" ] || continue
             name=$(basename "$f")
-            gh release delete-asset "$RELEASE_TAG" "$name" \
-              --yes --repo "${{ github.repository }}" 2>/dev/null || true
+            asset_id=$(gh api "repos/${REPO}/releases/${RELEASE_ID}/assets" \
+              --jq ".[] | select(.name == \"${name}\") | .id" 2>/dev/null || true)
+            [ -n "$asset_id" ] && \
+              gh api --method DELETE "repos/${REPO}/releases/assets/${asset_id}" || true
           done
           gh release upload "$RELEASE_TAG" \
             "$MAC_OUT_DIR"/DWM-Control-*-macOS-*.dmg \
@@ -284,12 +288,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Delete any pre-existing assets with the same names (handles re-runs)
+          REPO="${{ github.repository }}"
+          RELEASE_ID=$(gh api "repos/${REPO}/releases/tags/${RELEASE_TAG}" --jq '.id')
+          # Delete any pre-existing assets by name via REST API (handles re-runs reliably)
           for f in dist/DWM-Control-*-Windows-Setup.exe dist/latest.yml; do
             [ -f "$f" ] || continue
             name=$(basename "$f")
-            gh release delete-asset "$RELEASE_TAG" "$name" \
-              --yes --repo "${{ github.repository }}" 2>/dev/null || true
+            asset_id=$(gh api "repos/${REPO}/releases/${RELEASE_ID}/assets" \
+              --jq ".[] | select(.name == \"${name}\") | .id" 2>/dev/null || true)
+            [ -n "$asset_id" ] && \
+              gh api --method DELETE "repos/${REPO}/releases/assets/${asset_id}" || true
           done
           gh release upload "$RELEASE_TAG" \
             dist/DWM-Control-*-Windows-Setup.exe \
@@ -375,14 +383,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Delete any pre-existing assets with the same names (handles re-runs)
+          REPO="${{ github.repository }}"
+          RELEASE_ID=$(gh api "repos/${REPO}/releases/tags/${RELEASE_TAG}" --jq '.id')
+          # Delete any pre-existing assets by name via REST API (handles re-runs reliably)
           for f in dist/DWM-Control-*-Linux-*.AppImage \
                    dist/DWM-Control-*-Linux-*.deb \
                    dist/latest-linux*.yml; do
             [ -f "$f" ] || continue
             name=$(basename "$f")
-            gh release delete-asset "$RELEASE_TAG" "$name" \
-              --yes --repo "${{ github.repository }}" 2>/dev/null || true
+            asset_id=$(gh api "repos/${REPO}/releases/${RELEASE_ID}/assets" \
+              --jq ".[] | select(.name == \"${name}\") | .id" 2>/dev/null || true)
+            [ -n "$asset_id" ] && \
+              gh api --method DELETE "repos/${REPO}/releases/assets/${asset_id}" || true
           done
           gh release upload "$RELEASE_TAG" \
             dist/DWM-Control-*-Linux-*.AppImage \
