@@ -311,7 +311,7 @@ ipcMain.handle('install-winusb-driver', async () => {
   const os   = require('os');
   const path = require('path');
   const fs   = require('fs');
-  const { spawn } = require('child_process');
+  const { spawn, spawnSync } = require('child_process');
 
   const workDir    = path.join(os.tmpdir(), 'dwm-winusb');
   const infPath    = path.join(workDir, 'dwm-dfu-winusb.inf');
@@ -321,6 +321,9 @@ ipcMain.handle('install-winusb-driver', async () => {
   try {
     fs.mkdirSync(workDir, { recursive: true });
   } catch (e) { /* already exists */ }
+
+  // Delete stale log file so we never read old output on failure
+  try { fs.unlinkSync(outPath); } catch (e) {}
 
   // Date string for DriverVer
   const now = new Date();
@@ -358,78 +361,81 @@ ipcMain.handle('install-winusb-driver', async () => {
 
   fs.writeFileSync(infPath, infContent, 'utf8');
 
-  // PS single-quote escape
+  // Detect if this process is already running as Administrator.
+  // 'net session' requires admin rights; exit 0 means we are admin.
+  const adminCheck = spawnSync('net', ['session'], { windowsHide: true, stdio: 'ignore' });
+  const isAdmin = adminCheck.status === 0;
+
+  if (isAdmin) {
+    // Already elevated — run pnputil directly. No UAC dance needed.
+    return new Promise((resolve) => {
+      const child = spawn('pnputil.exe', ['/add-driver', infPath, '/install'], { windowsHide: true });
+      let out = '';
+      child.stdout.on('data', d => { out += d.toString(); });
+      child.stderr.on('data', d => { out += d.toString(); });
+      child.on('close', (code) => {
+        const suffix = '\r\n\r\nDriver staged. If the device is already in DFU mode, unplug and replug it now.';
+        if (code === 0) {
+          resolve({ success: true, output: out.trim() + suffix });
+        } else {
+          resolve({ success: false, error: out.trim() || `pnputil failed (exit ${code})`, output: out.trim() });
+        }
+      });
+      child.on('error', (err) => resolve({ success: false, error: `Failed to run pnputil: ${err.message}` }));
+    });
+  }
+
+  // Not admin — write an elevated helper script and invoke it via UAC.
+  // The helper uses Write-Host (visible in the PS window) AND writes a log
+  // file so the app can show the result after the elevated process exits.
   const psq = s => s.replace(/'/g, "''");
 
-  // The helper script runs elevated.
-  // Step 1: Stage the driver in the Windows driver store.
-  // Step 2: Enumerate connected devices to find our VID/PID instance ID.
-  //         pnputil /add-driver /install can fail to bind when the device is
-  //         already enumerated as "Unknown Device". We must explicitly call
-  //         pnputil /install-device <instance-id> to force-bind.
-  // Step 3: If no connected device found, driver is staged and will auto-bind
-  //         on next plug-in — exit 0 (staged successfully).
-  // All output is written to outFile so the app can display diagnostics.
   const helperContent = `
 $inf     = '${psq(infPath)}'
-$outFile = '${psq(outPath)}'
+$logFile = '${psq(outPath)}'
 
-function Log($msg) { $msg | Add-Content -Path $outFile }
-
-'[1/3] Staging WinUSB driver...' | Out-File -FilePath $outFile -Encoding UTF8 -Force
-$addOut = & pnputil /add-driver $inf 2>&1
-$addCode = $LASTEXITCODE
-$addOut | ForEach-Object { Log $_ }
-Log "  Stage exit code: $addCode"
-
-if ($addCode -ne 0) {
-    Log 'ERROR: pnputil failed to stage the driver.'
-    exit $addCode
+function Log($msg) {
+    Write-Host $msg
+    Add-Content -Path $logFile -Value $msg
 }
 
+'' | Out-File -FilePath $logFile -Encoding UTF8 -Force
+
+Write-Host ''
+Write-Host 'DWM Control - WinUSB Driver Installation' -ForegroundColor Cyan
+Write-Host '=========================================' -ForegroundColor Cyan
+Write-Host ''
+Log 'Installing WinUSB driver for DFU device (VID_0483 PID_DF11)...'
+Write-Host ''
+
+$result = & pnputil /add-driver $inf /install 2>&1
+$code   = $LASTEXITCODE
+$result | ForEach-Object { Log $_ }
 Log ''
-Log '[2/3] Searching for connected DFU device (VID_0483 PID_DF11)...'
-$enumLines = (& pnputil /enum-devices /ids 2>&1) -split '\r?\n'
 
-$instanceId = $null
-$currentId  = $null
-foreach ($line in $enumLines) {
-    if ($line -match 'Instance ID:\s+(.+)') {
-        $currentId = $Matches[1].Trim()
-    }
-    if ($line -match 'VID_0483' -and $line -match 'PID_DF11' -and $currentId) {
-        $instanceId = $currentId
-        Log "  Found device instance: $instanceId"
-        break
-    }
+if ($code -eq 0) {
+    Log 'SUCCESS: Driver staged/installed.'
+    Log 'If the device is already in DFU mode, unplug and replug it now.'
+    Write-Host '' ; Write-Host 'Done.' -ForegroundColor Green
+} else {
+    Log "ERROR: pnputil exited with code $code"
+    Write-Host '' ; Write-Host 'Installation failed.' -ForegroundColor Red
 }
 
-if (-not $instanceId) {
-    Log '  No connected device found.'
-    Log '  Driver staged — will auto-install when device is plugged in.'
-    exit 0
-}
-
-Log ''
-Log "[3/3] Installing driver on device: $instanceId"
-$instOut = & pnputil /install-device $instanceId 2>&1
-$instCode = $LASTEXITCODE
-$instOut | ForEach-Object { Log $_ }
-Log "  Install exit code: $instCode"
-
-exit $instCode
+Write-Host ''
+Write-Host 'This window will close in 6 seconds...'
+Start-Sleep 6
+exit $code
 `.trimStart();
 
   fs.writeFileSync(helperPath, helperContent, 'utf8');
 
-  // Non-elevated outer command: elevates the helper via UAC (-Verb RunAs).
-  // Script path stored in a PS variable to avoid backslash escaping issues.
-  // $r.ExitCode is null when UAC is cancelled — treat as failure.
-  const psq2 = psq; // alias for clarity below
+  // Outer (non-elevated) PS launches the helper elevated via UAC (-Verb RunAs).
+  // -Wait means the outer PS blocks until the elevated child exits.
   const psCmd = [
-    `$s = '${psq2(helperPath)}';`,
+    `$s = '${psq(helperPath)}';`,
     `$r = Start-Process powershell`,
-    `-ArgumentList @('-ExecutionPolicy','Bypass','-NonInteractive','-File',$s)`,
+    `-ArgumentList @('-ExecutionPolicy','Bypass','-File',$s)`,
     `-Verb RunAs -Wait -PassThru;`,
     `if ($r -eq $null -or $r.ExitCode -eq $null) { exit 1 };`,
     `exit $r.ExitCode`,
@@ -445,8 +451,8 @@ exit $instCode
       if (code === 0) {
         resolve({ success: true, output: pnpOutput });
       } else {
-        const msg = pnpOutput || stderr || `Exit code ${code}`;
-        resolve({ success: false, error: msg.trim() });
+        const msg = pnpOutput || stderr || `Installation failed (exit code ${code})`;
+        resolve({ success: false, error: msg.trim(), output: pnpOutput });
       }
     });
     ps.on('error', (err) => resolve({ success: false, error: err.message }));
@@ -504,9 +510,13 @@ ipcMain.handle('get-dfu-devices', async () => {
       console.log('DFU Debug - dfu-util exit code:', code);
       console.log('DFU Debug - stdout length:', stdout.length);
       console.log('DFU Debug - stderr length:', stderr.length);
+      console.log('DFU Debug - stdout content:', stdout);
+      console.log('DFU Debug - stderr content:', stderr);
       
-      if (code === 0 || stdout.length > 0) {
-        const devices = parseDfuDevices(stdout);
+      if (code === 0 || stdout.length > 0 || stderr.length > 0) {
+        // Some dfu-util builds (especially on Linux/ARM) write "Found DFU" lines to stderr
+        const combinedOutput = stdout + '\n' + stderr;
+        const devices = parseDfuDevices(combinedOutput);
         console.log('DFU Debug - parsed devices:', devices.length);
         console.log('DFU Debug - device details:', JSON.stringify(devices, null, 2));
         
@@ -519,6 +529,20 @@ ipcMain.handle('get-dfu-devices', async () => {
             output: stdout,
             windowsHelp: true
           });
+        } else if (devices.length === 0 && process.platform === 'linux') {
+          // Check for permission error in stderr
+          const hasPermError = /LIBUSB_ERROR_ACCESS|permission denied|cannot open/i.test(stderr);
+          console.log('DFU Debug - Linux permission error detected:', hasPermError);
+          if (hasPermError) {
+            resolve({
+              success: false,
+              error: 'USB permission denied. Run: sudo usermod -aG plugdev $USER then log out and back in, or run the app with sudo.',
+              output: stderr
+            });
+          } else {
+            console.log('DFU Debug - Returning success with', devices.length, 'devices');
+            resolve({ success: true, devices, output: stdout });
+          }
         } else {
           console.log('DFU Debug - Returning success with', devices.length, 'devices');
           console.log('DFU Debug - Devices being returned:', JSON.stringify(devices, null, 2));
