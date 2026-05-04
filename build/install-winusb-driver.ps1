@@ -17,7 +17,12 @@ if (-not (Test-Path $InfPath)) {
 
 Write-Host "INF: $InfPath"
 Write-Host ''
-$pnputil = "$env:SystemRoot\System32\pnputil.exe"
+# Locate pnputil — a 32-bit PowerShell (launched by the NSIS installer) has
+# System32 redirected to SysWOW64 via WOW64; pnputil.exe does not exist there.
+# The virtual 'Sysnative' folder bypasses WOW64 redirection from 32-bit processes.
+# From a 64-bit process, Sysnative does not exist, so fall back to System32.
+$sys32 = if (Test-Path "$env:SystemRoot\Sysnative") { "$env:SystemRoot\Sysnative" } else { "$env:SystemRoot\System32" }
+$pnputil = "$sys32\pnputil.exe"
 
 Write-Host "Running: pnputil /add-driver ..."
 Write-Host ''
