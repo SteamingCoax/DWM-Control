@@ -113,8 +113,7 @@ check-*.js
 *-debug.*
 
 # Platform-specific binaries that get added during development
-Programs/dfu-util/dfu-util
-Programs/dfu-util/*.dylib
+# Note: macOS dfu-util and libusb-1.0.0.dylib ARE committed (see Programs/dfu-util/)
 Programs/dfu-util/*.so
 # Linux arch-specific binaries — downloaded by CI, not committed
 Programs/dfu-util/linux-x64/dfu-util
