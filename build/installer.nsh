@@ -9,7 +9,7 @@
   File "${BUILD_RESOURCES_DIR}\zadig.exe"
 
   ; Ask the user if they want to install the USB driver now
-  MessageBox MB_YESNO|MB_ICONQUESTION "Install WinUSB driver for DFU firmware updates?$\r$\n$\r$\nThis will open Zadig, a free driver installation tool.$\r$\nIn Zadig: select 'STM32 BOOTLOADER' or 'DFU in FS Mode', choose WinUSB, and click Install Driver.$\r$\n$\r$\nOpen Zadig now?" IDNO skip_driver
+  MessageBox MB_YESNO|MB_ICONQUESTION "Install WinUSB driver for DFU firmware updates?$\r$\n$\r$\nThis will open Zadig, a free driver installation tool.$\r$\nSet the DWM to DFU mode by navigating to Main Menu->Configure->Update->Yes. Connect the DWM to your computer via USB.$\r$\nIn Zadig: select 'DFU in FS Mode', choose WinUSB, and click Install Driver.$\r$\n$\r$\nOpen Zadig now? You can always do this later." IDNO skip_driver
 
   ; Launch Zadig — it requests its own elevation via its manifest
   ExecShell "open" "$INSTDIR\zadig.exe"
