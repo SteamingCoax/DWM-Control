@@ -14,7 +14,7 @@
             nextRequestId: 1,
             pendingRequests: new Map(),
             serialBuffer: '',
-            pollIntervalMs: Number.parseInt(this.config.globalSampleIntervalMs || 60, 10),
+            pollIntervalMs: Number.parseInt(this.config.globalSampleIntervalMs || 100, 10),
             monitorTimer: null,
             monitorActive: false,
             monitorBusy: false,
@@ -100,12 +100,12 @@
 
     DWMControl.prototype._getGlobalTimingMs = function() {
         const cfg = this.config || {};
-        const candidates = [cfg.globalTimingMs, cfg.globalSampleIntervalMs, cfg.globalApiPacingMs, 60];
+        const candidates = [cfg.globalTimingMs, cfg.globalSampleIntervalMs, cfg.globalApiPacingMs, 100];
         for (const candidate of candidates) {
             const ms = Number.parseInt(candidate, 10);
             if (Number.isFinite(ms) && ms >= 50 && ms <= 2000) return ms;
         }
-        return 60;
+        return 100;
     };
 
     // Returns a palette object that adapts to the current light/dark theme.
