@@ -610,8 +610,9 @@
     DWMControl.prototype.renderMeterCard = function(record) {
         const sid = this.meterSafeId(record.key);
         const isConnected = record.connectionState === 'connected';
-        const badgeClass = isConnected ? 'connected' : (record.connectionState === 'disconnected' ? 'disconnected' : 'available');
-        const badgeText = isConnected ? 'Connected' : (record.connectionState === 'disconnected' ? 'Disconnected' : 'Available');
+        const connState = record.connectionState || 'available';
+        const badgeClass = connState === 'connected' ? 'connected' : (connState === 'disconnected' ? 'disconnected' : (connState === 'not-configured' ? 'not-configured' : 'available'));
+        const badgeText  = connState === 'connected' ? 'Connected' : (connState === 'disconnected' ? 'Disconnected' : (connState === 'not-configured' ? 'Not Configured' : 'Available'));
         const portLabel = record.portPath || '-';
         const nameLabel = record.friendlyName || 'DWM V2';
         const uidLabel = record.apiUid || record.fallbackUid || '-';
@@ -647,10 +648,9 @@
     </div>
     <div class="meter-card-header-right">
       <span class="meter-badge meter-badge-${badgeClass}" id="meter-${sid}-badge">${badgeText}</span>
-      <button class="btn btn-primary btn-small" data-meter-action="connect" ${isConnected ? 'disabled' : ''}>Connect</button>
-      <button class="btn btn-secondary btn-small" data-meter-action="disconnect" ${!isConnected ? 'disabled' : ''}>Disconnect</button>
+      <button id="meter-${sid}-connect-btn" class="btn btn-small meter-connect-btn meter-connect-btn-${connState}" data-meter-action="${isConnected ? 'disconnect' : 'connect'}">${badgeText}</button>
       <button class="btn btn-secondary btn-small" data-meter-action="check-updates" ${!isConnected ? 'disabled' : ''}>Check Updates</button>
-            <button class="btn btn-secondary btn-small" data-meter-action="identify-meter" ${!isConnected ? 'disabled' : ''}>Identify</button>
+      <button class="btn btn-secondary btn-small" data-meter-action="identify-meter" ${!isConnected ? 'disabled' : ''}>Identify</button>
     </div>
   </div>
 
@@ -687,7 +687,7 @@
                 <button class="btn btn-secondary btn-small" data-meter-action="refresh-element-profiles" ${!isConnected ? 'disabled' : ''}>Refresh Elements</button>
             </div>
             <div class="meter-elem-inline-group">
-                <span class="meter-elem-inline-label">Current Rating</span>
+                <span class="meter-elem-inline-label">Rating</span>
                 <select id="meter-${sid}-cfg-eval" class="form-select form-select-sm">${this._renderElementRatingOptions(selectedEval)}</select>
             </div>
             <div class="meter-elem-inline-group">

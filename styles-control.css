@@ -2037,6 +2037,58 @@
     border: 1px solid rgba(239, 68, 68, 0.25);
 }
 
+.meter-badge-not-configured {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* Combined connect/disconnect button states */
+.meter-connect-btn {
+    white-space: nowrap;
+    min-width: 7rem;
+}
+
+.meter-connect-btn-available {
+    background: var(--accent-primary);
+    color: #fff;
+    border-color: var(--accent-primary);
+}
+.meter-connect-btn-available:hover {
+    opacity: 0.85;
+}
+
+.meter-connect-btn-connected {
+    background: rgba(239, 68, 68, 0.12);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+}
+.meter-connect-btn-connected:hover {
+    background: rgba(239, 68, 68, 0.25);
+}
+
+.meter-connect-btn-disconnected {
+    background: rgba(100, 100, 100, 0.15);
+    color: var(--text-muted);
+    border: 1px solid var(--border-color);
+}
+.meter-connect-btn-disconnected:hover {
+    background: var(--accent-primary);
+    color: #fff;
+    border-color: var(--accent-primary);
+}
+
+.meter-connect-btn-not-configured {
+    background: rgba(245, 158, 11, 0.12);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.meter-connect-btn-not-configured:hover {
+    background: var(--accent-primary);
+    color: #fff;
+    border-color: var(--accent-primary);
+}
+
 /* Readings bar (shown when connected) */
 .meter-readings-bar {
     display: flex;

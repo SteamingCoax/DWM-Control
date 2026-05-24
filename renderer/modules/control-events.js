@@ -709,11 +709,19 @@
 
         // Combined connect/disconnect button
         const connectBtn = document.getElementById(`meter-${sid}-connect-btn`);
+        const connState = record.connectionState || 'available';
+        const connBtnText = isConn ? 'Connected' : (connState === 'disconnected' ? 'Disconnected' : (connState === 'not-configured' ? 'Not Configured' : 'Available'));
         if (connectBtn) {
-            const connState = record.connectionState;
             connectBtn.className = `btn btn-small meter-connect-btn meter-connect-btn-${connState}`;
             connectBtn.dataset.meterAction = isConn ? 'disconnect' : 'connect';
-            connectBtn.textContent = isConn ? 'Connected' : (connState === 'disconnected' ? 'Disconnected' : (connState === 'not-configured' ? 'Not Configured' : 'Available'));
+            connectBtn.textContent = connBtnText;
+        }
+
+        // Badge
+        const badgeEl = document.getElementById(`meter-${sid}-badge`);
+        if (badgeEl) {
+            badgeEl.className = `meter-badge meter-badge-${connState}`;
+            badgeEl.textContent = connBtnText;
         }
 
         // Readings bar visibility
