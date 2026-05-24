@@ -401,9 +401,16 @@ class DWMControl {
         if (!Array.isArray(this.config.meterCardOrder)) {
             this.config.meterCardOrder = [];
         }
+        if (!Array.isArray(this.config.boardCardOrder)) {
+            this.config.boardCardOrder = [];
+        }
 
         if (!this.config.meterCardOrder.includes(key)) {
             this.config.meterCardOrder.push(key);
+            const meterToken = `meter:${key}`;
+            if (!this.config.boardCardOrder.includes(meterToken)) {
+                this.config.boardCardOrder.push(meterToken);
+            }
             this.saveConfig();
         }
 
@@ -411,22 +418,6 @@ class DWMControl {
     }
 
     removeMissingMeterRecords(activeKeys) {
-        const nextOrder = [];
-        let changed = false;
-
-        this.config.meterCardOrder.forEach((key) => {
-            if (activeKeys.has(key)) {
-                nextOrder.push(key);
-            } else {
-                changed = true;
-            }
-        });
-
-        if (changed) {
-            this.config.meterCardOrder = nextOrder;
-            this.saveConfig();
-        }
-
         for (const [key, record] of this.meterRegistry.entries()) {
             if (!activeKeys.has(key)) {
                 if (record.connectionState === 'connected') {

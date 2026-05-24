@@ -280,12 +280,20 @@ body {
 /* Theme Toggle Button */
 #theme-toggle {
   color: var(--text-inverse) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.70);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.40);
 }
 
 #theme-toggle:hover {
-  background: rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.26) !important;
+  border-color: rgba(255, 255, 255, 0.88);
   transform: scale(1.05);
+}
+
+#theme-toggle:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.75);
+  outline-offset: 2px;
 }
 
 /* ===============================================
@@ -299,9 +307,9 @@ body {
 }
 
 .update-btn {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--text-inverse);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(15, 23, 42, 0.40);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.36);
   padding: 0.5rem 1rem;
   min-width: 170px;
   border-radius: var(--radius-md);
@@ -322,6 +330,13 @@ body {
   display: inline-block;
   min-width: 108px;
   text-align: left;
+  color: inherit;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+}
+
+.update-btn .update-icon {
+  color: inherit;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
 }
 
 .update-btn:disabled {
@@ -330,10 +345,48 @@ body {
 }
 
 .update-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(15, 23, 42, 0.58);
+  border-color: rgba(255, 255, 255, 0.56);
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
+}
+
+.update-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.75);
+  outline-offset: 2px;
+}
+
+[data-theme="light"] #theme-toggle {
+  color: #1f2937 !important;
+  background: rgba(255, 255, 255, 0.90);
+  border-color: rgba(31, 41, 55, 0.42);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+
+[data-theme="light"] #theme-toggle:hover {
+  background: rgba(255, 255, 255, 1) !important;
+  border-color: rgba(31, 41, 55, 0.62);
+}
+
+[data-theme="light"] #theme-toggle:focus-visible {
+  outline: 2px solid rgba(30, 64, 175, 0.55);
+}
+
+[data-theme="light"] .update-btn {
+  color: #1f2937;
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(31, 41, 55, 0.40);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+
+[data-theme="light"] .update-btn:hover {
+  background: rgba(255, 255, 255, 1);
+  border-color: rgba(31, 41, 55, 0.60);
+}
+
+[data-theme="light"] .update-btn:focus-visible {
+  outline: 2px solid rgba(30, 64, 175, 0.55);
+  outline-offset: 2px;
 }
 
 .update-btn.checking {

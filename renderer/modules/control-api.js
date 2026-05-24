@@ -727,7 +727,7 @@
         const cardEl = document.querySelector(`[data-meter-key="${key}"]`);
         if (cardEl) {
             const sel = cardEl.querySelector('.meter-layout-select');
-            if (sel) sel.value = layout;
+            if (sel && document.activeElement !== sel) sel.value = layout;
         }
 
         // Hide panels that aren't shown in this layout

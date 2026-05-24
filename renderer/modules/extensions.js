@@ -597,6 +597,8 @@
             globalSampleIntervalMs: 250,
             globalDebugLoggingEnabled: false,
             meterCardOrder: [],
+            boardCardOrder: [],
+            swrCards: [],
             meterCards: {},
             deembedPowerUnit: 'W',
             deembedVoltageMode: 'manual',
@@ -614,6 +616,8 @@
                 ...defaultConfig,
                 ...parsed,
                 meterCardOrder: Array.isArray(parsed.meterCardOrder) ? parsed.meterCardOrder : [],
+                boardCardOrder: Array.isArray(parsed.boardCardOrder) ? parsed.boardCardOrder : [],
+                swrCards: Array.isArray(parsed.swrCards) ? parsed.swrCards : [],
                 meterCards: parsed.meterCards && typeof parsed.meterCards === 'object' ? parsed.meterCards : {},
             };
         } catch (error) {
