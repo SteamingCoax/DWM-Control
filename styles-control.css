@@ -1386,12 +1386,11 @@
 
 .meter-gauge-panel-controls {
   display: flex;
-  flex-wrap: wrap;
   gap: 6px;
 }
 
 .gauge-metric-select {
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     width: auto;
     font-size: 13px;
     padding: 3px 6px;
@@ -1408,7 +1407,7 @@
 }
 
 .gauge-display-select {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   width: auto;
   font-size: 12px;
   padding: 3px 6px;
@@ -1426,7 +1425,7 @@
 
 .meter-gauge-radial-canvas {
     width: 100%;
-  min-height: 220px;
+  min-height: 300px;
   aspect-ratio: 16 / 10;
   height: auto;
     display: block;
@@ -1459,6 +1458,16 @@
 
 .meter-snapshot-settings .form-select.form-select-sm {
   min-width: 104px;
+}
+
+@media (max-width: 900px) {
+  .meter-gauge-panel-controls {
+    flex-direction: column;
+  }
+
+  .gauge-display-select {
+    flex: 1 1 auto;
+  }
 }
 
 /* History graph */
@@ -1649,7 +1658,6 @@
 
 .meter-page-shell.settings-open .meter-settings-panel {
   width: min(300px, 75vw);
-  overflow-y: auto;
   opacity: 1;
   padding: 12px;
   border-left-color: var(--border-color);
@@ -1778,14 +1786,6 @@
   width: 100%;
 }
 
-#global-board-layout {
-  width: 100%;
-}
-
-#global-card-size {
-  width: 100%;
-}
-
 /* ─── Meter Board ─────────────────────────────────────────────────────────── */
 
 .meter-board {
@@ -1793,36 +1793,6 @@
     flex-direction: column;
     gap: 16px;
     padding: 16px;
-}
-
-/* Grid layout variants */
-.meter-board[data-board-layout="grid-2"],
-.meter-board[data-board-layout="grid-3"],
-.meter-board[data-board-layout="grid-4"],
-.meter-board[data-board-layout="auto-fit"] {
-    display: grid;
-    align-items: start;
-}
-.meter-board[data-board-layout="grid-2"]   { grid-template-columns: repeat(2, 1fr); }
-.meter-board[data-board-layout="grid-3"]   { grid-template-columns: repeat(3, 1fr); }
-.meter-board[data-board-layout="grid-4"]   { grid-template-columns: repeat(4, 1fr); }
-.meter-board[data-board-layout="auto-fit"] {
-    grid-template-columns: repeat(auto-fit, minmax(var(--board-min-col-width, 420px), 1fr));
-}
-
-/* Empty state should always span all columns */
-.meter-board[data-board-layout] .meter-board-empty { grid-column: 1 / -1; }
-
-.meter-cfg-toggle-btn {
-    font-size: 1rem;
-    line-height: 1;
-    padding: 2px 7px;
-}
-
-.meter-cfg-toggle-btn.active {
-    background: var(--accent-color, #4a9eff);
-    color: #fff;
-    border-color: var(--accent-color, #4a9eff);
 }
 
 .meter-board-empty {
@@ -1844,7 +1814,7 @@
     transition: border-color 0.2s;
 }
 
-.meter-card:has(.meter-connect-btn-connected) {
+.meter-card:has(.meter-badge-connected) {
     border-color: var(--accent-color, #4a9eff);
 }
 
@@ -1866,25 +1836,24 @@
 }
 
 /* Card dragging state */
-.meter-card-dragging,
-.swr-card.meter-card-dragging {
+.meter-card-dragging {
     opacity: 0.35;
     cursor: grabbing;
 }
 
-/* Drop swap target indicator */
-.meter-card[data-drop-target],
-.swr-card[data-drop-target] {
-    box-shadow: 0 0 0 2px var(--accent-color, #4a9eff);
-    transition: box-shadow 0.1s ease;
+/* Drag-over highlight */
+.meter-card-drag-over {
+    outline: 2px dashed var(--accent-color, #4a9eff);
+    outline-offset: 2px;
 }
 
 /* Card header row */
 .meter-card-header {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px 16px;
+    gap: 12px;
+    padding: 18px 20px;
+    flex-wrap: wrap;
 }
 
 .meter-card-identity {
@@ -1892,17 +1861,13 @@
     align-items: center;
     gap: 8px;
     flex: 1;
-    min-width: 0;
-    overflow: hidden;
+    flex-wrap: wrap;
 }
 
 .meter-card-name {
     font-weight: 600;
     font-size: 15px;
     color: var(--text-primary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .meter-name-editable {
@@ -2013,13 +1978,8 @@
 .meter-card-header-right {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 8px;
     flex-shrink: 0;
-}
-
-.meter-card-header-right .btn-small {
-    padding: 2px 8px;
-    font-size: 10.5px;
 }
 
 /* Connection state badge */
@@ -2049,66 +2009,6 @@
     background: rgba(239, 68, 68, 0.12);
     color: #ef4444;
     border: 1px solid rgba(239, 68, 68, 0.25);
-}
-
-/* Combined connect/disconnect/status button */
-.meter-connect-btn {
-    font-size: 10.5px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    white-space: nowrap;
-    min-width: 74px;
-    border: 1px solid;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-
-.meter-connect-btn-available {
-    background: rgba(37, 99, 235, 0.10);
-    color: var(--color-primary, #2563eb);
-    border-color: rgba(37, 99, 235, 0.3);
-}
-
-.meter-connect-btn-available:hover {
-    background: var(--color-primary, #2563eb);
-    color: #fff;
-    border-color: var(--color-primary, #2563eb);
-}
-
-.meter-connect-btn-connected {
-    background: rgba(34, 197, 94, 0.15);
-    color: #22c55e;
-    border-color: rgba(34, 197, 94, 0.3);
-}
-
-.meter-connect-btn-connected:hover {
-    background: rgba(239, 68, 68, 0.12);
-    color: #ef4444;
-    border-color: rgba(239, 68, 68, 0.3);
-}
-
-.meter-connect-btn-disconnected {
-    background: rgba(239, 68, 68, 0.10);
-    color: #ef4444;
-    border-color: rgba(239, 68, 68, 0.25);
-}
-
-.meter-connect-btn-disconnected:hover {
-    background: rgba(37, 99, 235, 0.10);
-    color: var(--color-primary, #2563eb);
-    border-color: rgba(37, 99, 235, 0.3);
-}
-
-.meter-connect-btn-not-configured {
-    background: rgba(245, 158, 11, 0.10);
-    color: #f59e0b;
-    border-color: rgba(245, 158, 11, 0.30);
-}
-
-.meter-connect-btn-not-configured:hover {
-    background: rgba(37, 99, 235, 0.10);
-    color: var(--color-primary, #2563eb);
-    border-color: rgba(37, 99, 235, 0.3);
 }
 
 /* Readings bar (shown when connected) */
@@ -2165,57 +2065,28 @@
 }
 
 /* Expand row */
-/* More Info dialog */
-.meter-detail-dialog {
-    padding: 0;
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    background: var(--card-bg, #1c1c2e);
-    width: min(640px, 92vw);
-    max-height: 82vh;
-    overflow-y: auto;
-    box-shadow: 0 24px 64px rgba(0,0,0,0.55);
+.meter-card-expand-row {
+    padding: 4px 12px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: center;
+}
+
+.meter-expand-btn {
+    width: 100%;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 4px 0;
+}
+
+.meter-expand-btn:hover {
     color: var(--text-primary);
 }
 
-.meter-detail-dialog::backdrop {
-    background: rgba(0, 0, 0, 0.52);
-}
-
-.meter-detail-dialog-header {
-    position: sticky;
-    top: 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border-color);
-    background: var(--card-bg, #1c1c2e);
-    z-index: 1;
-}
-
-.meter-detail-dialog-title {
-    font-weight: 600;
-    font-size: 14px;
-}
-
-.meter-detail-dialog-close {
-    font-size: 14px;
-    line-height: 1;
-    padding: 4px 7px;
-    color: var(--text-muted);
-    min-height: unset;
-}
-
-.meter-detail-dialog-body {
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-/* Detail panel (legacy, still used for section styling) */
+/* Detail panel */
 .meter-card-detail {
+    border-top: 1px solid var(--border-color);
     padding: 16px;
     display: flex;
     flex-direction: column;
@@ -2312,23 +2183,12 @@
     background: rgba(0,0,0,0.04);
 }
 
-[data-theme="light"] .meter-card:has(.meter-connect-btn-connected) {
+[data-theme="light"] .meter-card:has(.meter-badge-connected) {
     border-color: #2563eb;
 }
 
-[data-theme="light"] .meter-connect-btn-connected {
+[data-theme="light"] .meter-badge-connected {
     background: rgba(34, 197, 94, 0.12);
-    color: #16a34a;
-}
-
-[data-theme="light"] .meter-connect-btn-available {
-    background: rgba(37, 99, 235, 0.08);
-    color: #2563eb;
-}
-
-[data-theme="light"] .meter-connect-btn-not-configured {
-    background: rgba(245, 158, 11, 0.08);
-    color: #d97706;
 }
 
 /* Responsive: stack on narrow panels */
@@ -2602,15 +2462,9 @@
 
 /* ── Derived value chips ────────────────────────────────────────────────────── */
 .swr-derived-chips {
-    display:     flex;
-    align-items: center;
-    gap:         8px;
-}
-.swr-chips-group {
     display:   flex;
     flex-wrap: wrap;
     gap:       8px;
-    flex:      1;
 }
 .swr-chip {
     display:       flex;
@@ -2629,8 +2483,7 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color:          rgba(200,200,220,0.50);
-    text-align:     center;
-    overflow-wrap:  normal;
+    white-space:    nowrap;
 }
 .swr-chip-value {
     font-size:   16px;
@@ -2638,7 +2491,7 @@
     font-family: monospace;
     color:       rgba(220, 210, 255, 0.92);
     white-space: nowrap;
-    margin-top:  auto;
+    margin-top:  2px;
 }
 
 /* per-chip accent borders */
@@ -2661,8 +2514,8 @@
 .swr-chip-worst-val { color: #f87171; }   /* red   — worst is bad */
 
 .swr-bw-reset-btn {
-    align-self:  center;
-    flex-shrink: 0;
+    align-self: center;
+    margin-left: 4px;
 }
 
 /* ── History view ──────────────────────────────────────────────────────────── */
@@ -2729,23 +2582,6 @@
     display: flex;
     align-items: center;
     gap: 8px;
-}
-
-.meter-fw-dismiss-btn {
-    margin-left: auto;
-    padding: 1px 6px;
-    font-size: 1rem;
-    line-height: 1;
-    opacity: 0.65;
-    color: var(--color-warning);
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    flex-shrink: 0;
-}
-
-.meter-fw-dismiss-btn:hover {
-    opacity: 1;
 }
 
 .meter-fw-update-icon {
