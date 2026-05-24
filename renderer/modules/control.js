@@ -215,6 +215,24 @@
         this.saveConfig();
     };
 
+    DWMControl.prototype._getBoardLayout = function() {
+        const valid = ['column', 'auto-fit', 'grid-2', 'grid-3', 'grid-4'];
+        const v = this.config.boardLayout;
+        return valid.includes(v) ? v : 'grid-2';
+    };
+
+    DWMControl.prototype._applyBoardLayout = function(layout, persist) {
+        const valid = ['column', 'auto-fit', 'grid-2', 'grid-3', 'grid-4'];
+        if (!valid.includes(layout)) return;
+        const board = document.getElementById('meter-board');
+        if (board) board.dataset.boardLayout = layout;
+        if (persist !== false) {
+            this.config.boardLayout = layout;
+            this.saveConfig();
+        }
+        requestAnimationFrame(() => this._repaintAllCanvases());
+    };
+
     DWMControl.prototype._parseElementProfiles = function(response) {
         const profiles = [];
         for (let i = 1; i <= 8; i += 1) {
@@ -280,6 +298,7 @@
         const panel = document.getElementById('control-panel');
         if (!panel) return;
         const timingMs = this._getGlobalTimingMs();
+        const boardLayout = this._getBoardLayout();
         const smoothingPct = this._getGlobalGaugeSmoothing();
         const panelVisible = Boolean(this.config.globalSettingsPanelVisible);
         const autoStartPolling = this.config.globalAutoStartPolling !== false;
@@ -322,6 +341,16 @@
                         <input type="checkbox" id="global-debug-logging" ${debugLoggingEnabled ? 'checked' : ''}>
                         Enable serial debug logging
                       </label>
+                    </div>
+                    <div class="meter-settings-group">
+                        <label class="meter-global-toolbar-label" for="global-board-layout">Board Layout</label>
+                        <select id="global-board-layout" class="form-select form-select-sm">
+                            <option value="column"${boardLayout === 'column' ? ' selected' : ''}>Single Column</option>
+                            <option value="auto-fit"${boardLayout === 'auto-fit' ? ' selected' : ''}>Auto-Fit Grid</option>
+                            <option value="grid-2"${boardLayout === 'grid-2' ? ' selected' : ''}>2 Columns</option>
+                            <option value="grid-3"${boardLayout === 'grid-3' ? ' selected' : ''}>3 Columns</option>
+                            <option value="grid-4"${boardLayout === 'grid-4' ? ' selected' : ''}>4 Columns</option>
+                        </select>
                     </div>
                     <div class="meter-settings-group">
                         <div class="meter-settings-group-label">Derived Measurements</div>
@@ -388,12 +417,20 @@
           });
         }
 
+        const boardLayoutSelect = document.getElementById('global-board-layout');
+        if (boardLayoutSelect) {
+            boardLayoutSelect.addEventListener('change', () => {
+                this._applyBoardLayout(boardLayoutSelect.value, true);
+            });
+        }
+
         const addSwrBtn = document.getElementById('add-swr-card-btn');
         if (addSwrBtn) {
             addSwrBtn.addEventListener('click', () => this.addSwrCard());
         }
 
         this._applyGlobalTimingMs(timingMs, { persist: false, restartTimers: false });
+        this._applyBoardLayout(boardLayout, false);
         this._initDragDrop();
         this._setupCanvasResizeObserver();
     };

@@ -1795,6 +1795,32 @@
     padding: 16px;
 }
 
+/* Board layout modes (set via data-board-layout attribute) */
+.meter-board[data-board-layout="column"] {
+    display: flex;
+    flex-direction: column;
+}
+
+.meter-board[data-board-layout="auto-fit"] {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+}
+
+.meter-board[data-board-layout="grid-2"] {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.meter-board[data-board-layout="grid-3"] {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.meter-board[data-board-layout="grid-4"] {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+}
+
 .meter-board-empty {
     text-align: center;
     padding: 48px 24px;
