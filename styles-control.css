@@ -1451,6 +1451,20 @@
   color: rgba(0,0,0,0.7);
 }
 
+/* Windows dark-mode native dropdown popup readability */
+[data-theme="dark"] select,
+[data-theme="dark"] .form-select,
+[data-theme="dark"] .gauge-metric-select,
+[data-theme="dark"] .gauge-display-select {
+    color: #eaf0ff;
+}
+
+[data-theme="dark"] select option,
+[data-theme="dark"] select optgroup {
+    color: #eaf0ff;
+    background-color: #1c2230;
+}
+
 .meter-snapshot-settings {
   display: flex;
   align-items: center;

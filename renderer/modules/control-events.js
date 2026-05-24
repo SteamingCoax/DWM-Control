@@ -10,6 +10,26 @@
         const board = document.getElementById('control-panel');
         if (!board) return;
 
+        const lockBoardRefresh = (ms = 2500) => {
+            this._boardInteractionLockUntil = Date.now() + ms;
+        };
+
+        // Discovery refresh runs every ~2s; lock refresh while the user is
+        // interacting with controls so native dropdown popups don't collapse.
+        board.addEventListener('pointerdown', (e) => {
+            const target = e.target;
+            if (!(target instanceof Element)) return;
+            if (target.closest('select, input, textarea, button, [role="button"]')) {
+                lockBoardRefresh();
+            }
+        }, true);
+
+        board.addEventListener('focusin', (e) => {
+            const target = e.target;
+            if (!(target instanceof Element)) return;
+            if (target.matches('select, input, textarea')) lockBoardRefresh();
+        }, true);
+
         // Event delegation: all actions bubble up to the panel
         board.addEventListener('click', (e) => {
             // ── SWR card actions ──────────────────────────────────────────
@@ -124,6 +144,7 @@
         });
 
         board.addEventListener('change', async (e) => {
+            lockBoardRefresh(1200);
             const sel = e.target;
 
             // SWR toolbar dropdowns (no id, identified by dataset)

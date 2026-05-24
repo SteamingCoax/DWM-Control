@@ -528,16 +528,23 @@
         const board = document.getElementById('meter-board');
         if (!board) return;
 
+      const lockUntil = Number(this._boardInteractionLockUntil) || 0;
+      if (Date.now() < lockUntil) return;
+
       // Discovery runs every ~2s; avoid reordering/reinserting cards while the
       // user is interacting with layout selectors, which can close the dropdown.
       const activeEl = document.activeElement;
-      const isEditingLayoutSelect =
-        activeEl instanceof HTMLSelectElement &&
+      const isEditingBoardControl =
+        activeEl instanceof Element &&
         board.contains(activeEl) && (
+          activeEl.matches('select, input, textarea') ||
           activeEl.classList.contains('meter-layout-select') ||
-          activeEl.dataset.swrField === 'cardLayout'
+          activeEl.dataset?.swrField === 'cardLayout'
         );
-      if (isEditingLayoutSelect) return;
+      if (isEditingBoardControl) {
+        this._boardInteractionLockUntil = Date.now() + 900;
+        return;
+      }
 
         const meterOrder = Array.isArray(this.config.meterCardOrder) ? this.config.meterCardOrder : [];
         const swrCards = Array.isArray(this.config.swrCards) ? this.config.swrCards : [];
