@@ -1392,10 +1392,27 @@ ipcMain.handle('check-for-updates', async () => {
 
 ipcMain.handle('download-update', async () => {
   try {
+    // On macOS, electron-updater uses Squirrel.Mac which requires its own internal
+    // download from a local proxy server. With autoInstallOnAppQuit=false that
+    // proxy-download is deferred until quitAndInstall() — too late, it can fail
+    // silently while the app is trying to quit. Setting autoInstallOnAppQuit=true
+    // here makes electron-updater trigger Squirrel's proxy-download immediately
+    // as part of downloadUpdate(), so Squirrel is fully staged before the user
+    // ever clicks "Restart". We reset the flag after so a normal Cmd+Q doesn't
+    // auto-install.
+    if (process.platform === 'darwin') {
+      autoUpdater.autoInstallOnAppQuit = true;
+    }
     await autoUpdater.downloadUpdate();
+    if (process.platform === 'darwin') {
+      autoUpdater.autoInstallOnAppQuit = false;
+    }
     updateDownloadedReady = true;
     return { success: true };
   } catch (error) {
+    if (process.platform === 'darwin') {
+      autoUpdater.autoInstallOnAppQuit = false;
+    }
     updateDownloadedReady = false;
     return { success: false, error: error.message };
   }
