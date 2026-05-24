@@ -14,7 +14,7 @@
             nextRequestId: 1,
             pendingRequests: new Map(),
             serialBuffer: '',
-            pollIntervalMs: Number.parseInt(this.config.globalSampleIntervalMs || 100, 10),
+            pollIntervalMs: Number.parseInt(this.config.globalSampleIntervalMs || 60, 10),
             monitorTimer: null,
             monitorActive: false,
             monitorBusy: false,
@@ -100,12 +100,12 @@
 
     DWMControl.prototype._getGlobalTimingMs = function() {
         const cfg = this.config || {};
-        const candidates = [cfg.globalTimingMs, cfg.globalSampleIntervalMs, cfg.globalApiPacingMs, 100];
+        const candidates = [cfg.globalTimingMs, cfg.globalSampleIntervalMs, cfg.globalApiPacingMs, 60];
         for (const candidate of candidates) {
             const ms = Number.parseInt(candidate, 10);
             if (Number.isFinite(ms) && ms >= 50 && ms <= 2000) return ms;
         }
-        return 100;
+        return 60;
     };
 
     // Returns a palette object that adapts to the current light/dark theme.
@@ -215,55 +215,6 @@
         this.saveConfig();
     };
 
-    // ─── Board layout & card size ──────────────────────────────────────────────
-
-    const _CARD_SIZE_STEPS = [
-        { step: 1, px: 280, label: 'XS — 280 px' },
-        { step: 2, px: 340, label: 'S — 340 px' },
-        { step: 3, px: 420, label: 'M — 420 px' },
-        { step: 4, px: 520, label: 'L — 520 px' },
-        { step: 5, px: 640, label: 'XL — 640 px' },
-    ];
-
-    DWMControl.prototype._getBoardLayout = function() {
-        const valid = ['column', 'auto-fit', 'grid-2', 'grid-3', 'grid-4'];
-        const v = this.config.boardLayout;
-        return valid.includes(v) ? v : 'grid-2';
-    };
-
-    DWMControl.prototype._applyBoardLayout = function(layout, persist) {
-        const valid = ['column', 'auto-fit', 'grid-2', 'grid-3', 'grid-4'];
-        if (!valid.includes(layout)) return;
-        const board = document.getElementById('meter-board');
-        if (board) board.dataset.boardLayout = layout;
-        if (persist !== false) {
-            this.config.boardLayout = layout;
-            this.saveConfig();
-        }
-        // Repaint canvases — cards resize when layout changes
-        requestAnimationFrame(() => this._repaintAllCanvases());
-    };
-
-    DWMControl.prototype._getCardSizeStep = function() {
-        const stored = Number.parseInt(this.config.boardCardSizeStep, 10);
-        return (Number.isFinite(stored) && stored >= 1 && stored <= 5) ? stored : 3;
-    };
-
-    DWMControl.prototype._applyCardMinWidth = function(step, persist) {
-        step = Math.max(1, Math.min(5, Number.parseInt(step, 10) || 3));
-        const info = _CARD_SIZE_STEPS.find(s => s.step === step) || _CARD_SIZE_STEPS[2];
-        const board = document.getElementById('meter-board');
-        if (board) board.style.setProperty('--board-min-col-width', `${info.px}px`);
-        const labelEl = document.getElementById('global-card-size-label');
-        if (labelEl) labelEl.textContent = info.label;
-        if (persist !== false) {
-            this.config.boardCardSizeStep = step;
-            this.saveConfig();
-        }
-        // Repaint canvases — cards resize when card size changes
-        requestAnimationFrame(() => this._repaintAllCanvases());
-    };
-
     DWMControl.prototype._parseElementProfiles = function(response) {
         const profiles = [];
         for (let i = 1; i <= 8; i += 1) {
@@ -331,10 +282,8 @@
         const timingMs = this._getGlobalTimingMs();
         const smoothingPct = this._getGlobalGaugeSmoothing();
         const panelVisible = Boolean(this.config.globalSettingsPanelVisible);
+        const autoStartPolling = this.config.globalAutoStartPolling !== false;
         const debugLoggingEnabled = this.config.globalDebugLoggingEnabled === true;
-        const boardLayout = this._getBoardLayout();
-        const cardSizeStep = this._getCardSizeStep();
-        const cardSizeLabel = (_CARD_SIZE_STEPS.find(s => s.step === cardSizeStep) || _CARD_SIZE_STEPS[2]).label;
         panel.innerHTML = `
             <div class="meter-page-shell${panelVisible ? ' settings-open' : ''}" id="meter-page-shell">
                 <div class="meter-page-main">
@@ -363,23 +312,16 @@
                         <span id="global-gauge-smoothing-value" class="meter-settings-value">${smoothingPct}%</span>
                     </div>
                     <div class="meter-settings-group">
+                        <label class="meter-settings-checkbox">
+                            <input type="checkbox" id="global-auto-start-poll" ${autoStartPolling ? 'checked' : ''}>
+                            Auto-start polling when a meter connects
+                        </label>
+                    </div>
+                    <div class="meter-settings-group">
                       <label class="meter-settings-checkbox">
                         <input type="checkbox" id="global-debug-logging" ${debugLoggingEnabled ? 'checked' : ''}>
                         Enable serial debug logging
                       </label>
-                    </div>
-                    <div class="meter-settings-group">
-                        <label class="meter-global-toolbar-label" for="global-board-layout">Board Layout</label>
-                        <select id="global-board-layout" class="form-select form-select-sm">
-                            <option value="column"${boardLayout === 'column' ? ' selected' : ''}>Single Column</option>
-                            <option value="auto-fit"${boardLayout === 'auto-fit' ? ' selected' : ''}>Auto-Fit Grid</option>
-                            <option value="grid-2"${boardLayout === 'grid-2' ? ' selected' : ''}>2 Columns</option>
-                            <option value="grid-3"${boardLayout === 'grid-3' ? ' selected' : ''}>3 Columns</option>
-                            <option value="grid-4"${boardLayout === 'grid-4' ? ' selected' : ''}>4 Columns</option>
-                        </select>
-                    </div>
-                    <div class="meter-settings-group">
-                        <button class="btn btn-secondary btn-small" id="global-fullscreen-btn" style="width:100%">Enter Full Screen</button>
                     </div>
                     <div class="meter-settings-group">
                         <div class="meter-settings-group-label">Derived Measurements</div>
@@ -430,6 +372,14 @@
             smoothingInput.addEventListener('change', updateSmoothing);
         }
 
+        const autoStartInput = document.getElementById('global-auto-start-poll');
+        if (autoStartInput) {
+            autoStartInput.addEventListener('change', () => {
+                this.config.globalAutoStartPolling = Boolean(autoStartInput.checked);
+                this.saveConfig();
+            });
+        }
+
         const debugLoggingInput = document.getElementById('global-debug-logging');
         if (debugLoggingInput) {
           debugLoggingInput.addEventListener('change', () => {
@@ -443,83 +393,27 @@
             addSwrBtn.addEventListener('click', () => this.addSwrCard());
         }
 
-        const boardLayoutSelect = document.getElementById('global-board-layout');
-        if (boardLayoutSelect) {
-            boardLayoutSelect.addEventListener('change', () => {
-                this._applyBoardLayout(boardLayoutSelect.value, true);
-            });
-        }
-
-        const fullscreenBtn = document.getElementById('global-fullscreen-btn');
-        if (fullscreenBtn) {
-            if (this._fsChangeHandler) {
-                document.removeEventListener('fullscreenchange', this._fsChangeHandler);
-            }
-            this._fsChangeHandler = () => {
-                const btn = document.getElementById('global-fullscreen-btn');
-                if (btn) btn.textContent = document.fullscreenElement ? 'Exit Full Screen' : 'Enter Full Screen';
-            };
-            document.addEventListener('fullscreenchange', this._fsChangeHandler);
-            fullscreenBtn.addEventListener('click', () => {
-                if (document.fullscreenElement) {
-                    document.exitFullscreen();
-                } else {
-                    document.documentElement.requestFullscreen();
-                }
-            });
-        }
-
         this._applyGlobalTimingMs(timingMs, { persist: false, restartTimers: false });
-        this._applyBoardLayout(boardLayout, false);
-        this._applyCardMinWidth(cardSizeStep, false);
         this._initDragDrop();
         this._setupCanvasResizeObserver();
     };
 
     // ─── Drag-and-drop card ordering ──────────────────────────────────────────
 
-    DWMControl.prototype._saveBoardOrder = function() {
-        const board = document.getElementById('meter-board');
-        if (!board) return;
-        const meterKeys = [];
-        const swrIds    = [];
-        board.querySelectorAll('.meter-card, .swr-card').forEach(el => {
-            if (el.classList.contains('meter-card') && el.dataset.meterKey) {
-                meterKeys.push(el.dataset.meterKey);
-            } else if (el.classList.contains('swr-card') && el.dataset.swrId) {
-                swrIds.push(el.dataset.swrId);
-            }
-        });
-        this.config.meterCardOrder = meterKeys;
-        if (Array.isArray(this.config.swrCards) && swrIds.length > 0) {
-            const swrMap = new Map(this.config.swrCards.map(c => [c.id, c]));
-            this.config.swrCards = swrIds.map(id => swrMap.get(id)).filter(Boolean);
-        }
-        this.saveConfig();
-    };
-
     DWMControl.prototype._initDragDrop = function() {
         const board = document.getElementById('meter-board');
         if (!board) return;
 
-        const CARD_SEL = '.meter-card, .swr-card';
-        let dragSrcEl  = null;
         let dragSrcKey = null;
-        let dropTarget = null;
-
-        const clearIndicators = () => {
-            board.querySelectorAll('[data-drop-target]').forEach(el => el.removeAttribute('data-drop-target'));
-        };
+        let dragSrcEl  = null;
 
         board.addEventListener('dragstart', (e) => {
-            const card = e.target.closest(CARD_SEL);
+            const card = e.target.closest('.meter-card');
             if (!card) return;
-            if (e.target.closest('button, input, select, textarea, a, .meter-name-editable')) {
-                e.preventDefault();
-                return;
-            }
+            // Only start drag when the handle is the origin
+            if (!e.target.closest('.meter-drag-handle')) { e.preventDefault(); return; }
+            dragSrcKey = card.dataset.meterKey;
             dragSrcEl  = card;
-            dragSrcKey = card.dataset.meterKey || card.dataset.swrId;
             card.classList.add('meter-card-dragging');
             e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('text/plain', dragSrcKey);
@@ -527,61 +421,56 @@
 
         board.addEventListener('dragend', () => {
             if (dragSrcEl) dragSrcEl.classList.remove('meter-card-dragging');
-            clearIndicators();
-            dragSrcEl  = null;
+            board.querySelectorAll('.meter-card-drag-over').forEach(el =>
+                el.classList.remove('meter-card-drag-over')
+            );
             dragSrcKey = null;
-            dropTarget = null;
-        });
-
-        board.addEventListener('dragenter', (e) => {
-            e.preventDefault();
-            const card = e.target.closest(CARD_SEL);
-            if (!card || card === dragSrcEl) {
-                clearIndicators();
-                dropTarget = null;
-                return;
-            }
-            if (card === dropTarget) return;
-            dropTarget = card;
-            clearIndicators();
-            card.dataset.dropTarget = 'true';
+            dragSrcEl  = null;
         });
 
         board.addEventListener('dragover', (e) => {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
+            const target = e.target.closest('.meter-card');
+            board.querySelectorAll('.meter-card-drag-over').forEach(el =>
+                el.classList.remove('meter-card-drag-over')
+            );
+            if (target && target.dataset.meterKey !== dragSrcKey) {
+                target.classList.add('meter-card-drag-over');
+            }
         });
 
         board.addEventListener('dragleave', (e) => {
             if (!board.contains(e.relatedTarget)) {
-                clearIndicators();
-                dropTarget = null;
+                board.querySelectorAll('.meter-card-drag-over').forEach(el =>
+                    el.classList.remove('meter-card-drag-over')
+                );
             }
         });
 
         board.addEventListener('drop', (e) => {
             e.preventDefault();
-            const target = dropTarget;
-            clearIndicators();
-            dropTarget = null;
-            if (!target || !dragSrcEl || target === dragSrcEl) return;
+            const target = e.target.closest('.meter-card');
+            if (!target || !dragSrcKey) return;
+            const destKey = target.dataset.meterKey;
+            if (destKey === dragSrcKey) return;
 
-            // Swap the two cards in the DOM
-            const srcNext = dragSrcEl.nextSibling;
-            const tgtNext = target.nextSibling;
+            // Reorder the DOM
+            const cards = [...board.querySelectorAll('.meter-card')];
+            const srcIndex  = cards.findIndex(c => c.dataset.meterKey === dragSrcKey);
+            const destIndex = cards.findIndex(c => c.dataset.meterKey === destKey);
+            if (srcIndex < 0 || destIndex < 0) return;
 
-            if (tgtNext === dragSrcEl) {
-                // target is immediately before src
-                board.insertBefore(dragSrcEl, target);
-            } else if (srcNext === target) {
-                // src is immediately before target
-                board.insertBefore(target, dragSrcEl);
+            if (srcIndex < destIndex) {
+                board.insertBefore(dragSrcEl, target.nextSibling);
             } else {
-                board.insertBefore(dragSrcEl, tgtNext);
-                board.insertBefore(target, srcNext);
+                board.insertBefore(dragSrcEl, target);
             }
 
-            this._saveBoardOrder();
+            // Persist new order
+            const newOrder = [...board.querySelectorAll('.meter-card')].map(c => c.dataset.meterKey);
+            this.config.meterCardOrder = newOrder;
+            this.saveConfig();
         });
     };
 
@@ -616,11 +505,6 @@
 
                 let cardEl = document.querySelector(`.meter-card[data-meter-key="${CSS.escape(key)}"]`);
                 if (!cardEl) {
-                    // Load persisted card prefs into state before rendering
-                    if (!record.state) record.state = this.createMeterState();
-                    const _savedPrefs = (this.config.meterCards || {})[key] || {};
-                    if (_savedPrefs.cardLayout) record.state.cardLayout = _savedPrefs.cardLayout;
-                    if (_savedPrefs.viewMode)   record.state.viewMode   = _savedPrefs.viewMode;
                     // Insert new card
                     const html = this.renderMeterCard(record);
                     const wrapper = document.createElement('div');
@@ -630,9 +514,6 @@
                     // Apply initial layout panel visibility (handles non-default stored layouts)
                     if (record.state?.cardLayout && record.state.cardLayout !== 'dual') {
                         this._setMeterCardLayout(record.key, record.state.cardLayout);
-                    }
-                    if (record.state?.viewMode === 'history') {
-                        this._setMeterView(record.key, 'history');
                     }
                 } else {
                     // Update dynamic fields only (don't re-render — avoid losing input state)
@@ -662,10 +543,6 @@
                     refMetric: cfg.refMetric || 'avg',
                     state:     this.createSwrCardState(),
                 };
-                // Load persisted prefs from config into state
-                if (cfg.viewMode)        swrRec.state.viewMode        = cfg.viewMode;
-                if (cfg.cardLayout)      swrRec.state.cardLayout      = cfg.cardLayout;
-                if (cfg.historyWindowMs) swrRec.state.historyWindowMs = cfg.historyWindowMs;
                 swrRegistry.set(cfg.id, swrRec);
             } else {
                 // Keep config in sync (user may have renamed the source meter)
@@ -696,12 +573,11 @@
     DWMControl.prototype.renderMeterCard = function(record) {
         const sid = this.meterSafeId(record.key);
         const isConnected = record.connectionState === 'connected';
-        const badgeClass = isConnected ? 'connected' : (record.connectionState === 'disconnected' ? 'disconnected' : (record.connectionState === 'not-configured' ? 'not-configured' : 'available'));
-        const badgeText = isConnected ? 'Connected' : (record.connectionState === 'disconnected' ? 'Disconnected' : (record.connectionState === 'not-configured' ? 'Not Configured' : 'Available'));
+        const badgeClass = isConnected ? 'connected' : (record.connectionState === 'disconnected' ? 'disconnected' : 'available');
+        const badgeText = isConnected ? 'Connected' : (record.connectionState === 'disconnected' ? 'Disconnected' : 'Available');
         const portLabel = record.portPath || '-';
-        const nameLabel    = record.friendlyName || 'DWM V2';
-        const uidLabel     = record.apiUid || record.fallbackUid || '-';
-        const isMonitoring = Boolean(record.state?.monitorActive);
+        const nameLabel = record.friendlyName || 'DWM V2';
+        const uidLabel = record.apiUid || record.fallbackUid || '-';
         const gaugeMetricL = record.gaugeMetricL || 'avg';
         const gaugeMetricR = record.gaugeMetricR || 'peak';
         const gaugeDisplayL = record.gaugeDisplayL || 'gauge';
@@ -729,12 +605,15 @@
     <span class="meter-drag-handle" title="Drag to reorder">&#8942;</span>
     <div class="meter-card-identity">
       <span class="meter-card-name meter-name-editable" id="meter-${sid}-header-name" title="Click to rename">${nameLabel}</span>
+      <span class="meter-chip meter-chip-uid" id="meter-${sid}-header-uid">${uidLabel}</span>
+      <span class="meter-chip meter-chip-port">${portLabel}</span>
     </div>
     <div class="meter-card-header-right">
-      <button class="btn btn-small meter-connect-btn meter-connect-btn-${badgeClass}" id="meter-${sid}-connect-btn" data-meter-action="${isConnected ? 'disconnect' : 'connect'}">${badgeText}</button>
+      <span class="meter-badge meter-badge-${badgeClass}" id="meter-${sid}-badge">${badgeText}</span>
+      <button class="btn btn-primary btn-small" data-meter-action="connect" ${isConnected ? 'disabled' : ''}>Connect</button>
+      <button class="btn btn-secondary btn-small" data-meter-action="disconnect" ${!isConnected ? 'disabled' : ''}>Disconnect</button>
       <button class="btn btn-secondary btn-small" data-meter-action="check-updates" ${!isConnected ? 'disabled' : ''}>Check Updates</button>
-      <button class="btn btn-secondary btn-small" data-meter-action="identify-meter" ${!isConnected ? 'disabled' : ''}>Identify</button>
-      <button class="btn btn-secondary btn-small meter-cfg-toggle-btn" data-meter-action="toggle-cfg" title="Element configuration">&#9881;</button>
+            <button class="btn btn-secondary btn-small" data-meter-action="identify-meter" ${!isConnected ? 'disabled' : ''}>Identify</button>
     </div>
   </div>
 
@@ -755,19 +634,23 @@
           <option value="wide-right"${cardLayout === 'wide-right' ? ' selected' : ''}>Wide Right</option>
           <option value="stacked"${cardLayout === 'stacked'    ? ' selected' : ''}>Stacked</option>
         </select>
-        <div class="meter-chart-actions" style="display:none">
+        <div class="meter-chart-actions">
                     <button class="btn btn-secondary btn-small" data-meter-action="export-history">Export Data</button>
         </div>
       </div>
+      <div class="meter-poll-controls">
+        <button class="btn btn-primary btn-small" data-meter-action="start-poll" ${!isConnected ? 'disabled' : ''}>Start Poll</button>
+        <button class="btn btn-text btn-small" data-meter-action="stop-poll" disabled>Stop</button>
+      </div>
     </div>
-    <div class="meter-elem-info-bar" id="meter-${sid}-elem-info-bar" style="display:none">
+    <div class="meter-elem-info-bar" id="meter-${sid}-elem-info-bar">
             <div class="meter-elem-inline-group meter-elem-profile-group">
                 <span class="meter-elem-inline-label">Element Profile</span>
                 <select id="meter-${sid}-cfg-elem" class="form-select form-select-sm">${this._renderElementProfileOptions(record, selectedElem)}</select>
                 <button class="btn btn-secondary btn-small" data-meter-action="refresh-element-profiles" ${!isConnected ? 'disabled' : ''}>Refresh Elements</button>
             </div>
             <div class="meter-elem-inline-group">
-                <span class="meter-elem-inline-label">Rating</span>
+                <span class="meter-elem-inline-label">Current Rating</span>
                 <select id="meter-${sid}-cfg-eval" class="form-select form-select-sm">${this._renderElementRatingOptions(selectedEval)}</select>
             </div>
             <div class="meter-elem-inline-group">
@@ -781,7 +664,6 @@
                     <option value="1"${selectedRangeCfg === 1 ? ' selected' : ''}>4x</option>
                 </select>
             </div>
-            <button class="btn btn-secondary btn-small" data-meter-action="more-info">More Info</button>
     </div>
     <div class="meter-gauges-view" id="meter-${sid}-gauges-view" data-layout="${cardLayout}">
       <div class="meter-gauge-radial-pair">
@@ -857,12 +739,13 @@
     <span id="meter-${sid}-inst" style="display:none"></span>
   </div>
 
-  <dialog class="meter-detail-dialog" id="meter-${sid}-detail">
-    <div class="meter-detail-dialog-header">
-      <span class="meter-detail-dialog-title">${nameLabel}</span>
-      <button class="btn btn-text meter-detail-dialog-close" data-meter-action="close-more-info">&#10005;</button>
-    </div>
-    <div class="meter-detail-dialog-body">
+  <div class="meter-card-expand-row">
+    <button class="btn btn-text btn-small meter-expand-btn" data-meter-action="toggle-expand">
+      <span class="meter-expand-label">Show Details</span>
+    </button>
+  </div>
+
+  <div class="meter-card-detail" id="meter-${sid}-detail" style="display:none">
 
     <div id="meter-${sid}-status" class="control-status-banner warning">
       ${isConnected ? 'Connected. Use Refresh All or individual actions to query the device.' : 'Connect to this meter to use the control API.'}
@@ -870,7 +753,6 @@
 
     <div class="meter-detail-toolbar">
       <button class="btn btn-primary btn-small" data-meter-action="refresh-all" ${!isConnected ? 'disabled' : ''}>Refresh All</button>
-      <button class="btn ${isMonitoring ? 'btn-danger' : 'btn-secondary'} btn-small" id="meter-${sid}-poll-toggle-btn" data-meter-action="toggle-poll" ${!isConnected ? 'disabled' : ''}>${isMonitoring ? 'Stop Polling' : 'Start Polling'}</button>
     </div>
 
     <div class="meter-detail-section">
@@ -944,8 +826,7 @@
       <textarea id="meter-${sid}-debug" class="control-debug-console" readonly></textarea>
     </div>
 
-    </div>
-  </dialog>
+  </div>
 </div>`;
     };
 
@@ -1043,7 +924,7 @@
         ].map(([ms, label]) => `<option value="${ms}"${histWindowMs === ms ? ' selected' : ''}>${label}</option>`).join('');
 
         return `
-<div class="swr-card" data-swr-id="${id}" id="swr-card-${sid}" draggable="true">
+<div class="swr-card" data-swr-id="${id}" id="swr-card-${sid}">
   <div class="swr-card-header">
     <span class="meter-drag-handle" title="Drag to reorder">&#8942;</span>
     <div class="swr-card-title-area">
@@ -1105,41 +986,43 @@
       </div>
     </div>
     <div class="swr-derived-chips">
-      <div class="swr-chips-group">
-        <div class="swr-chip swr-chip-swr">
-          <span class="swr-chip-label">SWR</span>
-          <span id="swr-${sid}-val-swr" class="swr-chip-value">—</span>
-        </div>
-        <div class="swr-chip swr-chip-rl">
-          <span class="swr-chip-label">Return Loss</span>
-          <span id="swr-${sid}-val-rl" class="swr-chip-value">—</span>
-        </div>
-        <div class="swr-chip swr-chip-fwd">
-          <span class="swr-chip-label">Forward</span>
-          <span id="swr-${sid}-val-fwd" class="swr-chip-value">—</span>
-        </div>
-        <div class="swr-chip swr-chip-ref">
-          <span class="swr-chip-label">Reflected</span>
-          <span id="swr-${sid}-val-ref" class="swr-chip-value">—</span>
-        </div>
-        <div class="swr-chip swr-chip-best">
-          <span class="swr-chip-label">BEST SWR</span>
-          <span id="swr-${sid}-val-best-swr" class="swr-chip-value swr-chip-best-val">—</span>
-        </div>
-        <div class="swr-chip swr-chip-best-rl">
-          <span class="swr-chip-label">BEST RL</span>
-          <span id="swr-${sid}-val-best-rl" class="swr-chip-value swr-chip-best-val">—</span>
-        </div>
-        <div class="swr-chip swr-chip-worst">
-          <span class="swr-chip-label">WORST SWR</span>
-          <span id="swr-${sid}-val-worst-swr" class="swr-chip-value swr-chip-worst-val">—</span>
-        </div>
-        <div class="swr-chip swr-chip-worst-rl">
-          <span class="swr-chip-label">WORST RL</span>
-          <span id="swr-${sid}-val-worst-rl" class="swr-chip-value swr-chip-worst-val">—</span>
-        </div>
+      <div class="swr-chip swr-chip-swr">
+        <span class="swr-chip-label">SWR</span>
+        <span id="swr-${sid}-val-swr" class="swr-chip-value">—</span>
       </div>
-      <button class="btn btn-danger btn-small swr-bw-reset-btn" data-swr-id="${id}" data-swr-action="reset-best-worst" title="Reset BEST / WORST to current reading">STAT<br>Reset</button>
+      <div class="swr-chip swr-chip-rl">
+        <span class="swr-chip-label">Return Loss</span>
+        <span id="swr-${sid}-val-rl" class="swr-chip-value">—</span>
+      </div>
+      <div class="swr-chip swr-chip-gamma">
+        <span class="swr-chip-label">&#x393; Refl. Coeff.</span>
+        <span id="swr-${sid}-val-gamma" class="swr-chip-value">—</span>
+      </div>
+      <div class="swr-chip swr-chip-fwd">
+        <span class="swr-chip-label">Forward</span>
+        <span id="swr-${sid}-val-fwd" class="swr-chip-value">—</span>
+      </div>
+      <div class="swr-chip swr-chip-ref">
+        <span class="swr-chip-label">Reflected</span>
+        <span id="swr-${sid}-val-ref" class="swr-chip-value">—</span>
+      </div>
+      <div class="swr-chip swr-chip-best">
+        <span class="swr-chip-label">BEST SWR</span>
+        <span id="swr-${sid}-val-best-swr" class="swr-chip-value swr-chip-best-val">—</span>
+      </div>
+      <div class="swr-chip swr-chip-best-rl">
+        <span class="swr-chip-label">BEST RL</span>
+        <span id="swr-${sid}-val-best-rl" class="swr-chip-value swr-chip-best-val">—</span>
+      </div>
+      <div class="swr-chip swr-chip-worst">
+        <span class="swr-chip-label">WORST SWR</span>
+        <span id="swr-${sid}-val-worst-swr" class="swr-chip-value swr-chip-worst-val">—</span>
+      </div>
+      <div class="swr-chip swr-chip-worst-rl">
+        <span class="swr-chip-label">WORST RL</span>
+        <span id="swr-${sid}-val-worst-rl" class="swr-chip-value swr-chip-worst-val">—</span>
+      </div>
+      <button class="btn btn-danger btn-small swr-bw-reset-btn" data-swr-id="${id}" data-swr-action="reset-best-worst" title="Reset BEST / WORST to current reading">STAT Reset</button>
     </div>
   </div>
 
