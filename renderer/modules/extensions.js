@@ -52,7 +52,7 @@
                     isCheckingForUpdates = false;
                     isDownloadingUpdate = false;
                     updateButton.classList.add('available');
-                    updateText.textContent = label || 'Download Update';
+                    updateText.textContent = label || 'Update Available';
                     break;
                 case 'downloading':
                     isCheckingForUpdates = false;
@@ -97,11 +97,7 @@
             updateInfo = info;
             manualCheckRequested = false;
             setButtonState('available');
-            this.appendOutput(` Update available: v${info.version}`);
-
-            if (window.confirm(`Version ${info.version} is available. Download and install it?`)) {
-                updateButton.click();
-            }
+            this.appendOutput(` Update available: v${info.version}. Click "Update Available" to install.`);
         });
 
         window.electronAPI.onUpdateNotAvailable(() => {
@@ -195,6 +191,9 @@
                     }, 12000);
                 }
             } else if (updateInfo) {
+                if (!window.confirm(`Version ${updateInfo.version} is available.\n\nDownload and install now?`)) {
+                    return;
+                }
                 setButtonState('downloading');
                 this.appendOutput(' Downloading update...');
                 const result = await window.electronAPI.downloadUpdate();

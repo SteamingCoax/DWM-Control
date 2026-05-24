@@ -183,16 +183,21 @@
     DWMControl.prototype._drawSemiRadialGauge = function(canvas, pct, valStr, metricLabel, scaleMax) {
         if (!canvas) return;
 
-        const TRACK_W  = 14;
-        const PAD_SIDE = 110;   // horizontal inset; keeps tick labels clear of canvas edges
-        const PAD_TOP  = 80;
-        const DIG_H    = 110;
-        const BOT_PAD  = 6;
+        const BOT_PAD = 6;
 
+        // Derive canvas width first, then scale all layout constants proportionally.
+        // Reference width: 420 px (the size at which the original constants were designed).
         const sizeProbe = this._getCachedCanvasSize(canvas, 300, 140);
         if (!sizeProbe) return;
-        const cssW   = sizeProbe.cssW;
-        const radius = Math.max(30, Math.floor((cssW - PAD_SIDE * 2) / 2));
+        const cssW = sizeProbe.cssW;
+        const sc   = Math.max(0.5, cssW / 420);
+
+        const TRACK_W  = Math.max(6,  Math.round(14  * sc));
+        const PAD_SIDE = Math.round(cssW * 0.200);   // keeps tick labels clear; ≈ 84 px at 420 px
+        const PAD_TOP  = Math.max(14, Math.round(52  * sc));
+        const DIG_H    = Math.max(26, Math.round(72  * sc));
+
+        const radius = Math.max(20, Math.floor((cssW - PAD_SIDE * 2) / 2));
         const cx     = cssW / 2;
         const cy     = PAD_TOP + TRACK_W / 2 + radius;
         const fallbackCssH = cy + 14 + DIG_H + BOT_PAD;
@@ -269,6 +274,8 @@
         };
 
         // ── Fine ticks at every 2.5% of FS (no labels, skip positions already covered by 10% ticks)
+        const fineTick5  = Math.max(4, Math.round(10 * sc));
+        const fineTick25 = Math.max(3, Math.round(6  * sc));
         for (let j = 1; j < 40; j++) {
             if (j % 4 === 0) continue; // 10% positions are drawn with labels below
             const p     = j / 40;
@@ -276,7 +283,7 @@
             const cosA  = Math.cos(angle);
             const sinA  = Math.sin(angle);
             const r1    = outerEdge + 2;
-            const r2    = outerEdge + (j % 2 === 0 ? 10 : 6); // 5% ticks slightly longer than 2.5% ticks
+            const r2    = outerEdge + (j % 2 === 0 ? fineTick5 : fineTick25);
             ctx.beginPath();
             ctx.moveTo(cx + cosA * r1, cy + sinA * r1);
             ctx.lineTo(cx + cosA * r2, cy + sinA * r2);
@@ -286,13 +293,16 @@
             ctx.stroke();
         }
 
+        const majTickLen    = Math.max(10, Math.round(19 * sc));
+        const minTickLen    = Math.max(7,  Math.round(12 * sc));
+        const tickLabelGap  = Math.max(3,  Math.round(5  * sc));
         for (let i = 0; i <= 10; i++) {
             const p     = i / 10;
             const angle = aAt(p);
             const cosA  = Math.cos(angle);
             const sinA  = Math.sin(angle);
             const isMaj = (i % 5 === 0);
-            const tLen  = isMaj ? 19 : 12;
+            const tLen  = isMaj ? majTickLen : minTickLen;
             const r1    = outerEdge + 2;
             const r2    = outerEdge + tLen;
 
@@ -300,13 +310,13 @@
             ctx.moveTo(cx + cosA * r1, cy + sinA * r1);
             ctx.lineTo(cx + cosA * r2, cy + sinA * r2);
             ctx.strokeStyle = isMaj ? pal.tickMaj : pal.tickMin;
-            ctx.lineWidth   = isMaj ? 2.5 : 1.5;
+            ctx.lineWidth   = isMaj ? Math.max(1.5, 2.5 * sc) : Math.max(1, 1.5 * sc);
             ctx.lineCap     = 'round';
             ctx.stroke();
 
-            const lx     = cx + cosA * (r2 + 5);
-            const ly     = cy + sinA * (r2 + 5);
-            const fSize  = isMaj ? 30 : 27;
+            const lx     = cx + cosA * (r2 + tickLabelGap);
+            const ly     = cy + sinA * (r2 + tickLabelGap);
+            const fSize  = isMaj ? Math.max(9, Math.round(22 * sc)) : Math.max(7, Math.round(17 * sc));
             ctx.fillStyle    = pal.zoneLabel(p);
             ctx.font         = `bold ${fSize}px monospace`;
             ctx.textAlign    = cosA < -0.12 ? 'right' : cosA > 0.12 ? 'left' : 'center';
@@ -327,15 +337,15 @@
         ctx.moveTo(cx - nCosA * tailR, cy - nSinA * tailR);
         ctx.lineTo(cx + nCosA * nLen,  cy + nSinA * nLen);
         ctx.strokeStyle = pal.needle;
-        ctx.lineWidth   = 2.5;
+        ctx.lineWidth   = Math.max(1.5, 2.5 * sc);
         ctx.lineCap     = 'round';
         ctx.stroke();
         ctx.shadowBlur  = 0;
 
         // ── Pivot bearing
-        ctx.beginPath(); ctx.arc(cx, cy, 9,   0, Math.PI * 2); ctx.fillStyle = pal.pivotOuter; ctx.fill();
-        ctx.beginPath(); ctx.arc(cx, cy, 5.5, 0, Math.PI * 2); ctx.fillStyle = pal.pivotMid;   ctx.fill();
-        ctx.beginPath(); ctx.arc(cx, cy, 2,   0, Math.PI * 2); ctx.fillStyle = pal.pivotInner; ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, Math.max(4,   Math.round(9   * sc)), 0, Math.PI * 2); ctx.fillStyle = pal.pivotOuter; ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, Math.max(2.5, 5.5 * sc),              0, Math.PI * 2); ctx.fillStyle = pal.pivotMid;   ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, Math.max(1,   2   * sc),              0, Math.PI * 2); ctx.fillStyle = pal.pivotInner; ctx.fill();
 
         // ── Digital readout strip below pivot
         const digTop = cy + 14;
@@ -352,17 +362,27 @@
             ctx.moveTo(6, digTop); ctx.lineTo(cssW - 6, digTop);
             ctx.stroke();
 
+            const metricFS = Math.max(11, Math.min(Math.round(34 * sc), Math.floor(digH * 0.35)));
             ctx.fillStyle    = pal.zoneColor(pct);
-            ctx.font         = 'bold 41px sans-serif';
+            ctx.font         = `bold ${metricFS}px sans-serif`;
             ctx.textAlign    = 'center';
             ctx.textBaseline = 'top';
-            ctx.fillText(metricLabel, cx, digTop + 4);
+            const labelTop = digTop + Math.round(4 * sc);
+            ctx.fillText(metricLabel, cx, labelTop);
+            const labelBot = labelTop + metricFS;
 
-            const valFS = Math.max(21, Math.min(42, Math.floor((cssW - 20) / Math.max(valStr.length, 1) * 0.65)));
+            // Font sized from scale factor only (not current value length) so both gauges
+            // in a dual layout always match. Width-capped to the longest possible string.
+            const refStr = (this.formatPowerWithClip && Number.isFinite(scaleMax))
+                ? this.formatPowerWithClip(scaleMax, scaleMax) : '';
+            const refLen    = Math.max(refStr.length, 6);
+            const valFSMaxW = Math.floor((cssW - 20) / refLen * 1.1);
+            const valSpace  = digTop + digH - labelBot;
+            const valFS     = Math.max(Math.round(14 * sc), Math.min(Math.round(64 * sc), valFSMaxW, Math.floor(valSpace * 0.78)));
             ctx.fillStyle    = pal.readout;
             ctx.font         = `bold ${valFS}px monospace`;
             ctx.textBaseline = 'middle';
-            ctx.fillText(valStr, cx, digTop + digH * 0.74);
+            ctx.fillText(valStr, cx, labelBot + valSpace * 0.52);
         }
 
         ctx.restore();
@@ -402,13 +422,14 @@
         ctx.lineWidth = 1;
         ctx.strokeRect(0.5, 0.5, cssW - 1, cssH - 1);
 
+        const sc = Math.max(0.5, cssW / 420);
         ctx.fillStyle = pal.zoneColor(pct);
-        ctx.font = 'bold 36px sans-serif';
+        ctx.font = `bold ${Math.max(11, Math.round(36 * sc))}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
-        ctx.fillText(metricLabel, cssW / 2, 12);
+        ctx.fillText(metricLabel, cssW / 2, Math.round(12 * sc));
 
-        const valueFS = Math.max(47, Math.min(109, Math.floor((cssW - 18) / Math.max(valStr.length, 1) * 1.6)));
+        const valueFS = Math.max(Math.round(29 * sc), Math.min(Math.round(109 * sc), Math.floor((cssW - 18) / Math.max(valStr.length, 1) * 1.6)));
         ctx.fillStyle = pal.readout;
         ctx.font = `bold ${valueFS}px monospace`;
         ctx.textBaseline = 'middle';
@@ -428,16 +449,21 @@
     DWMControl.prototype._drawSwrGauge = function(canvas, pct, valStr, metricLabel, tickDefs, zoneOpts, overlayMsg) {
         if (!canvas) return;
 
-        const TRACK_W  = 14;
-        const PAD_SIDE = 140;
-        const PAD_TOP  = 80;
-        const DIG_H    = 110;
-        const BOT_PAD  = 6;
+        const BOT_PAD = 6;
 
+        // Derive canvas width first, then scale all layout constants proportionally.
+        // Reference width: 420 px (the size at which the original constants were designed).
         const sizeProbe = this._getCachedCanvasSize(canvas, 300, 140);
         if (!sizeProbe) return;
         const cssW = sizeProbe.cssW;
-        const radius = Math.max(30, Math.floor((cssW - PAD_SIDE * 2) / 2));
+        const sc   = Math.max(0.5, cssW / 420);
+
+        const TRACK_W  = Math.max(6,  Math.round(14  * sc));
+        const PAD_SIDE = Math.round(cssW * 0.265);   // wider than power gauge for SWR tick labels; ≈ 111 px at 420 px
+        const PAD_TOP  = Math.max(14, Math.round(52  * sc));
+        const DIG_H    = Math.max(26, Math.round(72  * sc));
+
+        const radius = Math.max(20, Math.floor((cssW - PAD_SIDE * 2) / 2));
         const cx     = cssW / 2;
         const cy     = PAD_TOP + TRACK_W / 2 + radius;
         const fallbackCssH = cy + 14 + DIG_H + BOT_PAD;
@@ -519,7 +545,7 @@
             const cosA  = Math.cos(angle);
             const sinA  = Math.sin(angle);
             const isMaj = !!td.major;
-            const tLen  = isMaj ? 19 : 12;
+            const tLen  = isMaj ? Math.max(10, Math.round(19 * sc)) : Math.max(7, Math.round(12 * sc));
             const r1    = outerEdge + 2;
             const r2    = outerEdge + tLen;
 
@@ -527,14 +553,15 @@
             ctx.moveTo(cx + cosA * r1, cy + sinA * r1);
             ctx.lineTo(cx + cosA * r2, cy + sinA * r2);
             ctx.strokeStyle = isMaj ? pal.tickMaj : pal.tickMin;
-            ctx.lineWidth   = isMaj ? 2.5 : 1.5;
+            ctx.lineWidth   = isMaj ? Math.max(1.5, 2.5 * sc) : Math.max(1, 1.5 * sc);
             ctx.lineCap     = 'round';
             ctx.stroke();
 
             if (td.label) {
-                const lx     = cx + cosA * (r2 + 5);
-                const ly     = cy + sinA * (r2 + 5);
-                const fSize  = isMaj ? 30 : 27;
+                const tickLabelGap = Math.max(3, Math.round(5 * sc));
+                const lx     = cx + cosA * (r2 + tickLabelGap);
+                const ly     = cy + sinA * (r2 + tickLabelGap);
+                const fSize  = isMaj ? Math.max(9, Math.round(22 * sc)) : Math.max(7, Math.round(17 * sc));
                 ctx.fillStyle    = pal.zoneLabel(p);
                 ctx.font         = `bold ${fSize}px monospace`;
                 ctx.textAlign    = cosA < -0.12 ? 'right' : cosA > 0.12 ? 'left' : 'center';
@@ -556,15 +583,15 @@
         ctx.moveTo(cx - nCosA * tailR, cy - nSinA * tailR);
         ctx.lineTo(cx + nCosA * nLen,  cy + nSinA * nLen);
         ctx.strokeStyle = pal.needle;
-        ctx.lineWidth   = 2.5;
+        ctx.lineWidth   = Math.max(1.5, 2.5 * sc);
         ctx.lineCap     = 'round';
         ctx.stroke();
         ctx.shadowBlur  = 0;
 
         // ── Pivot
-        ctx.beginPath(); ctx.arc(cx, cy, 9,   0, Math.PI * 2); ctx.fillStyle = pal.pivotOuter; ctx.fill();
-        ctx.beginPath(); ctx.arc(cx, cy, 5.5, 0, Math.PI * 2); ctx.fillStyle = pal.pivotMid;   ctx.fill();
-        ctx.beginPath(); ctx.arc(cx, cy, 2,   0, Math.PI * 2); ctx.fillStyle = pal.pivotInner; ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, Math.max(4,   Math.round(9   * sc)), 0, Math.PI * 2); ctx.fillStyle = pal.pivotOuter; ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, Math.max(2.5, 5.5 * sc),              0, Math.PI * 2); ctx.fillStyle = pal.pivotMid;   ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, Math.max(1,   2   * sc),              0, Math.PI * 2); ctx.fillStyle = pal.pivotInner; ctx.fill();
 
         // ── Overlay message (e.g. "No FWD Power") — drawn in arc center, hides needle area
         if (overlayMsg) {
@@ -593,17 +620,24 @@
             ctx.moveTo(6, digTop); ctx.lineTo(cssW - 6, digTop);
             ctx.stroke();
 
+            const metricFS = Math.max(11, Math.min(Math.round(34 * sc), Math.floor(digH * 0.35)));
             ctx.fillStyle    = pal.zoneColor(pct);
-            ctx.font         = 'bold 41px sans-serif';
+            ctx.font         = `bold ${metricFS}px sans-serif`;
             ctx.textAlign    = 'center';
             ctx.textBaseline = 'top';
-            ctx.fillText(metricLabel, cx, digTop + 4);
+            const labelTop = digTop + Math.round(4 * sc);
+            ctx.fillText(metricLabel, cx, labelTop);
+            const labelBot = labelTop + metricFS;
 
-            const valFS = Math.max(21, Math.min(42, Math.floor((cssW - 20) / Math.max(valStr.length, 1) * 0.65)));
+            // SWR/RL max string ~7 chars (e.g. "10.00:1", "≥ 50 dB"); size from sc only for consistency
+            const refLen    = 7;
+            const valFSMaxW = Math.floor((cssW - 20) / refLen * 1.1);
+            const valSpace  = digTop + digH - labelBot;
+            const valFS     = Math.max(Math.round(14 * sc), Math.min(Math.round(64 * sc), valFSMaxW, Math.floor(valSpace * 0.78)));
             ctx.fillStyle    = pal.readout;
             ctx.font         = `bold ${valFS}px monospace`;
             ctx.textBaseline = 'middle';
-            ctx.fillText(valStr, cx, digTop + digH * 0.74);
+            ctx.fillText(valStr, cx, labelBot + valSpace * 0.52);
         }
 
         ctx.restore();

@@ -290,8 +290,8 @@
         const val = inputEl.value.trim();
         if (!val) { this.setMeterStatus(key, `Enter a value for ${cfgKey} before setting.`, 'warning'); return; }
         try {
-            // cfg.set key=eval and key=etype require elem to identify which element to update
-            const cmdFields = { key: cfgKey, val };
+            // cfg.set key=eval and key=etype require elem before val to identify which element to update
+            let cmdFields;
             if (cfgKey === 'eval' || cfgKey === 'etype') {
                 const record = this.meterRegistry.get(key);
                 const activeElem = Number.parseInt(record?.elementId, 10);
@@ -299,7 +299,9 @@
                     this.setMeterStatus(key, `Cannot set ${cfgKey}: no element selected.`, 'warning');
                     return;
                 }
-                cmdFields.elem = activeElem;
+                cmdFields = { key: cfgKey, elem: activeElem, val };
+            } else {
+                cmdFields = { key: cfgKey, val };
             }
             const response = await this.sendApiCommand(key, 'cfg.set', cmdFields);
             const sid = this.meterSafeId(key);
@@ -793,12 +795,11 @@
 
     DWMControl.prototype._updateSwrChips = function(sid, metrics, state) {
         const setChip = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
-        const fmtSwr = v => (v === null || v === undefined) ? '—' : (v >= 999 ? '∞' : `${v.toFixed(2)}:1`);
+        const fmtSwr = v => (v === null || v === undefined) ? '—' : (v >= 999 ? '∞' : `${v.toFixed(1)}:1`);
         const fmtRl  = v => (v === null || v === undefined) ? '—' : (v >= 60  ? '≥ 60 dB' : `${v.toFixed(1)} dB`);
         if (!metrics) {
             setChip(`swr-${sid}-val-swr`,   '—');
             setChip(`swr-${sid}-val-rl`,    '—');
-            setChip(`swr-${sid}-val-gamma`, '—');
             setChip(`swr-${sid}-val-fwd`,   '—');
             setChip(`swr-${sid}-val-ref`,   '—');
             // Keep best/worst chips if state exists
@@ -814,9 +815,8 @@
         const rlStr  = fmtRl(metrics.rl);
         setChip(`swr-${sid}-val-swr`,   swrStr);
         setChip(`swr-${sid}-val-rl`,    rlStr);
-        setChip(`swr-${sid}-val-gamma`, metrics.gamma.toFixed(4));
-        setChip(`swr-${sid}-val-fwd`,   this.formatPower(metrics.fwdW));
-        setChip(`swr-${sid}-val-ref`,   this.formatPower(metrics.refW));
+        setChip(`swr-${sid}-val-fwd`,   this.formatPower(metrics.fwdW, 1));
+        setChip(`swr-${sid}-val-ref`,   this.formatPower(metrics.refW, 1));
         if (state) {
             setChip(`swr-${sid}-val-best-swr`,  fmtSwr(state.bestSwr));
             setChip(`swr-${sid}-val-best-rl`,   fmtRl(state.bestRl));

@@ -300,9 +300,10 @@
   <div class="meter-fw-update-info">
     <span class="meter-fw-update-icon">&#x2B06;</span>
     <span class="meter-fw-update-text">Firmware update available &mdash; <strong>Latest: v${latestVerStr}</strong> &nbsp;(installed: v${deviceVerStr})</span>
+    <button class="btn btn-icon meter-fw-dismiss-btn" data-meter-action="dismiss-fw-notice" title="Dismiss">&times;</button>
   </div>
   <div class="meter-fw-update-actions">
-    <button class="btn btn-warning btn-small" data-meter-action="enter-dfu-from-update">Enter DFU Mode</button>
+    <button class="btn btn-warning btn-small" data-meter-action="enter-dfu-from-update">Enter DFU Mode &amp; Update Firmware</button>
   </div>
   <p class="meter-fw-update-note">&#x26A0; A manual power cycle (turn the meter off and on) is required after the firmware update completes.</p>
 </div>`;
@@ -695,9 +696,17 @@
                 const btnView = btn.dataset.meterAction === 'view-meters' ? 'meters' : 'history';
                 btn.classList.toggle('active', btnView === view);
             });
+            const chartActions = cardEl.querySelector('.meter-chart-actions');
+            if (chartActions) chartActions.style.display = view === 'history' ? '' : 'none';
         }
 
         if (view === 'history') this._drawMeterHistory(key);
+
+        // Persist view preference
+        if (!this.config.meterCards) this.config.meterCards = {};
+        if (!this.config.meterCards[key]) this.config.meterCards[key] = {};
+        this.config.meterCards[key].viewMode = view;
+        this.saveConfig();
     };
 
     DWMControl.prototype._setMeterCardLayout = function(key, layout) {
@@ -705,6 +714,11 @@
         if (!record?.state) return;
         record.state.cardLayout = layout;
 
+        // Persist layout preference
+        if (!this.config.meterCards) this.config.meterCards = {};
+        if (!this.config.meterCards[key]) this.config.meterCards[key] = {};
+        this.config.meterCards[key].cardLayout = layout;
+        this.saveConfig();
         const sid        = this.meterSafeId(key);
         const gaugesView = document.getElementById(`meter-${sid}-gauges-view`);
         if (gaugesView) gaugesView.dataset.layout = layout;
@@ -726,11 +740,21 @@
             panelR.style.display = showR ? '' : 'none';
         }
 
-        // Force gauge repaint at new size
+        // Force gauge repaint at new size — double rAF ensures CSS layout has settled
+        // before we measure canvas dimensions (single rAF can still read stale sizes).
         const liveRecord = this.meterRegistry.get(key);
-        if (liveRecord?.state?.lastSnapshotResponse) {
-            requestAnimationFrame(() => this._updateMeterGauges(key, liveRecord.state.lastSnapshotResponse));
-        }
+        requestAnimationFrame(() => {
+            // Bust the cached canvas size so _getCachedCanvasSize re-measures
+            if (gaugesView) {
+                gaugesView.querySelectorAll('canvas').forEach(c => {
+                    delete c.dataset.cssWidth;
+                    delete c.dataset.cssHeight;
+                });
+            }
+            if (liveRecord?.state?.lastSnapshotResponse) {
+                requestAnimationFrame(() => this._updateMeterGauges(key, liveRecord.state.lastSnapshotResponse));
+            }
+        });
     };
 
     DWMControl.prototype._setSwrCardLayout = function(id, layout) {
@@ -739,6 +763,9 @@
         if (!rec?.state) return;
         rec.state.cardLayout = layout;
 
+        // Persist layout preference
+        const swrCfg = (this.config.swrCards || []).find(c => c.id === id);
+        if (swrCfg) { swrCfg.cardLayout = layout; this.saveConfig(); }
         const sid        = this.swrSafeId(id);
         const gaugesView = document.getElementById(`swr-${sid}-gauges-view`);
         if (gaugesView) gaugesView.dataset.layout = layout;
@@ -753,10 +780,18 @@
             rlPanel.style.display  = showRl  ? '' : 'none';
         }
 
-        // Force gauge repaint at new size using the fwd meter key
+        // Force gauge repaint at new size — double rAF ensures CSS layout has settled.
         const fwdKey = rec.fwdKey;
-        if (fwdKey && rec.state.lastComputed) {
-            requestAnimationFrame(() => this._updateSwrCardsForMeter(fwdKey));
-        }
+        requestAnimationFrame(() => {
+            if (gaugesView) {
+                gaugesView.querySelectorAll('canvas').forEach(c => {
+                    delete c.dataset.cssWidth;
+                    delete c.dataset.cssHeight;
+                });
+            }
+            if (fwdKey && rec.state.lastComputed) {
+                requestAnimationFrame(() => this._updateSwrCardsForMeter(fwdKey));
+            }
+        });
     };
 })();

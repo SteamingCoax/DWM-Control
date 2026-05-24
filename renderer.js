@@ -471,8 +471,8 @@ class DWMControl {
             meterPorts.forEach((port) => {
                 const record = this.upsertMeterRecordFromPort(port);
                 activeKeys.add(record.key);
-                // Only reset to 'available' if not currently connected or manually disconnected
-                if (record.connectionState !== 'connected' && record.connectionState !== 'disconnected') {
+                // Only reset to 'available' if not currently connected, manually disconnected, or flagged as not-configured
+                if (record.connectionState !== 'connected' && record.connectionState !== 'disconnected' && record.connectionState !== 'not-configured') {
                     record.connectionState = 'available';
                 }
             });

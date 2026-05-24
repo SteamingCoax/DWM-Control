@@ -97,12 +97,13 @@
                 el.setSelectionRange(Math.min(pos, clean.length), Math.min(pos, clean.length));
             }
 
-            // Update header name immediately (optimistic)
+            // Update header name immediately (optimistic) and keep record in sync
             const sid = this.meterSafeId(key);
             const headerNameEl = document.getElementById(`meter-${sid}-header-name`);
             if (headerNameEl && !headerNameEl.querySelector('.meter-name-inline-input')) {
                 headerNameEl.textContent = clean || record.friendlyName || 'DWM V2';
             }
+            record.friendlyName = clean || record.friendlyName;
 
             if (record.connectionState !== 'connected') return;
 
@@ -142,6 +143,8 @@
                     const rec = this._getSwrRegistry().get(swrId);
                     if (rec?.state) rec.state.viewMode = sel.value;
                     if (isHistory) this._drawSwrHistory(swrId);
+                    // Persist view preference
+                    if (cfg) { cfg.viewMode = sel.value; this.saveConfig(); }
                     return;
                 }
 
@@ -158,6 +161,8 @@
                             rec.state.historyWindowMs = ms;
                             this._drawSwrHistory(swrId);
                         }
+                        // Persist historyRange preference
+                        if (Number.isFinite(ms) && ms > 0) { cfg.historyWindowMs = ms; this.saveConfig(); }
                     } else if (field === 'metric') {
                         cfg.fwdMetric = sel.value || 'avg';
                         cfg.refMetric = sel.value || 'avg';
@@ -446,7 +451,8 @@
             case 'connect': this.connectMeter(key); break;
             case 'disconnect': this.disconnectMeter(key); break;
             case 'identify-meter': this.identifyMeter(key); break;
-            case 'toggle-expand': this._toggleMeterExpand(key); break;
+            case 'more-info': this._openMeterMoreInfo(key); break;
+            case 'close-more-info': this._closeMeterMoreInfo(key); break;
             case 'view-meters': this._setMeterView(key, 'meters'); break;
             case 'view-history': this._setMeterView(key, 'history'); break;
             case 'layout-dual':       this._setMeterCardLayout(key, 'dual');       break;
@@ -461,19 +467,44 @@
             case 'save-name': this.saveDeviceName(key); break;
             case 'refresh-commands': this.refreshSupportedCommands(key); break;
             case 'refresh-element-profiles': this.refreshElementProfiles(key); break;
+            case 'toggle-cfg': {
+                const sid = this.meterSafeId(key);
+                const bar = document.getElementById(`meter-${sid}-elem-info-bar`);
+                if (!bar) break;
+                const isOpen = bar.style.display !== 'none';
+                bar.style.display = isOpen ? 'none' : '';
+                const toggleBtn = document.querySelector(`[data-meter-key="${key}"] [data-meter-action="toggle-cfg"]`);
+                if (toggleBtn) toggleBtn.classList.toggle('active', !isOpen);
+                if (record.state) record.state.cfgBarOpen = !isOpen;
+                break;
+            }
             case 'refresh-power-info': this.refreshPowerInfo(key); break;
             case 'read-metric': this.readSinglePowerMetric(key); break;
             case 'refresh-snapshot': this.refreshPowerSnapshot(key); break;
-            case 'start-poll': this.startMeterMonitoring(key); break;
+            case 'start-poll': this.startMeterMonitoring(key); this.updateMeterCardUI(key); break;
             case 'stop-poll': // fall-through
-            case 'stop-monitor': this.stopMeterMonitoring(key); break;
-            case 'start-monitor': this.startMeterMonitoring(key); break;
+            case 'stop-monitor': this.stopMeterMonitoring(key); this.updateMeterCardUI(key); break;
+            case 'start-monitor': this.startMeterMonitoring(key); this.updateMeterCardUI(key); break;
+            case 'toggle-poll':
+                if (record.state?.monitorActive) {
+                    this.stopMeterMonitoring(key);
+                } else {
+                    this.startMeterMonitoring(key);
+                }
+                this.updateMeterCardUI(key);
+                break;
             case 'send-raw': this.sendRawMeterCommand(key); break;
             case 'sys-save': this.systemSave(key); break;
             case 'sys-rst':  this.systemReset(key); break;
             case 'sys-dfu':  this.systemDfu(key); break;
             case 'check-updates': this.checkFirmwareUpdate(key); break;
             case 'enter-dfu-from-update': this.enterDfuForUpdate(key); break;
+            case 'dismiss-fw-notice': {
+                const sid = this.meterSafeId(key);
+                const noticeEl = document.getElementById(`meter-${sid}-fw-update-notice`);
+                if (noticeEl) noticeEl.style.display = 'none';
+                break;
+            }
             case 'debug-clear': this.clearMeterDebug(key); break;
             case 'cfg-bright': this.setCfgValue(key, 'bright', `meter-${this.meterSafeId(key)}-cfg-bright`); break;
             case 'cfg-elem':  this.setCfgValue(key, 'elem',  `meter-${this.meterSafeId(key)}-cfg-elem`);  break;
@@ -519,16 +550,21 @@
             spanEl.textContent = newName;
 
             if (newName !== originalName) {
-                record.friendlyName = newName;
+                // Re-fetch the live record — upsertMeterRecordFromPort may have replaced
+                // the registry entry with a new object while the user was typing.
+                const liveRecord = this.meterRegistry.get(key) || record;
+                liveRecord.friendlyName = newName;
                 const sid = this.meterSafeId(key);
                 const detailInput = document.getElementById(`meter-${sid}-name-input`);
                 if (detailInput) detailInput.value = newName;
-                if (record.connectionState === 'connected') {
+                if (liveRecord.connectionState === 'connected') {
                     try {
                         const resp = await this.sendApiCommand(key, 'sys.nset', { name: newName });
                         const saved = resp.dname || newName;
                         spanEl.textContent = saved;
-                        record.friendlyName = saved;
+                        // Re-fetch again after the await — registry may have been replaced
+                        const liveRecord2 = this.meterRegistry.get(key) || liveRecord;
+                        liveRecord2.friendlyName = saved;
                         if (detailInput) detailInput.value = saved;
                         this.setMeterStatus(key, `Device name saved: ${saved}`, 'ready');
                     } catch (err) {
@@ -556,14 +592,27 @@
         }, 200);
     };
 
-    DWMControl.prototype._toggleMeterExpand = function(key) {
+    DWMControl.prototype._openMeterMoreInfo = function(key) {
         const sid = this.meterSafeId(key);
-        const detail = document.getElementById(`meter-${sid}-detail`);
-        const label = document.querySelector(`#meter-card-${sid} .meter-expand-label`);
-        if (!detail) return;
-        const expanded = detail.style.display !== 'none';
-        detail.style.display = expanded ? 'none' : '';
-        if (label) label.textContent = expanded ? 'Show Details' : 'Hide Details';
+        const dialog = document.getElementById(`meter-${sid}-detail`);
+        if (!dialog || typeof dialog.showModal !== 'function') return;
+        dialog.showModal();
+        // Close on backdrop click (click outside the dialog box)
+        const onBackdrop = (e) => {
+            const rect = dialog.getBoundingClientRect();
+            if (e.clientX < rect.left || e.clientX > rect.right ||
+                e.clientY < rect.top  || e.clientY > rect.bottom) {
+                dialog.close();
+                dialog.removeEventListener('click', onBackdrop);
+            }
+        };
+        dialog.addEventListener('click', onBackdrop);
+    };
+
+    DWMControl.prototype._closeMeterMoreInfo = function(key) {
+        const sid = this.meterSafeId(key);
+        const dialog = document.getElementById(`meter-${sid}-detail`);
+        if (dialog && typeof dialog.close === 'function') dialog.close();
     };
 
     DWMControl.prototype._updateMeterPollInterval = function(key, value) {
@@ -578,12 +627,30 @@
         const record = this.meterRegistry.get(key);
         if (!record) return;
 
+        // Don't auto-connect a device that failed the API probe — require manual retry
+        if (options.autoConnect && record.connectionState === 'not-configured') return;
+
         try {
             const result = await window.electronAPI.openSerialPort(record.portPath, 115200);
             if (result.success) {
                 if (!record.state) record.state = this.createMeterState();
                 record.connectionState = 'connected';
                 record.lastSeenAt = Date.now();
+
+                // Probe: verify device responds to API protocol before completing connection
+                try {
+                    await this.sendApiCommand(key, 'sys.id', {}, { timeoutMs: 2500 });
+                } catch (_probeErr) {
+                    // No valid API response — device is present on USB but not in API mode
+                    record.connectionState = 'not-configured';
+                    record.state = null;
+                    try { await window.electronAPI.closeSerialPort(record.portPath); } catch (_) {}
+                    this.updateMeterCardUI(key);
+                    this.appendOutput(`Device at ${record.portPath} did not respond to API probe — not configured for API.`);
+                    return;
+                }
+
+                // Probe succeeded — complete the connection
                 this.activeMeterKey = key;
                 this.isConnected = true;
                 this.appendOutput(`Connected to ${record.portPath}`);
@@ -640,11 +707,13 @@
         const state = record.state;
         const isMonitoring = Boolean(state && state.monitorActive);
 
-        // Badge
-        const badge = document.getElementById(`meter-${sid}-badge`);
-        if (badge) {
-            badge.className = `meter-badge meter-badge-${record.connectionState}`;
-            badge.textContent = isConn ? 'Connected' : (record.connectionState === 'disconnected' ? 'Disconnected' : 'Available');
+        // Combined connect/disconnect button
+        const connectBtn = document.getElementById(`meter-${sid}-connect-btn`);
+        if (connectBtn) {
+            const connState = record.connectionState;
+            connectBtn.className = `btn btn-small meter-connect-btn meter-connect-btn-${connState}`;
+            connectBtn.dataset.meterAction = isConn ? 'disconnect' : 'connect';
+            connectBtn.textContent = isConn ? 'Connected' : (connState === 'disconnected' ? 'Disconnected' : (connState === 'not-configured' ? 'Not Configured' : 'Available'));
         }
 
         // Readings bar visibility
@@ -671,25 +740,18 @@
         // Buttons in header
         const cardEl = document.getElementById(`meter-card-${sid}`);
         if (cardEl) {
-            cardEl.querySelectorAll('[data-meter-action="connect"]').forEach(b => { b.disabled = isConn; });
-            cardEl.querySelectorAll('[data-meter-action="disconnect"]').forEach(b => { b.disabled = !isConn; });
             // Detail section connection-dependent buttons
             const detailDependent = [
                 'refresh-all','load-name','save-name','refresh-commands',
                 'refresh-element-profiles',
                 'refresh-power-info','read-metric','refresh-snapshot',
-                'start-poll','start-monitor','send-raw',
+                'start-monitor','send-raw',
                 'cfg-bright','cfg-elem','cfg-eval','cfg-etype','cfg-range','cfg-avgw',
                 'sys-save','sys-rst','sys-dfu','identify-meter','check-updates','enter-dfu-from-update',
             ];
             detailDependent.forEach(action => {
                 cardEl.querySelectorAll(`[data-meter-action="${action}"]`).forEach(b => { b.disabled = !isConn; });
             });
-            // Poll/stop buttons
-            cardEl.querySelectorAll('[data-meter-action="start-poll"],[data-meter-action="start-monitor"]')
-                .forEach(b => { b.disabled = !isConn || isMonitoring; });
-            cardEl.querySelectorAll('[data-meter-action="stop-poll"],[data-meter-action="stop-monitor"]')
-                .forEach(b => { b.disabled = !isMonitoring; });
 
             const isIdentifying = Boolean(state && state.identifyInProgress);
             cardEl.querySelectorAll('[data-meter-action="identify-meter"]')
@@ -698,7 +760,11 @@
 
         // Status banner
         if (!isConn) {
-            this.setMeterStatus(key, 'Connect to this meter to use the control API.', 'warning');
+            if (record.connectionState === 'not-configured') {
+                this.setMeterStatus(key, 'Device is connected via USB but did not respond to the API. Enable API mode on the device, then click Not Configured to retry.', 'warning');
+            } else {
+                this.setMeterStatus(key, 'Connect to this meter to use the control API.', 'warning');
+            }
         } else if (isMonitoring) {
             const ms = state ? state.pollIntervalMs : 500;
             this.setMeterStatus(key, `${ms}ms polling active. Press Stop to end background snapshots.`, 'active');
@@ -706,8 +772,17 @@
             this.setMeterStatus(key, 'Connected. Use Refresh All or individual actions to query the device.', 'ready');
         }
 
+
         const rawInput = document.getElementById(`meter-${sid}-raw-command`);
         if (rawInput) rawInput.disabled = !isConn;
+
+        // Poll toggle button in More Info dialog
+        const pollToggleBtn = document.getElementById(`meter-${sid}-poll-toggle-btn`);
+        if (pollToggleBtn) {
+            pollToggleBtn.disabled = !isConn;
+            pollToggleBtn.textContent = isMonitoring ? 'Stop Polling' : 'Start Polling';
+            pollToggleBtn.className = `btn btn-small ${isMonitoring ? 'btn-danger' : 'btn-secondary'}`;
+        }
 
         const sysStatusEl = document.getElementById(`meter-${sid}-sys-status`);
         if (sysStatusEl && !isConn) sysStatusEl.textContent = '';

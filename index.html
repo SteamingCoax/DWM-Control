@@ -11,34 +11,9 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- App Header -->
-        <header class="app-header">
-            <div class="header-content">
-                <div class="app-logo">
-                    <img class="logo-icon" src="assets/icon.png" alt="DWM Control" width="48" height="48" draggable="false">
-                    <div class="logo-text">
-                        <h1>DWM Control</h1>
-                        <p><span id="app-version" class="app-version-badge"></span></p>
-                    </div>
-                </div>
-                        <div class="header-status">
-            <!-- Update Status -->
-            <div id="update-panel" class="update-panel">
-                <button id="update-button" class="update-btn" title="Check for updates">
-                    <span class="update-icon"></span>
-                    <span class="update-text">Check Updates</span>
-                </button>
-            </div>
-            
-            <button id="theme-toggle" class="btn btn-text" title="Toggle Dark Mode">
-                <span class="btn-icon"></span>
-            </button>
-        </div>
-            </div>
-        </header>
-
-        <!-- Navigation Tabs -->
+        <!-- Title Bar + Navigation -->
         <nav class="tab-navigation">
+            <span class="titlebar-app-name">DWM Control <span id="app-version" class="app-version-badge"></span></span>
             <button class="tab-button active" data-tab="control">
                 <span class="tab-icon"></span>
                 <span class="tab-label">Control</span>
@@ -51,6 +26,18 @@
                 <span class="tab-icon"></span>
                 <span class="tab-label">De-Embed</span>
             </button>
+            <div class="titlebar-spacer"></div>
+            <div class="titlebar-actions">
+                <div id="update-panel" class="update-panel">
+                    <button id="update-button" class="update-btn" title="Check for updates">
+                        <span class="update-icon"></span>
+                        <span class="update-text">Check Updates</span>
+                    </button>
+                </div>
+                <button id="theme-toggle" class="btn btn-text" title="Toggle Dark Mode">
+                    <span class="btn-icon"></span>
+                </button>
+            </div>
         </nav>
 
         <!-- Main Content Area -->
