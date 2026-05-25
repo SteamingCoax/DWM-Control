@@ -232,6 +232,7 @@
                         }
                         this._updateHistoryLineLegend(key);
                         this._drawMeterHistory(key);
+                        this._persistMeterCardPrefs(key, { historyLines: [...lines] });
                     }
                 }
                 return;
@@ -276,6 +277,7 @@
                     if (record) {
                         if (side === 'L') record.gaugeMetricL = sel.value;
                         else             record.gaugeMetricR = sel.value;
+                        this._persistMeterCardPrefs(key, side === 'L' ? { gaugeMetricL: sel.value } : { gaugeMetricR: sel.value });
                         if (record.state && record.state.lastSnapshotResponse) {
                             this._updateMeterGauges(key, record.state.lastSnapshotResponse);
                         }
@@ -294,6 +296,7 @@
                         const mode = sel.value === 'numeric' ? 'numeric' : 'gauge';
                         if (side === 'L') record.gaugeDisplayL = mode;
                         else             record.gaugeDisplayR = mode;
+                        this._persistMeterCardPrefs(key, side === 'L' ? { gaugeDisplayL: mode } : { gaugeDisplayR: mode });
                         if (record.state && record.state.lastSnapshotResponse) {
                             this._updateMeterGauges(key, record.state.lastSnapshotResponse);
                         }
@@ -312,6 +315,7 @@
                         if (Number.isFinite(ms) && ms > 0) {
                             record.state.historyWindowMs = ms;
                             this._drawMeterHistory(key);
+                            this._persistMeterCardPrefs(key, { historyWindowMs: ms });
                         }
                     }
                 }
@@ -326,6 +330,7 @@
                     const holdMs = Number.parseInt(sel.value, 10);
                     if (record) {
                         record.pepHoldMs = Number.isFinite(holdMs) && holdMs >= 0 ? holdMs : 1000;
+                        this._persistMeterCardPrefs(key, { pepHoldMs: record.pepHoldMs });
                         if (record.state) {
                             record.state.pepHeldPeakW = 0;
                             record.state.pepHoldUntilTs = 0;
@@ -444,6 +449,8 @@
                 });
                 const rec = this._getSwrRegistry().get(swrId);
                 if (rec?.state) rec.state.viewMode = 'gauges';
+                const cfg = (this.config.swrCards || []).find(c => c.id === swrId);
+                if (cfg) { cfg.viewMode = 'gauges'; this.saveConfig(); }
                 break;
             }
             case 'view-history': {
@@ -456,6 +463,8 @@
                 });
                 const rec = this._getSwrRegistry().get(swrId);
                 if (rec?.state) rec.state.viewMode = 'history';
+                const cfg = (this.config.swrCards || []).find(c => c.id === swrId);
+                if (cfg) { cfg.viewMode = 'history'; this.saveConfig(); }
                 this._drawSwrHistory(swrId);
                 break;
             }
@@ -654,7 +663,22 @@
         try {
             const result = await window.electronAPI.openSerialPort(record.portPath, 115200);
             if (result.success) {
-                if (!record.state) record.state = this.createMeterState();
+                if (!record.state) {
+                    record.state = this.createMeterState();
+                    const prefs = this.config?.meterCards?.[key] || {};
+                    if (prefs.viewMode === 'meters' || prefs.viewMode === 'history') {
+                        record.state.viewMode = prefs.viewMode;
+                    }
+                    if (typeof prefs.cardLayout === 'string' && prefs.cardLayout) {
+                        record.state.cardLayout = prefs.cardLayout;
+                    }
+                    if (Number.isFinite(prefs.historyWindowMs) && prefs.historyWindowMs > 0) {
+                        record.state.historyWindowMs = prefs.historyWindowMs;
+                    }
+                    if (Array.isArray(prefs.historyLines) && prefs.historyLines.length > 0) {
+                        record.state.historyLines = [...prefs.historyLines];
+                    }
+                }
                 record.connectionState = 'connected';
                 record.lastSeenAt = Date.now();
 

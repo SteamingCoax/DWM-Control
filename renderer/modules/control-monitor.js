@@ -101,6 +101,19 @@
                     record.state = this.createMeterState();
                     record.state.history       = savedHistory;
                     record.state.pollIntervalMs = savedPollMs;
+                    const prefs = this.config?.meterCards?.[key] || {};
+                    if (prefs.viewMode === 'meters' || prefs.viewMode === 'history') {
+                        record.state.viewMode = prefs.viewMode;
+                    }
+                    if (typeof prefs.cardLayout === 'string' && prefs.cardLayout) {
+                        record.state.cardLayout = prefs.cardLayout;
+                    }
+                    if (Number.isFinite(prefs.historyWindowMs) && prefs.historyWindowMs > 0) {
+                        record.state.historyWindowMs = prefs.historyWindowMs;
+                    }
+                    if (Array.isArray(prefs.historyLines) && prefs.historyLines.length > 0) {
+                        record.state.historyLines = [...prefs.historyLines];
+                    }
                     record.connectionState = 'connected';
                     record.lastSeenAt      = Date.now();
                     record._watchdogActive  = false;

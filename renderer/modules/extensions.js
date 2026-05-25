@@ -166,6 +166,8 @@
             }
 
             if (isUpdateDownloaded) {
+                // Flush latest preferences before app restart/install.
+                this.saveConfig();
                 this.appendOutput(' Installing update and restarting...');
                 setButtonState('installing', 'Installing...');
                 const installResult = await window.electronAPI.installUpdate();
@@ -586,9 +588,111 @@
         }
     };
 
+    DWMControl.prototype._normalizeLoadedConfig = function _normalizeLoadedConfig(defaultConfig, parsed) {
+        const cfg = (parsed && typeof parsed === 'object') ? parsed : {};
+
+        const asStringArray = (value) => Array.isArray(value)
+            ? value.filter(v => typeof v === 'string' && v.length > 0)
+            : [];
+
+        const normalizeMeterCardPrefs = (prefs) => {
+            if (!prefs || typeof prefs !== 'object') return {};
+            const out = {};
+
+            if (prefs.viewMode === 'meters' || prefs.viewMode === 'history') {
+                out.viewMode = prefs.viewMode;
+            }
+
+            const allowedLayouts = new Set(['dual', 'single-L', 'single-R', 'wide-left', 'wide-right', 'stacked']);
+            if (typeof prefs.cardLayout === 'string' && allowedLayouts.has(prefs.cardLayout)) {
+                out.cardLayout = prefs.cardLayout;
+            }
+
+            const allowedMetrics = new Set(['avg', 'peak', 'inst', 'max', 'min', 'dev']);
+            if (typeof prefs.gaugeMetricL === 'string' && allowedMetrics.has(prefs.gaugeMetricL)) out.gaugeMetricL = prefs.gaugeMetricL;
+            if (typeof prefs.gaugeMetricR === 'string' && allowedMetrics.has(prefs.gaugeMetricR)) out.gaugeMetricR = prefs.gaugeMetricR;
+
+            const allowedDisplays = new Set(['gauge', 'numeric']);
+            if (typeof prefs.gaugeDisplayL === 'string' && allowedDisplays.has(prefs.gaugeDisplayL)) out.gaugeDisplayL = prefs.gaugeDisplayL;
+            if (typeof prefs.gaugeDisplayR === 'string' && allowedDisplays.has(prefs.gaugeDisplayR)) out.gaugeDisplayR = prefs.gaugeDisplayR;
+
+            if (Number.isFinite(prefs.historyWindowMs) && prefs.historyWindowMs > 0) {
+                out.historyWindowMs = Number.parseInt(prefs.historyWindowMs, 10);
+            }
+
+            if (Array.isArray(prefs.historyLines) && prefs.historyLines.length > 0) {
+                const lines = prefs.historyLines
+                    .filter(v => typeof v === 'string' && allowedMetrics.has(v));
+                if (lines.length) out.historyLines = [...new Set(lines)].slice(0, 6);
+            }
+
+            if (Number.isFinite(prefs.pepHoldMs) && prefs.pepHoldMs >= 0) {
+                out.pepHoldMs = Number.parseInt(prefs.pepHoldMs, 10);
+            }
+
+            return out;
+        };
+
+        const meterCards = {};
+        if (cfg.meterCards && typeof cfg.meterCards === 'object') {
+            Object.entries(cfg.meterCards).forEach(([key, prefs]) => {
+                if (typeof key !== 'string' || !key) return;
+                meterCards[key] = normalizeMeterCardPrefs(prefs);
+            });
+        }
+
+        const swrCards = Array.isArray(cfg.swrCards)
+            ? cfg.swrCards
+                .filter(c => c && typeof c === 'object' && typeof c.id === 'string' && c.id.length > 0)
+                .map(c => ({
+                    id: c.id,
+                    fwdKey: typeof c.fwdKey === 'string' ? c.fwdKey : null,
+                    refKey: typeof c.refKey === 'string' ? c.refKey : null,
+                    fwdMetric: typeof c.fwdMetric === 'string' ? c.fwdMetric : 'avg',
+                    refMetric: typeof c.refMetric === 'string' ? c.refMetric : 'avg',
+                    viewMode: c.viewMode === 'history' ? 'history' : 'gauges',
+                    cardLayout: (typeof c.cardLayout === 'string' && c.cardLayout) ? c.cardLayout : 'both',
+                    historyWindowMs: (Number.isFinite(c.historyWindowMs) && c.historyWindowMs > 0)
+                        ? Number.parseInt(c.historyWindowMs, 10)
+                        : 30000,
+                }))
+            : [];
+
+        const meterCardOrder = asStringArray(cfg.meterCardOrder);
+        let boardCardOrder = asStringArray(cfg.boardCardOrder);
+
+        // Migration: synthesize mixed board order if missing.
+        if (boardCardOrder.length === 0) {
+            boardCardOrder = [
+                ...meterCardOrder.map(key => `meter:${key}`),
+                ...swrCards.map(c => `swr:${c.id}`),
+            ];
+        }
+
+        // Keep board order complete for known cards.
+        meterCardOrder.forEach(key => {
+            const token = `meter:${key}`;
+            if (!boardCardOrder.includes(token)) boardCardOrder.push(token);
+        });
+        swrCards.forEach(c => {
+            const token = `swr:${c.id}`;
+            if (!boardCardOrder.includes(token)) boardCardOrder.push(token);
+        });
+
+        return {
+            ...defaultConfig,
+            ...cfg,
+            layoutVersion: Math.max(Number.parseInt(cfg.layoutVersion || defaultConfig.layoutVersion, 10) || 1, 1),
+            meterCardOrder,
+            boardCardOrder,
+            meterCards,
+            swrCards,
+        };
+    };
+
     DWMControl.prototype.loadConfig = function loadConfig() {
         const defaultConfig = {
-            layoutVersion: 1,
+            layoutVersion: 2,
             theme: 'dark',
             outputVisible: false,
             lastDevice: null,
@@ -606,20 +710,32 @@
         };
 
         try {
-            const saved = localStorage.getItem('dwm-control-config');
-            if (!saved) {
+            const mainRaw = localStorage.getItem('dwm-control-config');
+            const backupRaw = localStorage.getItem('dwm-control-config-backup');
+
+            if (!mainRaw && !backupRaw) {
                 return defaultConfig;
             }
 
-            const parsed = JSON.parse(saved);
-            return {
-                ...defaultConfig,
-                ...parsed,
-                meterCardOrder: Array.isArray(parsed.meterCardOrder) ? parsed.meterCardOrder : [],
-                boardCardOrder: Array.isArray(parsed.boardCardOrder) ? parsed.boardCardOrder : [],
-                swrCards: Array.isArray(parsed.swrCards) ? parsed.swrCards : [],
-                meterCards: parsed.meterCards && typeof parsed.meterCards === 'object' ? parsed.meterCards : {},
-            };
+            let parsed = null;
+            if (mainRaw) {
+                try { parsed = JSON.parse(mainRaw); } catch (_) { parsed = null; }
+            }
+            if (!parsed && backupRaw) {
+                try { parsed = JSON.parse(backupRaw); } catch (_) { parsed = null; }
+            }
+            if (!parsed) {
+                return defaultConfig;
+            }
+
+            const normalized = this._normalizeLoadedConfig(defaultConfig, parsed);
+
+            // Self-heal primary/backup keys when one is missing or stale.
+            const normalizedJson = JSON.stringify(normalized);
+            if (mainRaw !== normalizedJson) localStorage.setItem('dwm-control-config', normalizedJson);
+            if (backupRaw !== normalizedJson) localStorage.setItem('dwm-control-config-backup', normalizedJson);
+
+            return normalized;
         } catch (error) {
             console.warn('Failed to load config, using defaults:', error);
             return defaultConfig;
@@ -628,7 +744,10 @@
 
     DWMControl.prototype.saveConfig = function saveConfig() {
         try {
-            localStorage.setItem('dwm-control-config', JSON.stringify(this.config));
+            const payload = JSON.stringify(this.config);
+            localStorage.setItem('dwm-control-config', payload);
+            // Keep a mirrored backup key so preferences survive partial storage loss.
+            localStorage.setItem('dwm-control-config-backup', payload);
         } catch (error) {
             console.warn('Failed to save config:', error);
         }

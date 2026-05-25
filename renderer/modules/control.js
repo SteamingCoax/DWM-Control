@@ -631,13 +631,17 @@
 
             let swrRec = swrRegistry.get(id);
             if (!swrRec) {
+              const state = this.createSwrCardState();
+              if (Number.isFinite(cfg.historyWindowMs) && cfg.historyWindowMs > 0) state.historyWindowMs = cfg.historyWindowMs;
+              if (cfg.viewMode === 'history' || cfg.viewMode === 'gauges') state.viewMode = cfg.viewMode;
+              if (typeof cfg.cardLayout === 'string' && cfg.cardLayout) state.cardLayout = cfg.cardLayout;
               swrRec = {
                 id:        cfg.id,
                 fwdKey:    cfg.fwdKey    || null,
                 refKey:    cfg.refKey    || null,
                 fwdMetric: cfg.fwdMetric || 'avg',
                 refMetric: cfg.refMetric || 'avg',
-                state:     this.createSwrCardState(),
+                state,
               };
               swrRegistry.set(id, swrRec);
             } else {
@@ -645,6 +649,10 @@
               swrRec.refKey    = cfg.refKey    || null;
               swrRec.fwdMetric = cfg.fwdMetric || 'avg';
               swrRec.refMetric = cfg.refMetric || 'avg';
+              if (!swrRec.state) swrRec.state = this.createSwrCardState();
+              if (Number.isFinite(cfg.historyWindowMs) && cfg.historyWindowMs > 0) swrRec.state.historyWindowMs = cfg.historyWindowMs;
+              if (cfg.viewMode === 'history' || cfg.viewMode === 'gauges') swrRec.state.viewMode = cfg.viewMode;
+              if (typeof cfg.cardLayout === 'string' && cfg.cardLayout) swrRec.state.cardLayout = cfg.cardLayout;
             }
 
             const sid = this.swrSafeId(id);
@@ -678,6 +686,7 @@
 
     DWMControl.prototype.renderMeterCard = function(record) {
         const sid = this.meterSafeId(record.key);
+      const meterPrefs = this.config?.meterCards?.[record.key] || {};
         const isConnected = record.connectionState === 'connected';
         const connState = record.connectionState || 'available';
         const badgeClass = connState === 'connected' ? 'connected' : (connState === 'disconnected' ? 'disconnected' : (connState === 'not-configured' ? 'not-configured' : 'available'));
@@ -695,9 +704,14 @@
         const selectedEval = Number.isFinite(record.elementRating) && record.elementRating > 0 ? record.elementRating : 100;
         const selectedRangeCfg = Number.parseInt(record.rangeCfg, 10) === 1 || Number.parseInt(record.rangeMultiplier, 10) === 4 ? 1 : 0;
         const selectedEtype = String(record.elementType || '30ua').toLowerCase();
-        const histWindowMs = record.state?.historyWindowMs || 30000;
-        const histLines    = record.state?.historyLines || ['avg', 'peak'];
-        const cardLayout   = record.state?.cardLayout || 'dual';
+        const histWindowMs = Number.isFinite(record.state?.historyWindowMs)
+          ? record.state.historyWindowMs
+          : (Number.isFinite(meterPrefs.historyWindowMs) ? meterPrefs.historyWindowMs : 30000);
+        const histLines = Array.isArray(record.state?.historyLines)
+          ? record.state.historyLines
+          : (Array.isArray(meterPrefs.historyLines) && meterPrefs.historyLines.length ? meterPrefs.historyLines : ['avg', 'peak']);
+        const cardLayout = record.state?.cardLayout || meterPrefs.cardLayout || 'dual';
+        const viewMode = record.state?.viewMode || meterPrefs.viewMode || 'meters';
         const HIST_META = [
             { key: 'inst', label: 'INST' },
             { key: 'avg',  label: 'AVG'  },
@@ -728,8 +742,8 @@
     <div class="meter-live-toolbar">
       <div class="meter-live-toolbar-left">
         <div class="meter-view-toggle">
-          <button class="meter-view-btn active" data-meter-action="view-meters">Meters</button>
-          <button class="meter-view-btn" data-meter-action="view-history">History</button>
+          <button class="meter-view-btn${viewMode === 'meters' ? ' active' : ''}" data-meter-action="view-meters">Meters</button>
+          <button class="meter-view-btn${viewMode === 'history' ? ' active' : ''}" data-meter-action="view-history">History</button>
         </div>
         <select class="form-select form-select-sm meter-layout-select" data-meter-field="cardLayout">
           <option value="dual"${cardLayout === 'dual'       ? ' selected' : ''}>Dual Gauges</option>
@@ -739,7 +753,7 @@
           <option value="wide-right"${cardLayout === 'wide-right' ? ' selected' : ''}>Wide Right</option>
           <option value="stacked"${cardLayout === 'stacked'    ? ' selected' : ''}>Stacked</option>
         </select>
-        <div class="meter-chart-actions" style="display:none">
+        <div class="meter-chart-actions" style="${viewMode === 'history' ? '' : 'display:none'}">
                     <button class="btn btn-secondary btn-small" data-meter-action="export-history">Export Data</button>
         </div>
       </div>
@@ -767,7 +781,7 @@
             </div>
             <button class="btn btn-secondary btn-small" data-meter-action="more-info">More Info</button>
     </div>
-    <div class="meter-gauges-view" id="meter-${sid}-gauges-view" data-layout="${cardLayout}">
+    <div class="meter-gauges-view" id="meter-${sid}-gauges-view" data-layout="${cardLayout}" style="${viewMode === 'history' ? 'display:none' : ''}">
       <div class="meter-gauge-radial-pair">
         <div class="meter-gauge-radial-panel">
                     <div class="meter-gauge-panel-controls">
@@ -805,7 +819,7 @@
         </div>
       </div>
     </div>
-    <div class="meter-history-view" id="meter-${sid}-history-view" style="display:none">
+    <div class="meter-history-view" id="meter-${sid}-history-view" style="${viewMode === 'history' ? '' : 'display:none'}">
       <div class="meter-history-toolbar">
         <div class="meter-history-legend" id="meter-${sid}-history-legend">
           ${HIST_META.map(({ key, label }) => {

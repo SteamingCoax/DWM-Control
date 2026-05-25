@@ -682,7 +682,18 @@
 
     // ─── Live panel helpers ───────────────────────────────────────────────────
 
+    DWMControl.prototype._persistMeterCardPrefs = function(key, partialPrefs) {
+        if (!key || !partialPrefs || typeof partialPrefs !== 'object') return;
+        if (!this.config.meterCards) this.config.meterCards = {};
+        if (!this.config.meterCards[key]) this.config.meterCards[key] = {};
+        Object.assign(this.config.meterCards[key], partialPrefs);
+        this.saveConfig();
+    };
+
     DWMControl.prototype._setMeterView = function(key, view) {
+        const record = this.meterRegistry.get(key);
+        if (record?.state) record.state.viewMode = view;
+
         const sid = this.meterSafeId(key);
         const gaugesView = document.getElementById(`meter-${sid}-gauges-view`);
         const histView   = document.getElementById(`meter-${sid}-history-view`);
@@ -703,10 +714,7 @@
         if (view === 'history') this._drawMeterHistory(key);
 
         // Persist view preference
-        if (!this.config.meterCards) this.config.meterCards = {};
-        if (!this.config.meterCards[key]) this.config.meterCards[key] = {};
-        this.config.meterCards[key].viewMode = view;
-        this.saveConfig();
+        this._persistMeterCardPrefs(key, { viewMode: view });
     };
 
     DWMControl.prototype._setMeterCardLayout = function(key, layout) {
@@ -715,10 +723,7 @@
         record.state.cardLayout = layout;
 
         // Persist layout preference
-        if (!this.config.meterCards) this.config.meterCards = {};
-        if (!this.config.meterCards[key]) this.config.meterCards[key] = {};
-        this.config.meterCards[key].cardLayout = layout;
-        this.saveConfig();
+        this._persistMeterCardPrefs(key, { cardLayout: layout });
         const sid        = this.meterSafeId(key);
         const gaugesView = document.getElementById(`meter-${sid}-gauges-view`);
         if (gaugesView) gaugesView.dataset.layout = layout;

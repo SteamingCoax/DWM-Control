@@ -373,6 +373,8 @@ class DWMControl {
     upsertMeterRecordFromPort(port) {
         const key = this.buildMeterKey(port);
         const existing = this.meterRegistry.get(key) || {};
+        const meterPrefs = this.config?.meterCards?.[key] || {};
+        const existingState = existing.state || null;
         const nextRecord = {
             key,
             portPath: port.path,
@@ -380,14 +382,16 @@ class DWMControl {
             fallbackUid: this.parseUsbModemUid(port.path),
             apiUid: existing.apiUid || null,
             connectionState: existing.connectionState || 'available',
-            state: existing.state || null,
+            state: existingState,
             lastSeenAt: Date.now(),
             // Preserve user-chosen gauge metrics across record refreshes
-            gaugeMetricL: existing.gaugeMetricL || 'avg',
-            gaugeMetricR: existing.gaugeMetricR || 'peak',
-            gaugeDisplayL: existing.gaugeDisplayL || 'gauge',
-            gaugeDisplayR: existing.gaugeDisplayR || 'gauge',
-            pepHoldMs: Number.isFinite(existing.pepHoldMs) ? existing.pepHoldMs : 1000,
+            gaugeMetricL: existing.gaugeMetricL || meterPrefs.gaugeMetricL || 'avg',
+            gaugeMetricR: existing.gaugeMetricR || meterPrefs.gaugeMetricR || 'peak',
+            gaugeDisplayL: existing.gaugeDisplayL || meterPrefs.gaugeDisplayL || 'gauge',
+            gaugeDisplayR: existing.gaugeDisplayR || meterPrefs.gaugeDisplayR || 'gauge',
+            pepHoldMs: Number.isFinite(existing.pepHoldMs)
+                ? existing.pepHoldMs
+                : (Number.isFinite(meterPrefs.pepHoldMs) ? meterPrefs.pepHoldMs : 1000),
             elementId: Number.isFinite(existing.elementId) ? existing.elementId : 1,
             elementRating: Number.isFinite(existing.elementRating) ? existing.elementRating : 0,
             elementType: existing.elementType || '30ua',
@@ -395,6 +399,21 @@ class DWMControl {
             rangeMultiplier: Number.isFinite(existing.rangeMultiplier) ? existing.rangeMultiplier : 1,
             rangeCfg: Number.isFinite(existing.rangeCfg) ? existing.rangeCfg : 0,
         };
+
+        if (nextRecord.state) {
+            if (meterPrefs.viewMode === 'meters' || meterPrefs.viewMode === 'history') {
+                nextRecord.state.viewMode = meterPrefs.viewMode;
+            }
+            if (typeof meterPrefs.cardLayout === 'string' && meterPrefs.cardLayout) {
+                nextRecord.state.cardLayout = meterPrefs.cardLayout;
+            }
+            if (Number.isFinite(meterPrefs.historyWindowMs) && meterPrefs.historyWindowMs > 0) {
+                nextRecord.state.historyWindowMs = meterPrefs.historyWindowMs;
+            }
+            if (Array.isArray(meterPrefs.historyLines) && meterPrefs.historyLines.length > 0) {
+                nextRecord.state.historyLines = [...meterPrefs.historyLines];
+            }
+        }
 
         this.meterRegistry.set(key, nextRecord);
 
