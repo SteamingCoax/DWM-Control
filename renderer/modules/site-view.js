@@ -159,7 +159,8 @@
 
         let html = '';
         for (const node of this.sv.nodes.values()) {
-            html += window.SiteViewComponents.renderNodeSVG(node);
+            const gainCtx = this._svGetNodeGainCtx(node.id);
+            html += window.SiteViewComponents.renderNodeSVG(node, gainCtx);
         }
         layer.innerHTML = html;
     };
@@ -929,6 +930,38 @@
     };
 
     // ─── Live power readouts ──────────────────────────────────────────────────
+
+    DWMControl.prototype._svGetNodeGainCtx = function (nodeId) {
+        const GAIN_TYPES = ['attenuator', 'amplifier', 'hybrid-3db', 'combiner',
+                            'coax-switch', '4port-switch', 'filter', 'coupler'];
+        const node = this.sv.nodes.get(nodeId);
+        if (!node || !GAIN_TYPES.includes(node.type)) return { hasFwd: false, hasRfl: false };
+
+        const inputMeters  = { forward: false, reverse: false };
+        const outputMeters = { forward: false, reverse: false };
+
+        for (const conn of this.sv.connections.values()) {
+            if (conn.toNodeId === nodeId) {
+                const src = this.sv.nodes.get(conn.fromNodeId);
+                if (src?.type === 'dwm-meter') {
+                    const mt = src.props?.measureType === 'reverse' ? 'reverse' : 'forward';
+                    inputMeters[mt] = true;
+                }
+            }
+            if (conn.fromNodeId === nodeId) {
+                const dst = this.sv.nodes.get(conn.toNodeId);
+                if (dst?.type === 'dwm-meter') {
+                    const mt = dst.props?.measureType === 'reverse' ? 'reverse' : 'forward';
+                    outputMeters[mt] = true;
+                }
+            }
+        }
+
+        return {
+            hasFwd: inputMeters.forward  && outputMeters.forward,
+            hasRfl: inputMeters.reverse  && outputMeters.reverse,
+        };
+    };
 
     DWMControl.prototype._svStartPowerUpdates = function () {
         if (this.sv.powerTimer) clearInterval(this.sv.powerTimer);
