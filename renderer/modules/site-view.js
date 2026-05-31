@@ -283,19 +283,25 @@
         document.addEventListener('mousemove', (e) => this._svOnMouseMove(e));
         document.addEventListener('mouseup',   (e) => this._svOnMouseUp(e));
 
-        // ── Scroll-to-zoom ────────────────────────────────────────────────────
+        // ── Scroll to pan; Ctrl+scroll to zoom ────────────────────────────────
         svg.addEventListener('wheel', (e) => {
             e.preventDefault();
-            const rect     = svg.getBoundingClientRect();
-            const mouseX   = e.clientX - rect.left;
-            const mouseY   = e.clientY - rect.top;
-            const factor   = e.deltaY < 0 ? 1.1 : 0.9;
-            const prevScale = this.sv.viewport.scale;
-            const newScale  = Math.min(4, Math.max(0.2, prevScale * factor));
-
-            this.sv.viewport.x = mouseX - (mouseX - this.sv.viewport.x) * (newScale / prevScale);
-            this.sv.viewport.y = mouseY - (mouseY - this.sv.viewport.y) * (newScale / prevScale);
-            this.sv.viewport.scale = newScale;
+            if (e.ctrlKey || e.metaKey) {
+                // Zoom toward mouse cursor
+                const rect      = svg.getBoundingClientRect();
+                const mouseX    = e.clientX - rect.left;
+                const mouseY    = e.clientY - rect.top;
+                const factor    = e.deltaY < 0 ? 1.1 : 0.9;
+                const prevScale = this.sv.viewport.scale;
+                const newScale  = Math.min(4, Math.max(0.2, prevScale * factor));
+                this.sv.viewport.x     = mouseX - (mouseX - this.sv.viewport.x) * (newScale / prevScale);
+                this.sv.viewport.y     = mouseY - (mouseY - this.sv.viewport.y) * (newScale / prevScale);
+                this.sv.viewport.scale = newScale;
+            } else {
+                // Pan — trackpad sends deltaX+deltaY; mouse wheel sends deltaY only
+                this.sv.viewport.x -= e.deltaX;
+                this.sv.viewport.y -= e.deltaY;
+            }
             this._svApplyViewport();
         }, { passive: false });
 
@@ -310,12 +316,16 @@
         });
 
         // ── Toolbar buttons ───────────────────────────────────────────────────
-        const clearBtn  = document.getElementById('sv-clear-btn');
-        const fitBtn    = document.getElementById('sv-fit-btn');
-        const deleteBtn = document.getElementById('sv-delete-selected-btn');
-        if (clearBtn)  clearBtn.addEventListener('click',  () => this._svClear());
-        if (fitBtn)    fitBtn.addEventListener('click',    () => this._svFitView());
-        if (deleteBtn) deleteBtn.addEventListener('click', () => this._svDeleteSelected());
+        const clearBtn    = document.getElementById('sv-clear-btn');
+        const fitBtn      = document.getElementById('sv-fit-btn');
+        const deleteBtn   = document.getElementById('sv-delete-selected-btn');
+        const saveFileBtn = document.getElementById('sv-save-file-btn');
+        const loadFileBtn = document.getElementById('sv-load-file-btn');
+        if (clearBtn)    clearBtn.addEventListener('click',    () => this._svClear());
+        if (fitBtn)      fitBtn.addEventListener('click',      () => this._svFitView());
+        if (deleteBtn)   deleteBtn.addEventListener('click',   () => this._svDeleteSelected());
+        if (saveFileBtn) saveFileBtn.addEventListener('click', () => this._svSaveToFile());
+        if (loadFileBtn) loadFileBtn.addEventListener('click', () => this._svLoadFromFile());
     };
 
     // ─── Pan ──────────────────────────────────────────────────────────────────
@@ -638,7 +648,7 @@
             if (!node) { content.innerHTML = ''; return; }
 
             let html = `<div class="sv-props-section">
-<div class="sv-props-title">${_esc(node.type)}</div>
+<div class="sv-props-title">${_esc(window.SiteViewComponents?.COMPONENT_TYPES?.[node.type]?.label || node.type)}</div>
 
 <div class="sv-props-field">
     <label class="sv-props-label">Label</label>
@@ -691,6 +701,57 @@
         <option value="1"${node.props.activePort === 1 ? ' selected' : ''}>Port 1</option>
         <option value="2"${node.props.activePort === 2 ? ' selected' : ''}>Port 2</option>
     </select>
+</div>`;
+            }
+
+            // ── 4-Port Switch ─────────────────────────────────────────────────
+            if (node.type === '4port-switch') {
+                html += `
+<div class="sv-props-field">
+    <label class="sv-props-label">Switch Mode</label>
+    <select class="sv-props-select" id="sv-prop-sw-mode">
+        <option value="through"${(node.props.mode || 'through') === 'through' ? ' selected' : ''}>Straight Through</option>
+        <option value="cross"${node.props.mode === 'cross' ? ' selected' : ''}>Cross</option>
+    </select>
+</div>`;
+            }
+
+            // ── Filter ────────────────────────────────────────────────────────
+            if (node.type === 'filter') {
+                html += `
+<div class="sv-props-field">
+    <label class="sv-props-label">Filter Type</label>
+    <select class="sv-props-select" id="sv-prop-filter-type">
+        <option value="lowpass"${(node.props.filterType || 'lowpass') === 'lowpass'   ? ' selected' : ''}>Low Pass</option>
+        <option value="highpass"${node.props.filterType === 'highpass'                ? ' selected' : ''}>High Pass</option>
+        <option value="bandpass"${node.props.filterType === 'bandpass'               ? ' selected' : ''}>Band Pass</option>
+        <option value="notch"${node.props.filterType === 'notch'                     ? ' selected' : ''}>Notch</option>
+    </select>
+</div>`;
+            }
+
+            // ── Amplifier ─────────────────────────────────────────────────────
+            if (node.type === 'amplifier') {
+                html += `
+<div class="sv-props-field">
+    <label class="sv-props-label">Gain (dB)</label>
+    <input class="sv-props-input" type="number" id="sv-prop-gain-db"
+           value="${_esc(String(node.props.gainDb ?? ''))}" placeholder="e.g. 20" step="0.5">
+</div>`;
+            }
+
+            // ── Transmitter ───────────────────────────────────────────────────
+            if (node.type === 'transmitter') {
+                html += `
+<div class="sv-props-field">
+    <label class="sv-props-label">Power (W)</label>
+    <input class="sv-props-input" type="number" id="sv-prop-tx-power"
+           value="${_esc(String(node.props.powerW ?? ''))}" placeholder="e.g. 1000" min="0" step="1">
+</div>
+<div class="sv-props-field">
+    <label class="sv-props-label">Frequency (MHz)</label>
+    <input class="sv-props-input" type="number" id="sv-prop-tx-freq"
+           value="${_esc(String(node.props.freqMHz ?? ''))}" placeholder="e.g. 98.1" min="0" step="0.001">
 </div>`;
             }
 
@@ -780,6 +841,65 @@
                 }
             }
 
+            // Wire up 4-port switch mode
+            if (node.type === '4port-switch') {
+                const modeSel = document.getElementById('sv-prop-sw-mode');
+                if (modeSel) {
+                    modeSel.addEventListener('change', () => {
+                        node.props.mode = modeSel.value;
+                        this._svRender();
+                        this._svMarkDirty();
+                    });
+                }
+            }
+
+            // Wire up filter type
+            if (node.type === 'filter') {
+                const ftSel = document.getElementById('sv-prop-filter-type');
+                if (ftSel) {
+                    ftSel.addEventListener('change', () => {
+                        node.props.filterType = ftSel.value;
+                        this._svRender();
+                        this._svMarkDirty();
+                    });
+                }
+            }
+
+            // Wire up amplifier gain
+            if (node.type === 'amplifier') {
+                const gainInput = document.getElementById('sv-prop-gain-db');
+                if (gainInput) {
+                    gainInput.addEventListener('change', () => {
+                        const v = gainInput.value.trim();
+                        node.props.gainDb = v === '' ? null : parseFloat(v);
+                        this._svRender();
+                        this._svMarkDirty();
+                    });
+                }
+            }
+
+            // Wire up transmitter power and frequency
+            if (node.type === 'transmitter') {
+                const txPwr  = document.getElementById('sv-prop-tx-power');
+                const txFreq = document.getElementById('sv-prop-tx-freq');
+                if (txPwr) {
+                    txPwr.addEventListener('change', () => {
+                        const v = txPwr.value.trim();
+                        node.props.powerW = v === '' ? null : parseFloat(v);
+                        this._svRender();
+                        this._svMarkDirty();
+                    });
+                }
+                if (txFreq) {
+                    txFreq.addEventListener('change', () => {
+                        const v = txFreq.value.trim();
+                        node.props.freqMHz = v === '' ? null : parseFloat(v);
+                        this._svRender();
+                        this._svMarkDirty();
+                    });
+                }
+            }
+
             // Delete button
             const delBtn = document.getElementById('sv-prop-delete-btn');
             if (delBtn) delBtn.addEventListener('click', () => this._svDeleteSelected());
@@ -822,12 +942,10 @@
         for (const node of this.sv.nodes.values()) {
             if (node.type !== 'dwm-meter') continue;
 
-            let fwdText = '-- --';
-            let rflText = '-- --';
+            let powerText = '-- --';
 
             const deviceUid = node.props.deviceUid;
             if (deviceUid && window.dwm?.meterRegistry) {
-                // Look up the record by its apiUid
                 let record = null;
                 for (const rec of window.dwm.meterRegistry.values()) {
                     if (rec.apiUid === deviceUid) { record = rec; break; }
@@ -842,19 +960,15 @@
 
                     if (Number.isFinite(avgW) && typeof window.dwm.scalePower === 'function') {
                         const { scaled, unit } = window.dwm.scalePower(avgW);
-                        fwdText = `${scaled.toFixed(2)} ${unit}`;
+                        powerText = `${scaled.toFixed(2)} ${unit}`;
                     }
-                    // DWM meters only measure one direction per element; rfl stays '--'
                 }
             }
 
-            // Patch text nodes directly — no full re-render
-            const nodeG  = nodesLayer.querySelector(`[data-node-id="${CSS.escape(node.id)}"]`);
+            const nodeG = nodesLayer.querySelector(`[data-node-id="${CSS.escape(node.id)}"]`);
             if (!nodeG) continue;
-            const fwdEl  = nodeG.querySelector('.sv-meter-fwd');
-            const rflEl  = nodeG.querySelector('.sv-meter-rfl');
-            if (fwdEl) fwdEl.textContent = fwdText;
-            if (rflEl) rflEl.textContent = rflText;
+            const fwdEl = nodeG.querySelector('.sv-meter-fwd');
+            if (fwdEl) fwdEl.textContent = powerText;
         }
     };
 
@@ -947,6 +1061,79 @@
         if (this.sv?.saveTimer)  clearTimeout(this.sv.saveTimer);
     };
 
+    // ─── Save / Load to file ──────────────────────────────────────────────────
+
+    DWMControl.prototype._svSaveToFile = function () {
+        const data = {
+            version:     1,
+            nodes:       [...this.sv.nodes.values()],
+            connections: [...this.sv.connections.values()],
+            viewport:    { ...this.sv.viewport },
+        };
+        const json = JSON.stringify(data, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = 'site-schematic.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        this._svSetSaveStatus('saved');
+    };
+
+    DWMControl.prototype._svLoadFromFile = function () {
+        const input = document.createElement('input');
+        input.type   = 'file';
+        input.accept = '.json,application/json';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    const data = JSON.parse(ev.target.result);
+                    if (!data || data.version !== 1) {
+                        alert('Invalid schematic file (version mismatch).');
+                        return;
+                    }
+                    if (!window.confirm('Load this schematic? Current workspace will be replaced.')) return;
+                    this.sv.nodes.clear();
+                    this.sv.connections.clear();
+                    this.sv.selectedNodeId = null;
+                    this.sv.selectedConnId = null;
+                    if (Array.isArray(data.nodes)) {
+                        for (const node of data.nodes) {
+                            if (node?.id && node.type) this.sv.nodes.set(node.id, node);
+                        }
+                    }
+                    if (Array.isArray(data.connections)) {
+                        for (const conn of data.connections) {
+                            if (conn?.id) this.sv.connections.set(conn.id, conn);
+                        }
+                    }
+                    if (data.viewport && typeof data.viewport.scale === 'number') {
+                        this.sv.viewport = {
+                            x:     data.viewport.x ?? 0,
+                            y:     data.viewport.y ?? 0,
+                            scale: Math.min(4, Math.max(0.2, data.viewport.scale)),
+                        };
+                    }
+                    this._svRender();
+                    this._svRenderProperties();
+                    this._svMarkDirty();
+                } catch (err) {
+                    alert('Failed to load schematic: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        };
+        document.body.appendChild(input);
+        input.click();
+        document.body.removeChild(input);
+    };
+
     // ─── Bezier connection path ───────────────────────────────────────────────
 
     DWMControl.prototype._svConnectionPath = function (fromNode, fromPortId, toNode, toPortId) {
@@ -982,8 +1169,13 @@
     }
 
     function _defaultProps(typeId) {
-        if (typeId === 'attenuator') return { attenuationDb: 3 };
-        if (typeId === 'dwm-meter')  return { deviceUid: null, deviceName: null, measureType: 'forward' };
+        if (typeId === 'attenuator')   return { attenuationDb: 3 };
+        if (typeId === 'dwm-meter')    return { deviceUid: null, deviceName: null, measureType: 'forward' };
+        if (typeId === 'amplifier')    return { gainDb: null };
+        if (typeId === 'transmitter')  return { powerW: null, freqMHz: null };
+        if (typeId === 'filter')       return { filterType: 'lowpass' };
+        if (typeId === '4port-switch') return { mode: 'through' };
+        if (typeId === 'coax-switch')  return { activePort: 1 };
         return {};
     }
 

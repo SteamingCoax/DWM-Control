@@ -25,7 +25,6 @@
 /* ─── Top-Level Panel Layout ─────────────────────────────────────────────── */
 
 #siteview-panel {
-    display: flex;
     flex-direction: column;
     height: 100%;
     overflow: hidden;
@@ -188,6 +187,14 @@
     background: var(--color-danger-light);
     color: var(--color-danger);
     border-color: var(--color-danger);
+}
+
+.sv-toolbar-sep {
+    width: 1px;
+    height: 20px;
+    background: var(--border-light);
+    margin: 0 4px;
+    align-self: center;
 }
 
 .sv-toolbar-btn svg {
@@ -569,6 +576,21 @@
     fill: rgba(255, 255, 255, 0.58);
     font-size: 10px;
     pointer-events: none;
+}
+
+.sv-meter-fwd {
+    font-size: 20px;
+    font-weight: 700;
+    fill: var(--sv-deco-stroke);
+    font-family: 'Courier New', Courier, monospace;
+}
+
+.sv-meter-dir {
+    font-size: 10px;
+    fill: var(--sv-deco-stroke);
+    opacity: 0.8;
+    font-weight: 600;
+    letter-spacing: 0.5px;
 }
 
 

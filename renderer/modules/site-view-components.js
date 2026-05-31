@@ -6,9 +6,6 @@
 (function () {
     'use strict';
 
-    // ─── Helpers ─────────────────────────────────────────────────────────────
-
-    /** Escape special characters for safe SVG text content. */
     function _esc(str) {
         return String(str ?? '')
             .replace(/&/g, '&amp;')
@@ -17,32 +14,18 @@
             .replace(/"/g, '&quot;');
     }
 
-    /**
-     * Get the position of a port in the node's local coordinate space (origin = node top-left).
-     * @param {object} typeDef  - Component type definition
-     * @param {object} port     - Port definition object
-     * @returns {{ x: number, y: number }}
-     */
     function _portLocalPos(typeDef, port) {
         const w = typeDef.width;
         const h = typeDef.height;
         switch (port.side) {
-            case 'left':   return { x: 0, y: h * (port.yRatio ?? 0.5) };
-            case 'right':  return { x: w, y: h * (port.yRatio ?? 0.5) };
+            case 'left':   return { x: 0,                       y: h * (port.yRatio ?? 0.5) };
+            case 'right':  return { x: w,                       y: h * (port.yRatio ?? 0.5) };
             case 'top':    return { x: w * (port.xRatio ?? 0.5), y: 0 };
             case 'bottom': return { x: w * (port.xRatio ?? 0.5), y: h };
             default:       return { x: 0, y: 0 };
         }
     }
 
-    /**
-     * Get the position and text-anchor for a port's label.
-     * Label is placed 14px outward from the port circle in the direction of the port's side.
-     * @param {object} port  - Port definition
-     * @param {number} px    - Port local x
-     * @param {number} py    - Port local y
-     * @returns {{ x: number, y: number, anchor: string }}
-     */
     function _portLabelPos(port, px, py) {
         const off = 14;
         switch (port.side) {
@@ -54,12 +37,6 @@
         }
     }
 
-    // ─── Category Registry ───────────────────────────────────────────────────
-
-    /**
-     * Ordered list of component categories used in the sidebar palette.
-     * @type {Array<{id: string, label: string}>}
-     */
     const CATEGORIES = [
         { id: 'sources',       label: 'Sources' },
         { id: 'amplification', label: 'Amplification' },
@@ -69,16 +46,6 @@
         { id: 'switching',     label: 'Switching' },
     ];
 
-    // ─── Component Type Definitions ──────────────────────────────────────────
-
-    /**
-     * All registered component types, keyed by type id.
-     * Each type defines its geometry, ports, and SVG body renderer.
-     *
-     * Port definition:
-     *   { id, side: 'left'|'right'|'top'|'bottom', type: 'input'|'output'|'bidirectional',
-     *     label, yRatio? (left/right), xRatio? (top/bottom) }
-     */
     const COMPONENT_TYPES = {
 
         // ── Transmitter ──────────────────────────────────────────────────────
@@ -86,24 +53,29 @@
             id: 'transmitter',
             label: 'Transmitter',
             category: 'sources',
-            width: 140,
-            height: 70,
+            width: 150,
+            height: 80,
             defaultLabel: 'TX',
             ports: [
                 { id: 'rf-out', side: 'right', type: 'output', label: 'RF Out', yRatio: 0.5 },
             ],
             renderBody(node) {
                 const w = this.width, h = this.height;
-                const cx = w * 0.35, cy = h * 0.5;
-                // Three sine-wave lines on the right suggest RF energy radiating out
+                const cx = w * 0.33, cy = h * 0.5;
+                const pwr  = node.props?.powerW  != null ? `${node.props.powerW} W`   : '';
+                const freq = node.props?.freqMHz != null ? `${node.props.freqMHz} MHz` : '';
+                // Stack label lines dynamically
+                let lines = `<text class="sv-node-type-icon" x="${cx}" y="${cy - 10}" text-anchor="middle">TX</text>`;
+                lines += `<text class="sv-node-label" x="${cx}" y="${cy + 5}" text-anchor="middle">${_esc(node.label)}</text>`;
+                if (pwr)  lines += `<text class="sv-node-label" x="${cx}" y="${cy + 17}" text-anchor="middle" font-size="9">${_esc(pwr)}</text>`;
+                if (freq) lines += `<text class="sv-node-label" x="${cx}" y="${cy + 28}" text-anchor="middle" font-size="9">${_esc(freq)}</text>`;
                 return `
                     <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="6"/>
-                    <text class="sv-node-type-icon" x="${cx}" y="${cy - 6}" text-anchor="middle">TX</text>
-                    <text class="sv-node-label" x="${cx}" y="${cy + 12}" text-anchor="middle">${_esc(node.label)}</text>
-                    <line class="sv-node-deco" x1="${w * 0.57}" y1="${cy}" x2="${w * 0.62}" y2="${cy}" stroke-width="1.5"/>
-                    <path class="sv-node-deco" d="M${w*0.63},${cy-9} C${w*0.68},${cy-15} ${w*0.73},${cy-3} ${w*0.78},${cy-9} S${w*0.88},${cy-15} ${w*0.93},${cy-9}" fill="none" stroke-width="1.5" stroke-linecap="round" opacity="0.85"/>
-                    <path class="sv-node-deco" d="M${w*0.63},${cy} C${w*0.68},${cy-6} ${w*0.73},${cy+6} ${w*0.78},${cy} S${w*0.88},${cy-6} ${w*0.93},${cy}" fill="none" stroke-width="1.5" stroke-linecap="round" opacity="1"/>
-                    <path class="sv-node-deco" d="M${w*0.63},${cy+9} C${w*0.68},${cy+3} ${w*0.73},${cy+15} ${w*0.78},${cy+9} S${w*0.88},${cy+3} ${w*0.93},${cy+9}" fill="none" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+                    ${lines}
+                    <line class="sv-node-deco" x1="${w*0.55}" y1="${cy}" x2="${w*0.60}" y2="${cy}" stroke-width="1.5"/>
+                    <path class="sv-node-deco" d="M${w*0.61},${cy-8} C${w*0.66},${cy-14} ${w*0.71},${cy-2} ${w*0.76},${cy-8} S${w*0.86},${cy-14} ${w*0.91},${cy-8}" fill="none" stroke-width="1.5" stroke-linecap="round" opacity="0.85"/>
+                    <path class="sv-node-deco" d="M${w*0.61},${cy}   C${w*0.66},${cy-6}  ${w*0.71},${cy+6}  ${w*0.76},${cy}   S${w*0.86},${cy-6}  ${w*0.91},${cy}"   fill="none" stroke-width="1.5" stroke-linecap="round" opacity="1"/>
+                    <path class="sv-node-deco" d="M${w*0.61},${cy+8} C${w*0.66},${cy+2}  ${w*0.71},${cy+14} ${w*0.76},${cy+8} S${w*0.86},${cy+2}  ${w*0.91},${cy+8}" fill="none" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
                 `;
             },
         },
@@ -122,12 +94,13 @@
             ],
             renderBody(node) {
                 const w = this.width, h = this.height;
-                // IEEE-standard amplifier symbol: triangle pointing right
-                const pts = `${w * 0.08},${h * 0.09} ${w * 0.08},${h * 0.91} ${w * 0.92},${h * 0.5}`;
+                const pts  = `${w*0.08},${h*0.09} ${w*0.08},${h*0.91} ${w*0.92},${h*0.5}`;
+                const gain = node.props?.gainDb != null ? `${node.props.gainDb} dB` : '';
                 return `
                     <polygon class="sv-node-body" points="${pts}"/>
-                    <text class="sv-node-type-icon" x="${w * 0.35}" y="${h * 0.46}" text-anchor="middle" font-size="12">▶</text>
-                    <text class="sv-node-label" x="${w * 0.35}" y="${h * 0.64}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
+                    <text class="sv-node-type-icon" x="${w*0.35}" y="${h*0.42}" text-anchor="middle" font-size="12">▶</text>
+                    <text class="sv-node-label" x="${w*0.35}" y="${h*0.60}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
+                    ${gain ? `<text class="sv-node-label" x="${w*0.35}" y="${h*0.76}" text-anchor="middle" font-size="9">${_esc(gain)}</text>` : ''}
                 `;
             },
         },
@@ -146,52 +119,43 @@
             ],
             renderBody(node) {
                 const w = this.width, h = this.height;
-                const db = node.props.attenuationDb != null ? node.props.attenuationDb : '--';
-                // Suggest a Pi attenuator network with two vertical shunt lines and one series line
+                const db = node.props?.attenuationDb != null ? node.props.attenuationDb : '--';
                 return `
                     <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
                     <line class="sv-node-deco" x1="${w*0.28}" y1="${h*0.28}" x2="${w*0.28}" y2="${h*0.72}" stroke-width="1.5" opacity="0.5"/>
                     <line class="sv-node-deco" x1="${w*0.72}" y1="${h*0.28}" x2="${w*0.72}" y2="${h*0.72}" stroke-width="1.5" opacity="0.5"/>
-                    <line class="sv-node-deco" x1="${w*0.22}" y1="${h*0.5}" x2="${w*0.78}" y2="${h*0.5}" stroke-width="1.5" opacity="0.3"/>
+                    <line class="sv-node-deco" x1="${w*0.22}" y1="${h*0.5}"  x2="${w*0.78}" y2="${h*0.5}"  stroke-width="1.5" opacity="0.3"/>
                     <text class="sv-node-type-icon" x="${w*0.5}" y="${h*0.43}" text-anchor="middle" font-size="12">ATT</text>
-                    <text class="sv-node-label" x="${w*0.5}" y="${h*0.76}" text-anchor="middle" font-size="10">${_esc(db)} dB</text>
+                    <text class="sv-node-label"     x="${w*0.5}" y="${h*0.76}" text-anchor="middle" font-size="10">${_esc(db)} dB</text>
                 `;
             },
         },
 
-        // ── DWM Power Meter ──────────────────────────────────────────────────
+        // ── Power Meter ───────────────────────────────────────────────────────
         'dwm-meter': {
             id: 'dwm-meter',
-            label: 'DWM Power Meter',
+            label: 'Meter',
             category: 'meters',
-            width: 160,
-            height: 90,
-            defaultLabel: 'PWR Meter',
+            width: 150,
+            height: 80,
+            defaultLabel: 'METER',
             ports: [
                 { id: 'in',  side: 'left',  type: 'input',  label: 'In',  yRatio: 0.5 },
                 { id: 'out', side: 'right', type: 'output', label: 'Out', yRatio: 0.5 },
             ],
             renderBody(node) {
                 const w = this.width, h = this.height;
-                const devName = node.props.deviceName || 'Unlinked';
-                const mType = node.props.measureType === 'reverse' ? 'RFL' : 'FWD';
+                const isReverse = node.props?.measureType === 'reverse';
+                const dirLabel  = isReverse ? 'REFLECTED' : 'FORWARD';
+                const devName   = node.props?.deviceName || (node.props?.deviceUid ? '' : 'Unlinked');
                 return `
                     <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
-                    <!-- Meter arc icon (semicircle + needle) -->
-                    <path class="sv-node-deco" d="M${w*0.07},${h*0.3} A${w*0.1},${w*0.1} 0 0,1 ${w*0.27},${h*0.3}" fill="none" stroke-width="2" opacity="0.9"/>
-                    <line class="sv-node-deco" x1="${w*0.17}" y1="${h*0.3}" x2="${w*0.24}" y2="${h*0.18}" stroke-width="1.5" opacity="0.9"/>
-                    <!-- Component label and device name -->
-                    <text class="sv-node-type-icon" x="${w*0.62}" y="${h*0.22}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
-                    <text class="sv-meter-label" x="${w*0.62}" y="${h*0.4}" text-anchor="middle">${_esc(devName)}</text>
-                    <!-- Horizontal divider -->
-                    <line class="sv-node-deco" x1="${w*0.06}" y1="${h*0.49}" x2="${w*0.94}" y2="${h*0.49}" stroke-width="0.5" opacity="0.3"/>
-                    <!-- Live power readout — inner <g data-node-id> allows targeted DOM updates -->
+                    <text class="sv-meter-dir" x="${w*0.5}" y="${h*0.26}" text-anchor="middle" font-size="10">${_esc(dirLabel)}</text>
                     <g data-node-id="${_esc(node.id)}">
-                        <text class="sv-meter-label" x="${w*0.1}" y="${h*0.64}" text-anchor="start">${mType}:</text>
-                        <text class="sv-meter-fwd sv-meter-power-fwd" x="${w*0.92}" y="${h*0.64}" text-anchor="end">-- dBm</text>
-                        <text class="sv-meter-label" x="${w*0.1}" y="${h*0.82}" text-anchor="start">RFL:</text>
-                        <text class="sv-meter-rfl sv-meter-power-rfl" x="${w*0.92}" y="${h*0.82}" text-anchor="end">-- dBm</text>
+                        <text class="sv-meter-fwd" x="${w*0.5}" y="${h*0.60}" text-anchor="middle">-- --</text>
                     </g>
+                    <line class="sv-node-deco" x1="${w*0.06}" y1="${h*0.70}" x2="${w*0.94}" y2="${h*0.70}" stroke-width="0.5" opacity="0.3"/>
+                    <text class="sv-node-label" x="${w*0.5}" y="${h*0.86}" text-anchor="middle" font-size="9">${_esc(devName || node.label)}</text>
                 `;
             },
         },
@@ -212,20 +176,21 @@
             ],
             renderBody(node) {
                 const w = this.width, h = this.height;
-                // Junction cross symbol on left half, 3dB/90° labels on right
                 return `
                     <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
                     <line class="sv-node-deco" x1="${w*0.35}" y1="${h*0.25}" x2="${w*0.35}" y2="${h*0.75}" stroke-width="1.5" opacity="0.55"/>
-                    <line class="sv-node-deco" x1="${w*0.22}" y1="${h*0.5}" x2="${w*0.48}" y2="${h*0.5}" stroke-width="1.5" opacity="0.55"/>
+                    <line class="sv-node-deco" x1="${w*0.22}" y1="${h*0.5}"  x2="${w*0.48}" y2="${h*0.5}"  stroke-width="1.5" opacity="0.55"/>
                     <circle class="sv-node-deco" cx="${w*0.35}" cy="${h*0.5}" r="3" opacity="0.8"/>
                     <text class="sv-node-type-icon" x="${w*0.72}" y="${h*0.41}" text-anchor="middle">3dB</text>
-                    <text class="sv-node-label" x="${w*0.72}" y="${h*0.61}" text-anchor="middle">90°</text>
-                    <text class="sv-node-label" x="${w*0.5}" y="${h*0.88}" text-anchor="middle" font-size="9">${_esc(node.label)}</text>
+                    <text class="sv-node-label"     x="${w*0.72}" y="${h*0.61}" text-anchor="middle">90°</text>
+                    <text class="sv-node-label"     x="${w*0.5}"  y="${h*0.88}" text-anchor="middle" font-size="9">${_esc(node.label)}</text>
                 `;
             },
         },
 
         // ── Combiner / Splitter ───────────────────────────────────────────────
+        // Ports: in1 at (0, h*0.33), in2 at (0, h*0.67), out at (w, h*0.5)
+        // Shape is a trapezoid with its left vertices at the actual port positions
         'combiner': {
             id: 'combiner',
             label: 'Combiner/Splitter',
@@ -240,12 +205,20 @@
             ],
             renderBody(node) {
                 const w = this.width, h = this.height;
-                // Trapezoid shape: wide on left (2 ports), narrow on right (1 port)
-                const pts = `${w*0.15},${h*0.14} ${w*0.15},${h*0.86} ${w*0.85},${h*0.64} ${w*0.85},${h*0.36}`;
+                // Left side spans from in1 (h*0.33) to in2 (h*0.67); right narrows to out (h*0.5)
+                // Polygon: top-left at port in1, bottom-left at port in2, converge right to single out
+                const pts = `0,${h*0.22} 0,${h*0.78} ${w*0.82},${h*0.62} ${w*0.82},${h*0.38}`;
                 return `
                     <polygon class="sv-node-body" points="${pts}"/>
-                    <text class="sv-node-type-icon" x="${w*0.48}" y="${h*0.47}" text-anchor="middle">COMB</text>
-                    <text class="sv-node-label" x="${w*0.48}" y="${h*0.65}" text-anchor="middle">${_esc(node.label)}</text>
+                    <!-- Stub from polygon right to output port -->
+                    <line class="sv-node-deco" x1="${w*0.82}" y1="${h*0.5}" x2="${w}" y2="${h*0.5}" stroke-width="2" opacity="0.6"/>
+                    <!-- Internal lines from ports to convergence showing signal paths -->
+                    <line class="sv-node-deco" x1="0" y1="${h*0.33}" x2="${w*0.55}" y2="${h*0.46}" stroke-width="1.5" opacity="0.5"/>
+                    <line class="sv-node-deco" x1="0" y1="${h*0.67}" x2="${w*0.55}" y2="${h*0.54}" stroke-width="1.5" opacity="0.5"/>
+                    <line class="sv-node-deco" x1="${w*0.55}" y1="${h*0.46}" x2="${w*0.55}" y2="${h*0.54}" stroke-width="1.5" opacity="0.5"/>
+                    <line class="sv-node-deco" x1="${w*0.55}" y1="${h*0.5}" x2="${w*0.82}" y2="${h*0.5}" stroke-width="1.5" opacity="0.5"/>
+                    <text class="sv-node-type-icon" x="${w*0.38}" y="${h*0.46}" text-anchor="middle" font-size="9">COMB</text>
+                    <text class="sv-node-label"     x="${w*0.38}" y="${h*0.60}" text-anchor="middle" font-size="8">${_esc(node.label)}</text>
                 `;
             },
         },
@@ -259,33 +232,35 @@
             height: 100,
             defaultLabel: 'ANT',
             ports: [
-                { id: 'feed', side: 'left', type: 'input', label: 'Feed', yRatio: 0.7 },
+                // yRatio 0.5 so the feed aligns horizontally with components in the chain
+                { id: 'feed', side: 'left', type: 'input', label: 'Feed', yRatio: 0.5 },
             ],
             renderBody(node) {
                 const w = this.width, h = this.height;
-                const mx = w * 0.5;    // mast horizontal center
-                const feedY = h * 0.7; // matches port yRatio
-                const topY  = h * 0.08;
-                // Classic Yagi-style antenna symbol: vertical mast with horizontal elements
-                // decreasing in length from top (director) to feedpoint
+                const mx    = w * 0.5;
+                const feedY = h * 0.5;   // matches port yRatio: 0.5
+                const mastTopY = h * 0.08;
                 return `
                     <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
-                    <!-- Horizontal feed line from left port edge to mast base -->
+                    <!-- Feed line from left port to mast base -->
                     <line class="sv-node-deco" x1="0" y1="${feedY}" x2="${mx}" y2="${feedY}" stroke-width="1.5" opacity="0.5"/>
-                    <!-- Mast (vertical radiator) -->
-                    <line class="sv-node-deco" x1="${mx}" y1="${topY}" x2="${mx}" y2="${feedY}" stroke-width="2" opacity="0.75"/>
-                    <!-- Radiating elements: longest at top, tapering down to feedpoint -->
-                    <line class="sv-node-deco" x1="${w*0.14}" y1="${topY}"    x2="${w*0.86}" y2="${topY}"    stroke-width="2"   stroke-linecap="round" opacity="0.9"/>
-                    <line class="sv-node-deco" x1="${w*0.21}" y1="${h*0.22}"  x2="${w*0.79}" y2="${h*0.22}"  stroke-width="1.8" stroke-linecap="round" opacity="0.75"/>
-                    <line class="sv-node-deco" x1="${w*0.29}" y1="${h*0.36}"  x2="${w*0.71}" y2="${h*0.36}"  stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
-                    <line class="sv-node-deco" x1="${w*0.37}" y1="${h*0.5}"   x2="${w*0.63}" y2="${h*0.5}"   stroke-width="1.5" stroke-linecap="round" opacity="0.45"/>
-                    <!-- Label below feedpoint -->
-                    <text class="sv-node-label" x="${mx}" y="${h*0.88}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
+                    <!-- Mast -->
+                    <line class="sv-node-deco" x1="${mx}" y1="${mastTopY}" x2="${mx}" y2="${feedY}" stroke-width="2" opacity="0.75"/>
+                    <!-- Elements (longest at top, tapering down) -->
+                    <line class="sv-node-deco" x1="${w*0.14}" y1="${mastTopY}"   x2="${w*0.86}" y2="${mastTopY}"   stroke-width="2"   stroke-linecap="round" opacity="0.9"/>
+                    <line class="sv-node-deco" x1="${w*0.21}" y1="${h*0.18}"     x2="${w*0.79}" y2="${h*0.18}"     stroke-width="1.8" stroke-linecap="round" opacity="0.75"/>
+                    <line class="sv-node-deco" x1="${w*0.29}" y1="${h*0.28}"     x2="${w*0.71}" y2="${h*0.28}"     stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+                    <line class="sv-node-deco" x1="${w*0.37}" y1="${h*0.38}"     x2="${w*0.63}" y2="${h*0.38}"     stroke-width="1.5" stroke-linecap="round" opacity="0.45"/>
+                    <text class="sv-node-label" x="${mx}" y="${h*0.72}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
+                    <!-- Ground symbol -->
+                    <line class="sv-node-deco" x1="${w*0.35}" y1="${h*0.80}" x2="${w*0.65}" y2="${h*0.80}" stroke-width="1.5" opacity="0.6"/>
+                    <line class="sv-node-deco" x1="${w*0.42}" y1="${h*0.87}" x2="${w*0.58}" y2="${h*0.87}" stroke-width="1.5" opacity="0.45"/>
+                    <line class="sv-node-deco" x1="${w*0.47}" y1="${h*0.93}" x2="${w*0.53}" y2="${h*0.93}" stroke-width="1.5" opacity="0.3"/>
                 `;
             },
         },
 
-        // ── Coax Switch ───────────────────────────────────────────────────────
+        // ── Coax Switch (1-in, 2-out) ─────────────────────────────────────────
         'coax-switch': {
             id: 'coax-switch',
             label: 'Coax Switch',
@@ -294,30 +269,104 @@
             height: 90,
             defaultLabel: 'SW',
             ports: [
-                { id: 'in',   side: 'left',  type: 'input',  label: 'In',    yRatio: 0.5 },
+                { id: 'in',   side: 'left',  type: 'input',  label: 'In',    yRatio: 0.5  },
                 { id: 'out1', side: 'right', type: 'output', label: 'Port 1', yRatio: 0.33 },
                 { id: 'out2', side: 'right', type: 'output', label: 'Port 2', yRatio: 0.67 },
             ],
             renderBody(node) {
                 const w = this.width, h = this.height;
-                // Switch pivot point roughly aligns with the input port
-                const px = w * 0.44, py = h * 0.5;
-                // Active arm aims toward out1 (upper right)
-                const ax = w * 0.76, ay = h * 0.33;
-                // Inactive arm aims toward out2 (lower right)
-                const bx = w * 0.76, by = h * 0.67;
+                const px = w*0.44, py = h*0.5;
+                const ax = w*0.76, ay = h*0.33;
+                const bx = w*0.76, by = h*0.67;
+                const active = node.props?.activePort ?? 1;
                 return `
                     <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
-                    <!-- Active connection arm (solid) -->
-                    <line class="sv-node-deco" x1="${px}" y1="${py}" x2="${ax}" y2="${ay}" stroke-width="2" stroke-linecap="round" opacity="0.85"/>
-                    <!-- Inactive connection arm (dashed) -->
-                    <line class="sv-node-deco" x1="${px}" y1="${py}" x2="${bx}" y2="${by}" stroke-width="1.5" stroke-dasharray="4,3" stroke-linecap="round" opacity="0.4"/>
-                    <!-- Arc indicating switch rotation range -->
-                    <path class="sv-node-deco" d="M${ax},${ay + 4} A${h*0.22},${h*0.22} 0 0,1 ${bx},${by - 4}" fill="none" stroke-width="1" stroke-dasharray="3,3" opacity="0.35"/>
-                    <!-- Pivot circle -->
+                    <line class="sv-node-deco" x1="${px}" y1="${py}" x2="${active===1 ? ax : bx}" y2="${active===1 ? ay : by}" stroke-width="2"   stroke-linecap="round" opacity="0.85"/>
+                    <line class="sv-node-deco" x1="${px}" y1="${py}" x2="${active===1 ? bx : ax}" y2="${active===1 ? by : ay}" stroke-width="1.5" stroke-dasharray="4,3" stroke-linecap="round" opacity="0.4"/>
+                    <path class="sv-node-deco" d="M${ax},${ay+4} A${h*0.22},${h*0.22} 0 0,1 ${bx},${by-4}" fill="none" stroke-width="1" stroke-dasharray="3,3" opacity="0.35"/>
                     <circle class="sv-node-deco" cx="${px}" cy="${py}" r="4.5" opacity="0.85"/>
                     <text class="sv-node-type-icon" x="${w*0.2}" y="${h*0.44}" text-anchor="middle" font-size="14">SW</text>
-                    <text class="sv-node-label" x="${w*0.2}" y="${h*0.64}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
+                    <text class="sv-node-label"     x="${w*0.2}" y="${h*0.64}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
+                `;
+            },
+        },
+
+        // ── 4-Port Switch (2-in, 2-out): straight-through or cross ───────────
+        '4port-switch': {
+            id: '4port-switch',
+            label: '4-Port Switch',
+            category: 'switching',
+            width: 120,
+            height: 90,
+            defaultLabel: '4P-SW',
+            ports: [
+                { id: 'in1',  side: 'left',  type: 'input',  label: 'In 1',  yRatio: 0.33 },
+                { id: 'in2',  side: 'left',  type: 'input',  label: 'In 2',  yRatio: 0.67 },
+                { id: 'out1', side: 'right', type: 'output', label: 'Out 1', yRatio: 0.33 },
+                { id: 'out2', side: 'right', type: 'output', label: 'Out 2', yRatio: 0.67 },
+            ],
+            renderBody(node) {
+                const w = this.width, h = this.height;
+                const mode = node.props?.mode || 'through';
+                const in1Y  = h*0.33, in2Y = h*0.67;
+                const out1Y = h*0.33, out2Y = h*0.67;
+                // Straight-through: parallel lines; cross: X crossing lines
+                const lx1 = w*0.12, lx2 = w*0.88;
+                let paths = '';
+                if (mode === 'through') {
+                    paths = `
+                        <line class="sv-node-deco" x1="${lx1}" y1="${in1Y}" x2="${lx2}" y2="${out1Y}" stroke-width="2" opacity="0.85"/>
+                        <line class="sv-node-deco" x1="${lx1}" y1="${in2Y}" x2="${lx2}" y2="${out2Y}" stroke-width="2" opacity="0.85"/>`;
+                } else {
+                    // Cross: break at center to show which is on top
+                    const cx = w*0.5;
+                    paths = `
+                        <line class="sv-node-deco" x1="${lx1}" y1="${in1Y}" x2="${cx - 4}" y2="${(in1Y+out2Y)/2 - 2}" stroke-width="2" opacity="0.85"/>
+                        <line class="sv-node-deco" x1="${cx + 4}" y1="${(in1Y+out2Y)/2 + 2}" x2="${lx2}" y2="${out2Y}" stroke-width="2" opacity="0.85"/>
+                        <line class="sv-node-deco" x1="${lx1}" y1="${in2Y}" x2="${lx2}" y2="${out1Y}" stroke-width="2" opacity="0.85"/>`;
+                }
+                return `
+                    <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
+                    ${paths}
+                    <text class="sv-node-type-icon" x="${w*0.5}" y="${h*0.30}" text-anchor="middle" font-size="9">4P-SW</text>
+                    <text class="sv-node-label"     x="${w*0.5}" y="${h*0.56}" text-anchor="middle" font-size="9">${_esc(node.label)}</text>
+                    <text class="sv-node-label"     x="${w*0.5}" y="${h*0.78}" text-anchor="middle" font-size="8">${mode.toUpperCase()}</text>
+                `;
+            },
+        },
+
+        // ── Filter ────────────────────────────────────────────────────────────
+        'filter': {
+            id: 'filter',
+            label: 'Filter',
+            category: 'passive',
+            width: 110,
+            height: 60,
+            defaultLabel: 'FILT',
+            ports: [
+                { id: 'in',  side: 'left',  type: 'input',  label: 'In',  yRatio: 0.5 },
+                { id: 'out', side: 'right', type: 'output', label: 'Out', yRatio: 0.5 },
+            ],
+            renderBody(node) {
+                const w = this.width, h = this.height;
+                const ft = node.props?.filterType || 'lowpass';
+                const ftLabel = { lowpass: 'LP', highpass: 'HP', bandpass: 'BP', notch: 'NOTCH' }[ft] || ft.toUpperCase();
+                // Frequency response curve per filter type
+                let curve = '';
+                if (ft === 'lowpass') {
+                    curve = `<path class="sv-node-deco" d="M${w*0.2},${h*0.3} L${w*0.48},${h*0.3} C${w*0.58},${h*0.3} ${w*0.62},${h*0.7} ${w*0.8},${h*0.7}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
+                } else if (ft === 'highpass') {
+                    curve = `<path class="sv-node-deco" d="M${w*0.2},${h*0.7} C${w*0.38},${h*0.7} ${w*0.42},${h*0.3} ${w*0.52},${h*0.3} L${w*0.8},${h*0.3}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
+                } else if (ft === 'bandpass') {
+                    curve = `<path class="sv-node-deco" d="M${w*0.2},${h*0.7} C${w*0.3},${h*0.7} ${w*0.36},${h*0.26} ${w*0.5},${h*0.26} C${w*0.64},${h*0.26} ${w*0.7},${h*0.7} ${w*0.8},${h*0.7}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
+                } else {
+                    // notch
+                    curve = `<path class="sv-node-deco" d="M${w*0.2},${h*0.3} C${w*0.3},${h*0.3} ${w*0.38},${h*0.74} ${w*0.5},${h*0.74} C${w*0.62},${h*0.74} ${w*0.7},${h*0.3} ${w*0.8},${h*0.3}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
+                }
+                return `
+                    <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
+                    ${curve}
+                    <text class="sv-node-type-icon" x="${w*0.5}" y="${h*0.90}" text-anchor="middle" font-size="10">${ftLabel}</text>
                 `;
             },
         },
@@ -340,46 +389,34 @@
                 const cx = w * 0.5;
                 return `
                     <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
-                    <!-- Main through-line (dashed to suggest minimal insertion loss) -->
                     <line class="sv-node-deco" x1="${w*0.07}" y1="${h*0.5}" x2="${w*0.93}" y2="${h*0.5}" stroke-width="1.5" stroke-dasharray="5,2" opacity="0.3"/>
-                    <!-- Two parallel coupled-line bars (IEEE directional coupler symbol) -->
                     <line class="sv-node-deco" x1="${w*0.38}" y1="${h*0.3}" x2="${w*0.62}" y2="${h*0.3}" stroke-width="2" opacity="0.6"/>
                     <line class="sv-node-deco" x1="${w*0.38}" y1="${h*0.4}" x2="${w*0.62}" y2="${h*0.4}" stroke-width="2" opacity="0.6"/>
-                    <!-- Coupled port arrow pointing downward -->
-                    <line class="sv-node-deco" x1="${cx}" y1="${h*0.5}" x2="${cx}" y2="${h*0.87}" stroke-width="1.5" opacity="0.75"/>
+                    <line class="sv-node-deco" x1="${cx}" y1="${h*0.5}"   x2="${cx}" y2="${h*0.87}" stroke-width="1.5" opacity="0.75"/>
                     <polygon class="sv-node-deco" points="${cx},${h*0.87} ${cx-5},${h*0.76} ${cx+5},${h*0.76}" opacity="0.75"/>
                     <text class="sv-node-type-icon" x="${cx}" y="${h*0.22}" text-anchor="middle" font-size="12">CPL</text>
-                    <text class="sv-node-label" x="${w*0.26}" y="${h*0.72}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
+                    <text class="sv-node-label"     x="${w*0.26}" y="${h*0.72}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
                 `;
             },
         },
 
-    }; // end COMPONENT_TYPES
+    };
 
-    // ─── Public API Functions ─────────────────────────────────────────────────
-
-    /**
-     * Create a new node object of the specified component type.
-     * @param {string} type  - Component type id (key in COMPONENT_TYPES)
-     * @param {number} x     - Canvas x position (top-left of component bounding box)
-     * @param {number} y     - Canvas y position
-     * @returns {object} Node object
-     */
     function createNode(type, x, y) {
         const typeDef = COMPONENT_TYPES[type];
-        if (!typeDef) {
-            throw new Error(`SiteViewComponents: unknown component type "${type}"`);
-        }
+        if (!typeDef) throw new Error(`SiteViewComponents: unknown component type "${type}"`);
 
         let props = {};
-        if (type === 'attenuator') {
-            props = { attenuationDb: 3 };
-        } else if (type === 'dwm-meter') {
-            props = { deviceUid: null, deviceName: null, measureType: 'forward' };
-        }
+        if (type === 'attenuator')   props = { attenuationDb: 3 };
+        if (type === 'dwm-meter')    props = { deviceUid: null, deviceName: null, measureType: 'forward' };
+        if (type === 'amplifier')    props = { gainDb: null };
+        if (type === 'transmitter')  props = { powerW: null, freqMHz: null };
+        if (type === 'filter')       props = { filterType: 'lowpass' };
+        if (type === '4port-switch') props = { mode: 'through' };
+        if (type === 'coax-switch')  props = { activePort: 1 };
 
         return {
-            id: 'node-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+            id:    'node-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
             type,
             x,
             y,
@@ -388,71 +425,39 @@
         };
     }
 
-    /**
-     * Get a port's absolute position in canvas coordinate space.
-     * @param {object} node    - Node object
-     * @param {string} portId  - Port id
-     * @returns {{ x: number, y: number, side: string } | null}
-     */
     function getPortAbsolutePos(node, portId) {
         const typeDef = COMPONENT_TYPES[node.type];
         if (!typeDef) return null;
         const port = typeDef.ports.find(p => p.id === portId);
         if (!port) return null;
         const local = _portLocalPos(typeDef, port);
-        return {
-            x: node.x + local.x,
-            y: node.y + local.y,
-            side: port.side,
-        };
+        return { x: node.x + local.x, y: node.y + local.y, side: port.side };
     }
 
-    /**
-     * Get a port's position in screen/pixel space, accounting for viewport pan and zoom.
-     * @param {object} node      - Node object
-     * @param {string} portId    - Port id
-     * @param {object} viewport  - { x: panX, y: panY, scale: zoomScale }
-     * @returns {{ x: number, y: number } | null}
-     */
     function getPortScreenPos(node, portId, viewport) {
         const abs = getPortAbsolutePos(node, portId);
         if (!abs) return null;
         const s = viewport.scale ?? 1;
-        return {
-            x: abs.x * s + (viewport.x ?? 0),
-            y: abs.y * s + (viewport.y ?? 0),
-        };
+        return { x: abs.x * s + (viewport.x ?? 0), y: abs.y * s + (viewport.y ?? 0) };
     }
 
-    /**
-     * Render the full SVG <g> element for a node, including body, selection rect, and port circles.
-     * @param {object} node  - Node object (from createNode)
-     * @returns {string} SVG markup string
-     */
     function renderNodeSVG(node) {
         const typeDef = COMPONENT_TYPES[node.type];
-        if (!typeDef) {
-            return `<!-- sv-unknown-type: ${_esc(node.type)} -->`;
-        }
+        if (!typeDef) return `<!-- sv-unknown-type: ${_esc(node.type)} -->`;
 
-        const w = typeDef.width;
-        const h = typeDef.height;
+        const w = typeDef.width, h = typeDef.height;
         const nid = _esc(node.id);
 
-        // Build SVG for each port: a transparent hit circle + a visual circle + a label
         const portsHtml = typeDef.ports.map(port => {
             const { x: px, y: py } = _portLocalPos(typeDef, port);
-            const lp = _portLabelPos(port, px, py);
+            const lp  = _portLabelPos(port, px, py);
             const pid = _esc(port.id);
             return (
-                // Large transparent circle handles pointer events for drag-to-connect
                 `<circle class="sv-port-hit" cx="${px}" cy="${py}" r="12"` +
                     ` data-node-id="${nid}" data-port-id="${pid}"` +
                     ` data-port-type="${port.type}" data-port-side="${port.side}"/>` +
-                // Smaller visible circle — pointer-events disabled so hit circle takes precedence
                 `<circle class="sv-port sv-port-${port.type}" cx="${px}" cy="${py}" r="6"` +
                     ` pointer-events="none" data-node-id="${nid}" data-port-id="${pid}"/>` +
-                // Port label positioned outward from the port side
                 `<text class="sv-port-label" x="${lp.x}" y="${lp.y}"` +
                     ` font-size="9" text-anchor="${lp.anchor}">${_esc(port.label)}</text>`
             );
@@ -462,7 +467,6 @@
             `<g id="sv-node-${nid}" class="sv-node sv-node-${_esc(node.type)}"` +
             ` transform="translate(${node.x},${node.y})" data-node-id="${nid}">` +
             `\n    ${typeDef.renderBody(node)}` +
-            // Selection highlight rect — hidden by default, shown via .sv-selected CSS class
             `\n    <rect class="sv-node-selection" x="-4" y="-4"` +
             ` width="${w + 8}" height="${h + 8}" rx="8"` +
             ` fill="none" stroke="var(--sv-select-color)" stroke-width="2"` +
@@ -472,25 +476,14 @@
         );
     }
 
-    /**
-     * Return the component palette grouped by category, in display order.
-     * @returns {Array<{id: string, label: string, items: Array<{typeId: string, label: string}>}>}
-     */
     function getComponentCategories() {
         const map = {};
-        CATEGORIES.forEach(c => {
-            map[c.id] = { id: c.id, label: c.label, items: [] };
-        });
+        CATEGORIES.forEach(c => { map[c.id] = { id: c.id, label: c.label, items: [] }; });
         Object.values(COMPONENT_TYPES).forEach(t => {
-            if (map[t.category]) {
-                map[t.category].items.push({ typeId: t.id, label: t.label });
-            }
+            if (map[t.category]) map[t.category].items.push({ typeId: t.id, label: t.label });
         });
-        // Return only categories that have at least one component
         return CATEGORIES.map(c => map[c.id]).filter(c => c.items.length > 0);
     }
-
-    // ─── Export ───────────────────────────────────────────────────────────────
 
     window.SiteViewComponents = {
         COMPONENT_TYPES,
