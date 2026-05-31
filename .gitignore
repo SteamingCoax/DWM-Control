@@ -123,3 +123,6 @@ Programs/dfu-util/linux-arm/dfu-util
 # Batch and PowerShell test files
 test-*.bat
 test-*.ps1
+
+# Agent memory artifacts
+memories/
