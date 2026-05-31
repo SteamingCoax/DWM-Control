@@ -37,6 +37,10 @@
         }
     }
 
+    const STRIP_H = 28;
+    const GAIN_TYPES = new Set(['amplifier', 'attenuator', 'hybrid-3db', 'combiner',
+                                 'coax-switch', '4port-switch', 'filter', 'coupler']);
+
     const CATEGORIES = [
         { id: 'sources',       label: 'Sources' },
         { id: 'amplification', label: 'Amplification' },
@@ -92,27 +96,16 @@
                 { id: 'in',  side: 'left',  type: 'input',  label: 'In',  yRatio: 0.5 },
                 { id: 'out', side: 'right', type: 'output', label: 'Out', yRatio: 0.5 },
             ],
-            renderBody(node, ctx) {
-                const w = this.width;
-                const baseH = this.height; // = 66
-                const effectiveH = ctx?.effectiveH ?? baseH;
-                const showStrip = ctx?.hasFwd || ctx?.hasRfl;
-                const midY = baseH * 0.5;
-                const triPts = `${w*0.12},${baseH*0.12} ${w*0.12},${baseH*0.88} ${w*0.72},${midY}`;
+            renderBody(node) {
+                const w = this.width, h = this.height; // w=140, h=66
+                const midY = h * 0.5;
+                const triPts = `${w*0.12},${h*0.12} ${w*0.12},${h*0.88} ${w*0.72},${midY}`;
                 const confGain = node.props?.gainDb != null ? `${node.props.gainDb >= 0 ? '+' : ''}${node.props.gainDb} dB` : '';
-                const gainHtml = showStrip ? `
-                    <line class="sv-node-deco" x1="0" y1="${baseH}" x2="${w}" y2="${baseH}" stroke-width="0.5" opacity="0.35"/>
-                    <g data-gain-node-id="${_esc(node.id)}">
-                        <text class="sv-comp-gain-fwd" x="${w*0.5}" y="${baseH + 11}" text-anchor="middle"></text>
-                        <text class="sv-comp-gain-rfl" x="${w*0.5}" y="${baseH + 22}" text-anchor="middle"></text>
-                    </g>` : '';
                 return `
-                    <rect class="sv-node-body" x="0" y="0" width="${w}" height="${effectiveH}" rx="4"/>
                     <polygon class="sv-node-deco" points="${triPts}" opacity="0.55"/>
                     <text class="sv-node-type-icon" x="${w*0.35}" y="${midY - 4}" text-anchor="middle" font-size="11">▶</text>
                     <text class="sv-node-label" x="${w*0.35}" y="${midY + 9}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
                     ${confGain ? `<text class="sv-node-label" x="${w*0.35}" y="${midY + 20}" text-anchor="middle" font-size="8">${_esc(confGain)}</text>` : ''}
-                    ${gainHtml}
                 `;
             },
         },
@@ -129,26 +122,15 @@
                 { id: 'in',  side: 'left',  type: 'input',  label: 'In',  yRatio: 0.5 },
                 { id: 'out', side: 'right', type: 'output', label: 'Out', yRatio: 0.5 },
             ],
-            renderBody(node, ctx) {
-                const w = this.width;
-                const baseH = this.height; // = 60
-                const effectiveH = ctx?.effectiveH ?? baseH;
-                const showStrip = ctx?.hasFwd || ctx?.hasRfl;
+            renderBody(node) {
+                const w = this.width, h = this.height; // w=110, h=60
                 const db = node.props?.attenuationDb != null ? node.props.attenuationDb : '--';
-                const gainHtml = showStrip ? `
-                    <line class="sv-node-deco" x1="0" y1="${baseH}" x2="${w}" y2="${baseH}" stroke-width="0.5" opacity="0.35"/>
-                    <g data-gain-node-id="${_esc(node.id)}">
-                        <text class="sv-comp-gain-fwd" x="${w*0.5}" y="${baseH + 11}" text-anchor="middle"></text>
-                        <text class="sv-comp-gain-rfl" x="${w*0.5}" y="${baseH + 22}" text-anchor="middle"></text>
-                    </g>` : '';
                 return `
-                    <rect class="sv-node-body" x="0" y="0" width="${w}" height="${effectiveH}" rx="4"/>
-                    <line class="sv-node-deco" x1="${w*0.28}" y1="${baseH*0.28}" x2="${w*0.28}" y2="${baseH*0.72}" stroke-width="1.5" opacity="0.5"/>
-                    <line class="sv-node-deco" x1="${w*0.72}" y1="${baseH*0.28}" x2="${w*0.72}" y2="${baseH*0.72}" stroke-width="1.5" opacity="0.5"/>
-                    <line class="sv-node-deco" x1="${w*0.22}" y1="${baseH*0.5}"  x2="${w*0.78}" y2="${baseH*0.5}"  stroke-width="1.5" opacity="0.3"/>
-                    <text class="sv-node-type-icon" x="${w*0.5}" y="${baseH*0.43}" text-anchor="middle" font-size="12">ATT</text>
-                    <text class="sv-node-label"     x="${w*0.5}" y="${baseH*0.76}" text-anchor="middle" font-size="10">${_esc(db)} dB</text>
-                    ${gainHtml}
+                    <line class="sv-node-deco" x1="${w*0.28}" y1="${h*0.28}" x2="${w*0.28}" y2="${h*0.72}" stroke-width="1.5" opacity="0.5"/>
+                    <line class="sv-node-deco" x1="${w*0.72}" y1="${h*0.28}" x2="${w*0.72}" y2="${h*0.72}" stroke-width="1.5" opacity="0.5"/>
+                    <line class="sv-node-deco" x1="${w*0.22}" y1="${h*0.5}"  x2="${w*0.78}" y2="${h*0.5}"  stroke-width="1.5" opacity="0.3"/>
+                    <text class="sv-node-type-icon" x="${w*0.5}" y="${h*0.43}" text-anchor="middle" font-size="12">ATT</text>
+                    <text class="sv-node-label"     x="${w*0.5}" y="${h*0.76}" text-anchor="middle" font-size="10">${_esc(db)} dB</text>
                 `;
             },
         },
@@ -196,26 +178,15 @@
                 { id: 'out1', side: 'right', type: 'output', label: 'Out 1', yRatio: 0.33 },
                 { id: 'out2', side: 'right', type: 'output', label: 'Out 2', yRatio: 0.67 },
             ],
-            renderBody(node, ctx) {
-                const w = this.width;
-                const baseH = this.height; // = 90
-                const effectiveH = ctx?.effectiveH ?? baseH;
-                const showStrip = ctx?.hasFwd || ctx?.hasRfl;
-                const gainHtml = showStrip ? `
-                    <line class="sv-node-deco" x1="0" y1="${baseH}" x2="${w}" y2="${baseH}" stroke-width="0.5" opacity="0.35"/>
-                    <g data-gain-node-id="${_esc(node.id)}">
-                        <text class="sv-comp-gain-fwd" x="${w*0.5}" y="${baseH + 11}" text-anchor="middle"></text>
-                        <text class="sv-comp-gain-rfl" x="${w*0.5}" y="${baseH + 22}" text-anchor="middle"></text>
-                    </g>` : '';
+            renderBody(node) {
+                const w = this.width, h = this.height; // w=120, h=90
                 return `
-                    <rect class="sv-node-body" x="0" y="0" width="${w}" height="${effectiveH}" rx="4"/>
-                    <line class="sv-node-deco" x1="${w*0.35}" y1="${baseH*0.25}" x2="${w*0.35}" y2="${baseH*0.75}" stroke-width="1.5" opacity="0.55"/>
-                    <line class="sv-node-deco" x1="${w*0.22}" y1="${baseH*0.5}"  x2="${w*0.48}" y2="${baseH*0.5}"  stroke-width="1.5" opacity="0.55"/>
-                    <circle class="sv-node-deco" cx="${w*0.35}" cy="${baseH*0.5}" r="3" opacity="0.8"/>
-                    <text class="sv-node-type-icon" x="${w*0.72}" y="${baseH*0.41}" text-anchor="middle">3dB</text>
-                    <text class="sv-node-label"     x="${w*0.72}" y="${baseH*0.61}" text-anchor="middle">90°</text>
-                    <text class="sv-node-label"     x="${w*0.5}"  y="${baseH*0.88}" text-anchor="middle" font-size="9">${_esc(node.label)}</text>
-                    ${gainHtml}
+                    <line class="sv-node-deco" x1="${w*0.35}" y1="${h*0.25}" x2="${w*0.35}" y2="${h*0.75}" stroke-width="1.5" opacity="0.55"/>
+                    <line class="sv-node-deco" x1="${w*0.22}" y1="${h*0.5}"  x2="${w*0.48}" y2="${h*0.5}"  stroke-width="1.5" opacity="0.55"/>
+                    <circle class="sv-node-deco" cx="${w*0.35}" cy="${h*0.5}" r="3" opacity="0.8"/>
+                    <text class="sv-node-type-icon" x="${w*0.72}" y="${h*0.41}" text-anchor="middle">3dB</text>
+                    <text class="sv-node-label"     x="${w*0.72}" y="${h*0.61}" text-anchor="middle">90°</text>
+                    <text class="sv-node-label"     x="${w*0.5}"  y="${h*0.88}" text-anchor="middle" font-size="9">${_esc(node.label)}</text>
                 `;
             },
         },
@@ -235,30 +206,18 @@
                 { id: 'in2', side: 'left',  type: 'input',  label: 'In 2', yRatio: 0.67 },
                 { id: 'out', side: 'right', type: 'output', label: 'Out',  yRatio: 0.5 },
             ],
-            renderBody(node, ctx) {
-                const w = this.width;
-                const baseH = this.height; // = 90
-                const effectiveH = ctx?.effectiveH ?? baseH;
-                const showStrip = ctx?.hasFwd || ctx?.hasRfl;
-                const pts = `0,${baseH*0.22} 0,${baseH*0.78} ${w*0.82},${baseH*0.62} ${w*0.82},${baseH*0.38}`;
-                const gainHtml = showStrip ? `
-                    <line class="sv-node-deco" x1="0" y1="${baseH}" x2="${w}" y2="${baseH}" stroke-width="0.5" opacity="0.35"/>
-                    <g data-gain-node-id="${_esc(node.id)}">
-                        <text class="sv-comp-gain-fwd" x="${w*0.5}" y="${baseH + 11}" text-anchor="middle"></text>
-                        <text class="sv-comp-gain-rfl" x="${w*0.5}" y="${baseH + 22}" text-anchor="middle"></text>
-                    </g>` : '';
+            renderBody(node) {
+                const w = this.width, h = this.height; // w=120, h=90
+                const pts = `0,${h*0.22} 0,${h*0.78} ${w*0.82},${h*0.62} ${w*0.82},${h*0.38}`;
                 return `
                     <polygon class="sv-node-body" points="${pts}"/>
-                    <!-- Stub from polygon right to output port -->
-                    <line class="sv-node-deco" x1="${w*0.82}" y1="${baseH*0.5}" x2="${w}" y2="${baseH*0.5}" stroke-width="2" opacity="0.6"/>
-                    <!-- Internal lines from ports to convergence showing signal paths -->
-                    <line class="sv-node-deco" x1="0" y1="${baseH*0.33}" x2="${w*0.55}" y2="${baseH*0.46}" stroke-width="1.5" opacity="0.5"/>
-                    <line class="sv-node-deco" x1="0" y1="${baseH*0.67}" x2="${w*0.55}" y2="${baseH*0.54}" stroke-width="1.5" opacity="0.5"/>
-                    <line class="sv-node-deco" x1="${w*0.55}" y1="${baseH*0.46}" x2="${w*0.55}" y2="${baseH*0.54}" stroke-width="1.5" opacity="0.5"/>
-                    <line class="sv-node-deco" x1="${w*0.55}" y1="${baseH*0.5}" x2="${w*0.82}" y2="${baseH*0.5}" stroke-width="1.5" opacity="0.5"/>
-                    <text class="sv-node-type-icon" x="${w*0.38}" y="${baseH*0.46}" text-anchor="middle" font-size="9">COMB</text>
-                    <text class="sv-node-label"     x="${w*0.38}" y="${baseH*0.60}" text-anchor="middle" font-size="8">${_esc(node.label)}</text>
-                    ${gainHtml}
+                    <line class="sv-node-deco" x1="${w*0.82}" y1="${h*0.5}" x2="${w}" y2="${h*0.5}" stroke-width="2" opacity="0.6"/>
+                    <line class="sv-node-deco" x1="0" y1="${h*0.33}" x2="${w*0.55}" y2="${h*0.46}" stroke-width="1.5" opacity="0.5"/>
+                    <line class="sv-node-deco" x1="0" y1="${h*0.67}" x2="${w*0.55}" y2="${h*0.54}" stroke-width="1.5" opacity="0.5"/>
+                    <line class="sv-node-deco" x1="${w*0.55}" y1="${h*0.46}" x2="${w*0.55}" y2="${h*0.54}" stroke-width="1.5" opacity="0.5"/>
+                    <line class="sv-node-deco" x1="${w*0.55}" y1="${h*0.5}" x2="${w*0.82}" y2="${h*0.5}" stroke-width="1.5" opacity="0.5"/>
+                    <text class="sv-node-type-icon" x="${w*0.38}" y="${h*0.46}" text-anchor="middle" font-size="9">COMB</text>
+                    <text class="sv-node-label"     x="${w*0.38}" y="${h*0.60}" text-anchor="middle" font-size="8">${_esc(node.label)}</text>
                 `;
             },
         },
@@ -313,30 +272,19 @@
                 { id: 'out1', side: 'right', type: 'output', label: 'Out 1', yRatio: 0.33 },
                 { id: 'out2', side: 'right', type: 'output', label: 'Out 2', yRatio: 0.67 },
             ],
-            renderBody(node, ctx) {
-                const w = this.width;
-                const baseH = this.height; // = 90
-                const effectiveH = ctx?.effectiveH ?? baseH;
-                const showStrip = ctx?.hasFwd || ctx?.hasRfl;
-                const px = w*0.44, py = baseH*0.5;
-                const ax = w*0.76, ay = baseH*0.33;
-                const bx = w*0.76, by = baseH*0.67;
+            renderBody(node) {
+                const w = this.width, h = this.height; // w=120, h=90
+                const px = w*0.44, py = h*0.5;
+                const ax = w*0.76, ay = h*0.33;
+                const bx = w*0.76, by = h*0.67;
                 const active = node.props?.activePort ?? 1;
-                const gainHtml = showStrip ? `
-                    <line class="sv-node-deco" x1="0" y1="${baseH}" x2="${w}" y2="${baseH}" stroke-width="0.5" opacity="0.35"/>
-                    <g data-gain-node-id="${_esc(node.id)}">
-                        <text class="sv-comp-gain-fwd" x="${w*0.5}" y="${baseH + 11}" text-anchor="middle"></text>
-                        <text class="sv-comp-gain-rfl" x="${w*0.5}" y="${baseH + 22}" text-anchor="middle"></text>
-                    </g>` : '';
                 return `
-                    <rect class="sv-node-body" x="0" y="0" width="${w}" height="${effectiveH}" rx="4"/>
                     <line class="sv-node-deco" x1="${px}" y1="${py}" x2="${active===1 ? ax : bx}" y2="${active===1 ? ay : by}" stroke-width="2"   stroke-linecap="round" opacity="0.85"/>
                     <line class="sv-node-deco" x1="${px}" y1="${py}" x2="${active===1 ? bx : ax}" y2="${active===1 ? by : ay}" stroke-width="1.5" stroke-dasharray="4,3" stroke-linecap="round" opacity="0.4"/>
-                    <path class="sv-node-deco" d="M${ax},${ay+4} A${baseH*0.22},${baseH*0.22} 0 0,1 ${bx},${by-4}" fill="none" stroke-width="1" stroke-dasharray="3,3" opacity="0.35"/>
+                    <path class="sv-node-deco" d="M${ax},${ay+4} A${h*0.22},${h*0.22} 0 0,1 ${bx},${by-4}" fill="none" stroke-width="1" stroke-dasharray="3,3" opacity="0.35"/>
                     <circle class="sv-node-deco" cx="${px}" cy="${py}" r="4.5" opacity="0.85"/>
-                    <text class="sv-node-type-icon" x="${w*0.2}" y="${baseH*0.44}" text-anchor="middle" font-size="14">SW</text>
-                    <text class="sv-node-label"     x="${w*0.2}" y="${baseH*0.64}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
-                    ${gainHtml}
+                    <text class="sv-node-type-icon" x="${w*0.2}" y="${h*0.44}" text-anchor="middle" font-size="14">SW</text>
+                    <text class="sv-node-label"     x="${w*0.2}" y="${h*0.64}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
                 `;
             },
         },
@@ -355,14 +303,11 @@
                 { id: 'out1', side: 'right', type: 'output', label: 'Out 1', yRatio: 0.33 },
                 { id: 'out2', side: 'right', type: 'output', label: 'Out 2', yRatio: 0.67 },
             ],
-            renderBody(node, ctx) {
-                const w = this.width;
-                const baseH = this.height; // = 90
-                const effectiveH = ctx?.effectiveH ?? baseH;
-                const showStrip = ctx?.hasFwd || ctx?.hasRfl;
+            renderBody(node) {
+                const w = this.width, h = this.height; // w=120, h=90
                 const mode = node.props?.mode || 'through';
-                const in1Y  = baseH*0.33, in2Y = baseH*0.67;
-                const out1Y = baseH*0.33, out2Y = baseH*0.67;
+                const in1Y = h*0.33, in2Y = h*0.67;
+                const out1Y = h*0.33, out2Y = h*0.67;
                 const lx1 = w*0.12, lx2 = w*0.88;
                 let paths = '';
                 if (mode === 'through') {
@@ -370,26 +315,17 @@
                         <line class="sv-node-deco" x1="${lx1}" y1="${in1Y}" x2="${lx2}" y2="${out1Y}" stroke-width="2" opacity="0.85"/>
                         <line class="sv-node-deco" x1="${lx1}" y1="${in2Y}" x2="${lx2}" y2="${out2Y}" stroke-width="2" opacity="0.85"/>`;
                 } else {
-                    // Cross: break at center to show which is on top
                     const cx = w*0.5;
                     paths = `
                         <line class="sv-node-deco" x1="${lx1}" y1="${in1Y}" x2="${cx - 4}" y2="${(in1Y+out2Y)/2 - 2}" stroke-width="2" opacity="0.85"/>
                         <line class="sv-node-deco" x1="${cx + 4}" y1="${(in1Y+out2Y)/2 + 2}" x2="${lx2}" y2="${out2Y}" stroke-width="2" opacity="0.85"/>
                         <line class="sv-node-deco" x1="${lx1}" y1="${in2Y}" x2="${lx2}" y2="${out1Y}" stroke-width="2" opacity="0.85"/>`;
                 }
-                const gainHtml = showStrip ? `
-                    <line class="sv-node-deco" x1="0" y1="${baseH}" x2="${w}" y2="${baseH}" stroke-width="0.5" opacity="0.35"/>
-                    <g data-gain-node-id="${_esc(node.id)}">
-                        <text class="sv-comp-gain-fwd" x="${w*0.5}" y="${baseH + 11}" text-anchor="middle"></text>
-                        <text class="sv-comp-gain-rfl" x="${w*0.5}" y="${baseH + 22}" text-anchor="middle"></text>
-                    </g>` : '';
                 return `
-                    <rect class="sv-node-body" x="0" y="0" width="${w}" height="${effectiveH}" rx="4"/>
                     ${paths}
-                    <text class="sv-node-type-icon" x="${w*0.5}" y="${baseH*0.30}" text-anchor="middle" font-size="9">4P-SW</text>
-                    <text class="sv-node-label"     x="${w*0.5}" y="${baseH*0.56}" text-anchor="middle" font-size="9">${_esc(node.label)}</text>
-                    <text class="sv-node-label"     x="${w*0.5}" y="${baseH*0.78}" text-anchor="middle" font-size="8">${mode.toUpperCase()}</text>
-                    ${gainHtml}
+                    <text class="sv-node-type-icon" x="${w*0.5}" y="${h*0.30}" text-anchor="middle" font-size="9">4P-SW</text>
+                    <text class="sv-node-label"     x="${w*0.5}" y="${h*0.56}" text-anchor="middle" font-size="9">${_esc(node.label)}</text>
+                    <text class="sv-node-label"     x="${w*0.5}" y="${h*0.78}" text-anchor="middle" font-size="8">${mode.toUpperCase()}</text>
                 `;
             },
         },
@@ -406,36 +342,23 @@
                 { id: 'in',  side: 'left',  type: 'input',  label: 'In',  yRatio: 0.5 },
                 { id: 'out', side: 'right', type: 'output', label: 'Out', yRatio: 0.5 },
             ],
-            renderBody(node, ctx) {
-                const w = this.width;
-                const baseH = this.height; // = 60
-                const effectiveH = ctx?.effectiveH ?? baseH;
-                const showStrip = ctx?.hasFwd || ctx?.hasRfl;
+            renderBody(node) {
+                const w = this.width, h = this.height; // w=110, h=60
                 const ft = node.props?.filterType || 'lowpass';
                 const ftLabel = { lowpass: 'LP', highpass: 'HP', bandpass: 'BP', notch: 'NOTCH' }[ft] || ft.toUpperCase();
-                // Frequency response curve per filter type
                 let curve = '';
                 if (ft === 'lowpass') {
-                    curve = `<path class="sv-node-deco" d="M${w*0.2},${baseH*0.3} L${w*0.48},${baseH*0.3} C${w*0.58},${baseH*0.3} ${w*0.62},${baseH*0.7} ${w*0.8},${baseH*0.7}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
+                    curve = `<path class="sv-node-deco" d="M${w*0.2},${h*0.3} L${w*0.48},${h*0.3} C${w*0.58},${h*0.3} ${w*0.62},${h*0.7} ${w*0.8},${h*0.7}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
                 } else if (ft === 'highpass') {
-                    curve = `<path class="sv-node-deco" d="M${w*0.2},${baseH*0.7} C${w*0.38},${baseH*0.7} ${w*0.42},${baseH*0.3} ${w*0.52},${baseH*0.3} L${w*0.8},${baseH*0.3}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
+                    curve = `<path class="sv-node-deco" d="M${w*0.2},${h*0.7} C${w*0.38},${h*0.7} ${w*0.42},${h*0.3} ${w*0.52},${h*0.3} L${w*0.8},${h*0.3}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
                 } else if (ft === 'bandpass') {
-                    curve = `<path class="sv-node-deco" d="M${w*0.2},${baseH*0.7} C${w*0.3},${baseH*0.7} ${w*0.36},${baseH*0.26} ${w*0.5},${baseH*0.26} C${w*0.64},${baseH*0.26} ${w*0.7},${baseH*0.7} ${w*0.8},${baseH*0.7}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
+                    curve = `<path class="sv-node-deco" d="M${w*0.2},${h*0.7} C${w*0.3},${h*0.7} ${w*0.36},${h*0.26} ${w*0.5},${h*0.26} C${w*0.64},${h*0.26} ${w*0.7},${h*0.7} ${w*0.8},${h*0.7}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
                 } else {
-                    // notch
-                    curve = `<path class="sv-node-deco" d="M${w*0.2},${baseH*0.3} C${w*0.3},${baseH*0.3} ${w*0.38},${baseH*0.74} ${w*0.5},${baseH*0.74} C${w*0.62},${baseH*0.74} ${w*0.7},${baseH*0.3} ${w*0.8},${baseH*0.3}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
+                    curve = `<path class="sv-node-deco" d="M${w*0.2},${h*0.3} C${w*0.3},${h*0.3} ${w*0.38},${h*0.74} ${w*0.5},${h*0.74} C${w*0.62},${h*0.74} ${w*0.7},${h*0.3} ${w*0.8},${h*0.3}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
                 }
-                const gainHtml = showStrip ? `
-                    <line class="sv-node-deco" x1="0" y1="${baseH}" x2="${w}" y2="${baseH}" stroke-width="0.5" opacity="0.35"/>
-                    <g data-gain-node-id="${_esc(node.id)}">
-                        <text class="sv-comp-gain-fwd" x="${w*0.5}" y="${baseH + 11}" text-anchor="middle"></text>
-                        <text class="sv-comp-gain-rfl" x="${w*0.5}" y="${baseH + 22}" text-anchor="middle"></text>
-                    </g>` : '';
                 return `
-                    <rect class="sv-node-body" x="0" y="0" width="${w}" height="${effectiveH}" rx="4"/>
                     ${curve}
-                    <text class="sv-node-type-icon" x="${w*0.5}" y="${baseH*0.90}" text-anchor="middle" font-size="10">${ftLabel}</text>
-                    ${gainHtml}
+                    <text class="sv-node-type-icon" x="${w*0.5}" y="${h*0.90}" text-anchor="middle" font-size="10">${ftLabel}</text>
                 `;
             },
         },
@@ -453,28 +376,17 @@
                 { id: 'out',     side: 'right',  type: 'output', label: 'Out',     yRatio: 0.5 },
                 { id: 'coupled', side: 'bottom', type: 'output', label: 'Coupled', xRatio: 0.5 },
             ],
-            renderBody(node, ctx) {
-                const w = this.width;
-                const baseH = this.height; // = 90
-                const effectiveH = ctx?.effectiveH ?? baseH;
-                const showStrip = ctx?.hasFwd || ctx?.hasRfl;
+            renderBody(node) {
+                const w = this.width, h = this.height; // w=130, h=90
                 const cx = w * 0.5;
-                const gainHtml = showStrip ? `
-                    <line class="sv-node-deco" x1="0" y1="${baseH}" x2="${w}" y2="${baseH}" stroke-width="0.5" opacity="0.35"/>
-                    <g data-gain-node-id="${_esc(node.id)}">
-                        <text class="sv-comp-gain-fwd" x="${w*0.5}" y="${baseH + 11}" text-anchor="middle"></text>
-                        <text class="sv-comp-gain-rfl" x="${w*0.5}" y="${baseH + 22}" text-anchor="middle"></text>
-                    </g>` : '';
                 return `
-                    <rect class="sv-node-body" x="0" y="0" width="${w}" height="${effectiveH}" rx="4"/>
-                    <line class="sv-node-deco" x1="${w*0.07}" y1="${baseH*0.5}" x2="${w*0.93}" y2="${baseH*0.5}" stroke-width="1.5" stroke-dasharray="5,2" opacity="0.3"/>
-                    <line class="sv-node-deco" x1="${w*0.38}" y1="${baseH*0.3}" x2="${w*0.62}" y2="${baseH*0.3}" stroke-width="2" opacity="0.6"/>
-                    <line class="sv-node-deco" x1="${w*0.38}" y1="${baseH*0.4}" x2="${w*0.62}" y2="${baseH*0.4}" stroke-width="2" opacity="0.6"/>
-                    <line class="sv-node-deco" x1="${cx}" y1="${baseH*0.5}"   x2="${cx}" y2="${baseH*0.87}" stroke-width="1.5" opacity="0.75"/>
-                    <polygon class="sv-node-deco" points="${cx},${baseH*0.87} ${cx-5},${baseH*0.76} ${cx+5},${baseH*0.76}" opacity="0.75"/>
-                    <text class="sv-node-type-icon" x="${cx}" y="${baseH*0.22}" text-anchor="middle" font-size="12">CPL</text>
-                    <text class="sv-node-label"     x="${w*0.26}" y="${baseH*0.72}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
-                    ${gainHtml}
+                    <line class="sv-node-deco" x1="${w*0.07}" y1="${h*0.5}" x2="${w*0.93}" y2="${h*0.5}" stroke-width="1.5" stroke-dasharray="5,2" opacity="0.3"/>
+                    <line class="sv-node-deco" x1="${w*0.38}" y1="${h*0.3}" x2="${w*0.62}" y2="${h*0.3}" stroke-width="2" opacity="0.6"/>
+                    <line class="sv-node-deco" x1="${w*0.38}" y1="${h*0.4}" x2="${w*0.62}" y2="${h*0.4}" stroke-width="2" opacity="0.6"/>
+                    <line class="sv-node-deco" x1="${cx}" y1="${h*0.5}"   x2="${cx}" y2="${h*0.87}" stroke-width="1.5" opacity="0.75"/>
+                    <polygon class="sv-node-deco" points="${cx},${h*0.87} ${cx-5},${h*0.76} ${cx+5},${h*0.76}" opacity="0.75"/>
+                    <text class="sv-node-type-icon" x="${cx}" y="${h*0.22}" text-anchor="middle" font-size="12">CPL</text>
+                    <text class="sv-node-label"     x="${w*0.26}" y="${h*0.72}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
                 `;
             },
         },
@@ -524,15 +436,33 @@
         const typeDef = COMPONENT_TYPES[node.type];
         if (!typeDef) return `<!-- sv-unknown-type: ${_esc(node.type)} -->`;
 
+        const isGainType = GAIN_TYPES.has(node.type);
         const w = typeDef.width;
         const baseH = typeDef.height;
-        const hasFwd = gainCtx?.hasFwd || false;
-        const hasRfl = gainCtx?.hasRfl || false;
-        const showStrip = hasFwd || hasRfl;
-        const effectiveH = baseH + (showStrip ? 24 : 0);
-        const bodyCtx = { effectiveH, hasFwd, hasRfl };
+        const hasFwd = isGainType && (gainCtx?.hasFwd || false);
+        const hasRfl = isGainType && (gainCtx?.hasRfl || false);
+        const topH = hasFwd ? STRIP_H : 0;
+        const botH = hasRfl ? STRIP_H : 0;
+        const effectiveH = topH + baseH + botH;
         const nid = _esc(node.id);
 
+        // Background rect covering full area (strips + body). Only for gain types;
+        // non-gain types render their own rect inside renderBody.
+        const bgRect = isGainType
+            ? `<rect class="sv-node-body" x="0" y="${-topH}" width="${w}" height="${effectiveH}" rx="4"/>`
+            : '';
+
+        // Top strip: forward gain (expands above body at negative y)
+        const topStripHtml = hasFwd ? `
+        <text class="sv-comp-gain-fwd" x="${w * 0.5}" y="${-topH + STRIP_H * 0.73}" text-anchor="middle"></text>
+        <line class="sv-node-deco" x1="0" y1="0" x2="${w}" y2="0" stroke-width="0.5" opacity="0.4"/>` : '';
+
+        // Bottom strip: reflected gain (expands below body)
+        const botStripHtml = hasRfl ? `
+        <line class="sv-node-deco" x1="0" y1="${baseH}" x2="${w}" y2="${baseH}" stroke-width="0.5" opacity="0.4"/>
+        <text class="sv-comp-gain-rfl" x="${w * 0.5}" y="${baseH + STRIP_H * 0.73}" text-anchor="middle"></text>` : '';
+
+        // Port SVG elements (positions based on baseH — unchanged)
         const portsHtml = typeDef.ports.map(port => {
             const { x: px, y: py } = _portLocalPos(typeDef, port);
             const lp  = _portLabelPos(port, px, py);
@@ -551,8 +481,11 @@
         return (
             `<g id="sv-node-${nid}" class="sv-node sv-node-${_esc(node.type)}"` +
             ` transform="translate(${node.x},${node.y})" data-node-id="${nid}">` +
-            `\n    ${typeDef.renderBody(node, bodyCtx)}` +
-            `\n    <rect class="sv-node-selection" x="-4" y="-4"` +
+            `\n    ${bgRect}` +
+            `\n    ${topStripHtml}` +
+            `\n    ${typeDef.renderBody(node)}` +
+            `\n    ${botStripHtml}` +
+            `\n    <rect class="sv-node-selection" x="-4" y="${-topH - 4}"` +
             ` width="${w + 8}" height="${effectiveH + 8}" rx="8"` +
             ` fill="none" stroke="var(--sv-select-color)" stroke-width="2"` +
             ` stroke-dasharray="6,3" visibility="hidden"/>` +

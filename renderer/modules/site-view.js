@@ -1060,10 +1060,10 @@
                 rflText = (db >= 0 ? '+' : '') + db.toFixed(1) + ' dB RFL';
             }
 
-            const gainG = nodesLayer.querySelector(`[data-gain-node-id="${CSS.escape(node.id)}"]`);
-            if (gainG) {
-                const fwdEl = gainG.querySelector('.sv-comp-gain-fwd');
-                const rflEl = gainG.querySelector('.sv-comp-gain-rfl');
+            const nodeEl = nodesLayer.querySelector(`#sv-node-${CSS.escape(node.id)}`);
+            if (nodeEl) {
+                const fwdEl = nodeEl.querySelector('.sv-comp-gain-fwd');
+                const rflEl = nodeEl.querySelector('.sv-comp-gain-rfl');
                 if (fwdEl) fwdEl.textContent = fwdText;
                 if (rflEl) rflEl.textContent = rflText;
             }

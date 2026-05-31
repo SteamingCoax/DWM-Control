@@ -683,17 +683,17 @@
 
 /* ─── Component Gain/Loss Overlay Text ─── */
 .sv-comp-gain-fwd {
-    font-size: 8px;
+    font-size: 18px;
     font-family: 'Courier New', monospace;
     font-weight: 600;
     fill: var(--sv-fwd-color, #4ade80);
-    opacity: 0.9;
+    opacity: 0.95;
 }
 
 .sv-comp-gain-rfl {
-    font-size: 8px;
+    font-size: 18px;
     font-family: 'Courier New', monospace;
     font-weight: 600;
     fill: var(--sv-rfl-color, #fb923c);
-    opacity: 0.9;
+    opacity: 0.95;
 }
