@@ -85,8 +85,8 @@
             id: 'amplifier',
             label: 'Amplifier',
             category: 'amplification',
-            width: 100,
-            height: 70,
+            width: 140,
+            height: 90,
             defaultLabel: 'AMP',
             ports: [
                 { id: 'in',  side: 'left',  type: 'input',  label: 'In',  yRatio: 0.5 },
@@ -94,13 +94,21 @@
             ],
             renderBody(node) {
                 const w = this.width, h = this.height;
-                const pts  = `${w*0.08},${h*0.09} ${w*0.08},${h*0.91} ${w*0.92},${h*0.5}`;
-                const gain = node.props?.gainDb != null ? `${node.props.gainDb} dB` : '';
+                const stripY = h - 24;
+                const midY   = stripY * 0.5;
+                const triPts = `${w*0.12},${stripY*0.12} ${w*0.12},${stripY*0.88} ${w*0.72},${midY}`;
+                const confGain = node.props?.gainDb != null ? `${node.props.gainDb >= 0 ? '+' : ''}${node.props.gainDb} dB` : '';
                 return `
-                    <polygon class="sv-node-body" points="${pts}"/>
-                    <text class="sv-node-type-icon" x="${w*0.35}" y="${h*0.42}" text-anchor="middle" font-size="12">▶</text>
-                    <text class="sv-node-label" x="${w*0.35}" y="${h*0.60}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
-                    ${gain ? `<text class="sv-node-label" x="${w*0.35}" y="${h*0.76}" text-anchor="middle" font-size="9">${_esc(gain)}</text>` : ''}
+                    <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
+                    <polygon class="sv-node-deco" points="${triPts}" opacity="0.55"/>
+                    <text class="sv-node-type-icon" x="${w*0.35}" y="${midY - 4}" text-anchor="middle" font-size="11">▶</text>
+                    <text class="sv-node-label" x="${w*0.35}" y="${midY + 9}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
+                    ${confGain ? `<text class="sv-node-label" x="${w*0.35}" y="${midY + 20}" text-anchor="middle" font-size="8">${_esc(confGain)}</text>` : ''}
+                    <line class="sv-node-deco" x1="0" y1="${stripY}" x2="${w}" y2="${stripY}" stroke-width="0.5" opacity="0.35"/>
+                    <g data-gain-node-id="${_esc(node.id)}">
+                        <text class="sv-comp-gain-fwd" x="${w*0.5}" y="${stripY + 10}" text-anchor="middle"></text>
+                        <text class="sv-comp-gain-rfl" x="${w*0.5}" y="${stripY + 20}" text-anchor="middle"></text>
+                    </g>
                 `;
             },
         },
@@ -111,7 +119,7 @@
             label: 'Attenuator',
             category: 'passive',
             width: 110,
-            height: 60,
+            height: 84,
             defaultLabel: 'ATT',
             ports: [
                 { id: 'in',  side: 'left',  type: 'input',  label: 'In',  yRatio: 0.5 },
@@ -120,13 +128,19 @@
             renderBody(node) {
                 const w = this.width, h = this.height;
                 const db = node.props?.attenuationDb != null ? node.props.attenuationDb : '--';
+                const bodyH = h - 24;
                 return `
                     <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
-                    <line class="sv-node-deco" x1="${w*0.28}" y1="${h*0.28}" x2="${w*0.28}" y2="${h*0.72}" stroke-width="1.5" opacity="0.5"/>
-                    <line class="sv-node-deco" x1="${w*0.72}" y1="${h*0.28}" x2="${w*0.72}" y2="${h*0.72}" stroke-width="1.5" opacity="0.5"/>
-                    <line class="sv-node-deco" x1="${w*0.22}" y1="${h*0.5}"  x2="${w*0.78}" y2="${h*0.5}"  stroke-width="1.5" opacity="0.3"/>
-                    <text class="sv-node-type-icon" x="${w*0.5}" y="${h*0.43}" text-anchor="middle" font-size="12">ATT</text>
-                    <text class="sv-node-label"     x="${w*0.5}" y="${h*0.76}" text-anchor="middle" font-size="10">${_esc(db)} dB</text>
+                    <line class="sv-node-deco" x1="${w*0.28}" y1="${bodyH*0.28}" x2="${w*0.28}" y2="${bodyH*0.72}" stroke-width="1.5" opacity="0.5"/>
+                    <line class="sv-node-deco" x1="${w*0.72}" y1="${bodyH*0.28}" x2="${w*0.72}" y2="${bodyH*0.72}" stroke-width="1.5" opacity="0.5"/>
+                    <line class="sv-node-deco" x1="${w*0.22}" y1="${bodyH*0.5}"  x2="${w*0.78}" y2="${bodyH*0.5}"  stroke-width="1.5" opacity="0.3"/>
+                    <text class="sv-node-type-icon" x="${w*0.5}" y="${bodyH*0.43}" text-anchor="middle" font-size="12">ATT</text>
+                    <text class="sv-node-label"     x="${w*0.5}" y="${bodyH*0.76}" text-anchor="middle" font-size="10">${_esc(db)} dB</text>
+                    <line class="sv-node-deco" x1="0" y1="${bodyH}" x2="${w}" y2="${bodyH}" stroke-width="0.5" opacity="0.35"/>
+                    <g data-gain-node-id="${_esc(node.id)}">
+                        <text class="sv-comp-gain-fwd" x="${w*0.5}" y="${bodyH + 10}" text-anchor="middle"></text>
+                        <text class="sv-comp-gain-rfl" x="${w*0.5}" y="${bodyH + 20}" text-anchor="middle"></text>
+                    </g>
                 `;
             },
         },
@@ -166,59 +180,69 @@
             label: '3dB Hybrid',
             category: 'passive',
             width: 120,
-            height: 90,
+            height: 114,
             defaultLabel: '3dB HYB',
             ports: [
-                { id: 'in1',  side: 'left',  type: 'input',  label: 'In 1',  yRatio: 0.33 },
-                { id: 'in2',  side: 'left',  type: 'input',  label: 'In 2',  yRatio: 0.67 },
-                { id: 'out1', side: 'right', type: 'output', label: 'Out 1', yRatio: 0.33 },
-                { id: 'out2', side: 'right', type: 'output', label: 'Out 2', yRatio: 0.67 },
+                { id: 'in1',  side: 'left',  type: 'input',  label: 'In 1',  yRatio: 0.26 },
+                { id: 'in2',  side: 'left',  type: 'input',  label: 'In 2',  yRatio: 0.529 },
+                { id: 'out1', side: 'right', type: 'output', label: 'Out 1', yRatio: 0.26 },
+                { id: 'out2', side: 'right', type: 'output', label: 'Out 2', yRatio: 0.529 },
             ],
             renderBody(node) {
                 const w = this.width, h = this.height;
+                const bodyH = h - 24;
                 return `
                     <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
-                    <line class="sv-node-deco" x1="${w*0.35}" y1="${h*0.25}" x2="${w*0.35}" y2="${h*0.75}" stroke-width="1.5" opacity="0.55"/>
-                    <line class="sv-node-deco" x1="${w*0.22}" y1="${h*0.5}"  x2="${w*0.48}" y2="${h*0.5}"  stroke-width="1.5" opacity="0.55"/>
-                    <circle class="sv-node-deco" cx="${w*0.35}" cy="${h*0.5}" r="3" opacity="0.8"/>
-                    <text class="sv-node-type-icon" x="${w*0.72}" y="${h*0.41}" text-anchor="middle">3dB</text>
-                    <text class="sv-node-label"     x="${w*0.72}" y="${h*0.61}" text-anchor="middle">90°</text>
-                    <text class="sv-node-label"     x="${w*0.5}"  y="${h*0.88}" text-anchor="middle" font-size="9">${_esc(node.label)}</text>
+                    <line class="sv-node-deco" x1="${w*0.35}" y1="${bodyH*0.25}" x2="${w*0.35}" y2="${bodyH*0.75}" stroke-width="1.5" opacity="0.55"/>
+                    <line class="sv-node-deco" x1="${w*0.22}" y1="${bodyH*0.5}"  x2="${w*0.48}" y2="${bodyH*0.5}"  stroke-width="1.5" opacity="0.55"/>
+                    <circle class="sv-node-deco" cx="${w*0.35}" cy="${bodyH*0.5}" r="3" opacity="0.8"/>
+                    <text class="sv-node-type-icon" x="${w*0.72}" y="${bodyH*0.41}" text-anchor="middle">3dB</text>
+                    <text class="sv-node-label"     x="${w*0.72}" y="${bodyH*0.61}" text-anchor="middle">90°</text>
+                    <text class="sv-node-label"     x="${w*0.5}"  y="${bodyH*0.88}" text-anchor="middle" font-size="9">${_esc(node.label)}</text>
+                    <line class="sv-node-deco" x1="0" y1="${bodyH}" x2="${w}" y2="${bodyH}" stroke-width="0.5" opacity="0.35"/>
+                    <g data-gain-node-id="${_esc(node.id)}">
+                        <text class="sv-comp-gain-fwd" x="${w*0.5}" y="${bodyH + 10}" text-anchor="middle"></text>
+                        <text class="sv-comp-gain-rfl" x="${w*0.5}" y="${bodyH + 20}" text-anchor="middle"></text>
+                    </g>
                 `;
             },
         },
 
         // ── Combiner / Splitter ───────────────────────────────────────────────
-        // Ports: in1 at (0, h*0.33), in2 at (0, h*0.67), out at (w, h*0.5)
+        // Ports: in1 at (0, h*0.26), in2 at (0, h*0.529), out at (w, h*0.395)
         // Shape is a trapezoid with its left vertices at the actual port positions
         'combiner': {
             id: 'combiner',
             label: 'Combiner/Splitter',
             category: 'passive',
             width: 120,
-            height: 90,
+            height: 114,
             defaultLabel: 'COMB',
             ports: [
-                { id: 'in1', side: 'left',  type: 'input',  label: 'In 1', yRatio: 0.33 },
-                { id: 'in2', side: 'left',  type: 'input',  label: 'In 2', yRatio: 0.67 },
-                { id: 'out', side: 'right', type: 'output', label: 'Out',  yRatio: 0.5 },
+                { id: 'in1', side: 'left',  type: 'input',  label: 'In 1', yRatio: 0.26 },
+                { id: 'in2', side: 'left',  type: 'input',  label: 'In 2', yRatio: 0.529 },
+                { id: 'out', side: 'right', type: 'output', label: 'Out',  yRatio: 0.395 },
             ],
             renderBody(node) {
                 const w = this.width, h = this.height;
-                // Left side spans from in1 (h*0.33) to in2 (h*0.67); right narrows to out (h*0.5)
-                // Polygon: top-left at port in1, bottom-left at port in2, converge right to single out
-                const pts = `0,${h*0.22} 0,${h*0.78} ${w*0.82},${h*0.62} ${w*0.82},${h*0.38}`;
+                const bodyH = h - 24;
+                const pts = `0,${bodyH*0.22} 0,${bodyH*0.78} ${w*0.82},${bodyH*0.62} ${w*0.82},${bodyH*0.38}`;
                 return `
                     <polygon class="sv-node-body" points="${pts}"/>
                     <!-- Stub from polygon right to output port -->
-                    <line class="sv-node-deco" x1="${w*0.82}" y1="${h*0.5}" x2="${w}" y2="${h*0.5}" stroke-width="2" opacity="0.6"/>
+                    <line class="sv-node-deco" x1="${w*0.82}" y1="${bodyH*0.5}" x2="${w}" y2="${bodyH*0.5}" stroke-width="2" opacity="0.6"/>
                     <!-- Internal lines from ports to convergence showing signal paths -->
-                    <line class="sv-node-deco" x1="0" y1="${h*0.33}" x2="${w*0.55}" y2="${h*0.46}" stroke-width="1.5" opacity="0.5"/>
-                    <line class="sv-node-deco" x1="0" y1="${h*0.67}" x2="${w*0.55}" y2="${h*0.54}" stroke-width="1.5" opacity="0.5"/>
-                    <line class="sv-node-deco" x1="${w*0.55}" y1="${h*0.46}" x2="${w*0.55}" y2="${h*0.54}" stroke-width="1.5" opacity="0.5"/>
-                    <line class="sv-node-deco" x1="${w*0.55}" y1="${h*0.5}" x2="${w*0.82}" y2="${h*0.5}" stroke-width="1.5" opacity="0.5"/>
-                    <text class="sv-node-type-icon" x="${w*0.38}" y="${h*0.46}" text-anchor="middle" font-size="9">COMB</text>
-                    <text class="sv-node-label"     x="${w*0.38}" y="${h*0.60}" text-anchor="middle" font-size="8">${_esc(node.label)}</text>
+                    <line class="sv-node-deco" x1="0" y1="${bodyH*0.33}" x2="${w*0.55}" y2="${bodyH*0.46}" stroke-width="1.5" opacity="0.5"/>
+                    <line class="sv-node-deco" x1="0" y1="${bodyH*0.67}" x2="${w*0.55}" y2="${bodyH*0.54}" stroke-width="1.5" opacity="0.5"/>
+                    <line class="sv-node-deco" x1="${w*0.55}" y1="${bodyH*0.46}" x2="${w*0.55}" y2="${bodyH*0.54}" stroke-width="1.5" opacity="0.5"/>
+                    <line class="sv-node-deco" x1="${w*0.55}" y1="${bodyH*0.5}" x2="${w*0.82}" y2="${bodyH*0.5}" stroke-width="1.5" opacity="0.5"/>
+                    <text class="sv-node-type-icon" x="${w*0.38}" y="${bodyH*0.46}" text-anchor="middle" font-size="9">COMB</text>
+                    <text class="sv-node-label"     x="${w*0.38}" y="${bodyH*0.60}" text-anchor="middle" font-size="8">${_esc(node.label)}</text>
+                    <line class="sv-node-deco" x1="0" y1="${bodyH}" x2="${w}" y2="${bodyH}" stroke-width="0.5" opacity="0.35"/>
+                    <g data-gain-node-id="${_esc(node.id)}">
+                        <text class="sv-comp-gain-fwd" x="${w*0.5}" y="${bodyH + 10}" text-anchor="middle"></text>
+                        <text class="sv-comp-gain-rfl" x="${w*0.5}" y="${bodyH + 20}" text-anchor="middle"></text>
+                    </g>
                 `;
             },
         },
@@ -266,27 +290,33 @@
             label: 'Coax Switch',
             category: 'switching',
             width: 120,
-            height: 90,
+            height: 114,
             defaultLabel: 'SW',
             ports: [
-                { id: 'in',   side: 'left',  type: 'input',  label: 'In',    yRatio: 0.5  },
-                { id: 'out1', side: 'right', type: 'output', label: 'Port 1', yRatio: 0.33 },
-                { id: 'out2', side: 'right', type: 'output', label: 'Port 2', yRatio: 0.67 },
+                { id: 'in',   side: 'left',  type: 'input',  label: 'In',   yRatio: 0.395 },
+                { id: 'out1', side: 'right', type: 'output', label: 'Out 1', yRatio: 0.26 },
+                { id: 'out2', side: 'right', type: 'output', label: 'Out 2', yRatio: 0.529 },
             ],
             renderBody(node) {
                 const w = this.width, h = this.height;
-                const px = w*0.44, py = h*0.5;
-                const ax = w*0.76, ay = h*0.33;
-                const bx = w*0.76, by = h*0.67;
+                const bodyH = h - 24;
+                const px = w*0.44, py = bodyH*0.5;
+                const ax = w*0.76, ay = bodyH*0.33;
+                const bx = w*0.76, by = bodyH*0.67;
                 const active = node.props?.activePort ?? 1;
                 return `
                     <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
                     <line class="sv-node-deco" x1="${px}" y1="${py}" x2="${active===1 ? ax : bx}" y2="${active===1 ? ay : by}" stroke-width="2"   stroke-linecap="round" opacity="0.85"/>
                     <line class="sv-node-deco" x1="${px}" y1="${py}" x2="${active===1 ? bx : ax}" y2="${active===1 ? by : ay}" stroke-width="1.5" stroke-dasharray="4,3" stroke-linecap="round" opacity="0.4"/>
-                    <path class="sv-node-deco" d="M${ax},${ay+4} A${h*0.22},${h*0.22} 0 0,1 ${bx},${by-4}" fill="none" stroke-width="1" stroke-dasharray="3,3" opacity="0.35"/>
+                    <path class="sv-node-deco" d="M${ax},${ay+4} A${bodyH*0.22},${bodyH*0.22} 0 0,1 ${bx},${by-4}" fill="none" stroke-width="1" stroke-dasharray="3,3" opacity="0.35"/>
                     <circle class="sv-node-deco" cx="${px}" cy="${py}" r="4.5" opacity="0.85"/>
-                    <text class="sv-node-type-icon" x="${w*0.2}" y="${h*0.44}" text-anchor="middle" font-size="14">SW</text>
-                    <text class="sv-node-label"     x="${w*0.2}" y="${h*0.64}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
+                    <text class="sv-node-type-icon" x="${w*0.2}" y="${bodyH*0.44}" text-anchor="middle" font-size="14">SW</text>
+                    <text class="sv-node-label"     x="${w*0.2}" y="${bodyH*0.64}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
+                    <line class="sv-node-deco" x1="0" y1="${bodyH}" x2="${w}" y2="${bodyH}" stroke-width="0.5" opacity="0.35"/>
+                    <g data-gain-node-id="${_esc(node.id)}">
+                        <text class="sv-comp-gain-fwd" x="${w*0.5}" y="${bodyH + 10}" text-anchor="middle"></text>
+                        <text class="sv-comp-gain-rfl" x="${w*0.5}" y="${bodyH + 20}" text-anchor="middle"></text>
+                    </g>
                 `;
             },
         },
@@ -297,20 +327,20 @@
             label: '4-Port Switch',
             category: 'switching',
             width: 120,
-            height: 90,
+            height: 114,
             defaultLabel: '4P-SW',
             ports: [
-                { id: 'in1',  side: 'left',  type: 'input',  label: 'In 1',  yRatio: 0.33 },
-                { id: 'in2',  side: 'left',  type: 'input',  label: 'In 2',  yRatio: 0.67 },
-                { id: 'out1', side: 'right', type: 'output', label: 'Out 1', yRatio: 0.33 },
-                { id: 'out2', side: 'right', type: 'output', label: 'Out 2', yRatio: 0.67 },
+                { id: 'in1',  side: 'left',  type: 'input',  label: 'In 1',  yRatio: 0.26 },
+                { id: 'in2',  side: 'left',  type: 'input',  label: 'In 2',  yRatio: 0.529 },
+                { id: 'out1', side: 'right', type: 'output', label: 'Out 1', yRatio: 0.26 },
+                { id: 'out2', side: 'right', type: 'output', label: 'Out 2', yRatio: 0.529 },
             ],
             renderBody(node) {
                 const w = this.width, h = this.height;
+                const bodyH = h - 24;
                 const mode = node.props?.mode || 'through';
-                const in1Y  = h*0.33, in2Y = h*0.67;
-                const out1Y = h*0.33, out2Y = h*0.67;
-                // Straight-through: parallel lines; cross: X crossing lines
+                const in1Y  = bodyH*0.33, in2Y = bodyH*0.67;
+                const out1Y = bodyH*0.33, out2Y = bodyH*0.67;
                 const lx1 = w*0.12, lx2 = w*0.88;
                 let paths = '';
                 if (mode === 'through') {
@@ -328,9 +358,14 @@
                 return `
                     <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
                     ${paths}
-                    <text class="sv-node-type-icon" x="${w*0.5}" y="${h*0.30}" text-anchor="middle" font-size="9">4P-SW</text>
-                    <text class="sv-node-label"     x="${w*0.5}" y="${h*0.56}" text-anchor="middle" font-size="9">${_esc(node.label)}</text>
-                    <text class="sv-node-label"     x="${w*0.5}" y="${h*0.78}" text-anchor="middle" font-size="8">${mode.toUpperCase()}</text>
+                    <text class="sv-node-type-icon" x="${w*0.5}" y="${bodyH*0.30}" text-anchor="middle" font-size="9">4P-SW</text>
+                    <text class="sv-node-label"     x="${w*0.5}" y="${bodyH*0.56}" text-anchor="middle" font-size="9">${_esc(node.label)}</text>
+                    <text class="sv-node-label"     x="${w*0.5}" y="${bodyH*0.78}" text-anchor="middle" font-size="8">${mode.toUpperCase()}</text>
+                    <line class="sv-node-deco" x1="0" y1="${bodyH}" x2="${w}" y2="${bodyH}" stroke-width="0.5" opacity="0.35"/>
+                    <g data-gain-node-id="${_esc(node.id)}">
+                        <text class="sv-comp-gain-fwd" x="${w*0.5}" y="${bodyH + 10}" text-anchor="middle"></text>
+                        <text class="sv-comp-gain-rfl" x="${w*0.5}" y="${bodyH + 20}" text-anchor="middle"></text>
+                    </g>
                 `;
             },
         },
@@ -341,7 +376,7 @@
             label: 'Filter',
             category: 'passive',
             width: 110,
-            height: 60,
+            height: 84,
             defaultLabel: 'FILT',
             ports: [
                 { id: 'in',  side: 'left',  type: 'input',  label: 'In',  yRatio: 0.5 },
@@ -349,24 +384,30 @@
             ],
             renderBody(node) {
                 const w = this.width, h = this.height;
+                const bodyH = h - 24;
                 const ft = node.props?.filterType || 'lowpass';
                 const ftLabel = { lowpass: 'LP', highpass: 'HP', bandpass: 'BP', notch: 'NOTCH' }[ft] || ft.toUpperCase();
                 // Frequency response curve per filter type
                 let curve = '';
                 if (ft === 'lowpass') {
-                    curve = `<path class="sv-node-deco" d="M${w*0.2},${h*0.3} L${w*0.48},${h*0.3} C${w*0.58},${h*0.3} ${w*0.62},${h*0.7} ${w*0.8},${h*0.7}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
+                    curve = `<path class="sv-node-deco" d="M${w*0.2},${bodyH*0.3} L${w*0.48},${bodyH*0.3} C${w*0.58},${bodyH*0.3} ${w*0.62},${bodyH*0.7} ${w*0.8},${bodyH*0.7}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
                 } else if (ft === 'highpass') {
-                    curve = `<path class="sv-node-deco" d="M${w*0.2},${h*0.7} C${w*0.38},${h*0.7} ${w*0.42},${h*0.3} ${w*0.52},${h*0.3} L${w*0.8},${h*0.3}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
+                    curve = `<path class="sv-node-deco" d="M${w*0.2},${bodyH*0.7} C${w*0.38},${bodyH*0.7} ${w*0.42},${bodyH*0.3} ${w*0.52},${bodyH*0.3} L${w*0.8},${bodyH*0.3}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
                 } else if (ft === 'bandpass') {
-                    curve = `<path class="sv-node-deco" d="M${w*0.2},${h*0.7} C${w*0.3},${h*0.7} ${w*0.36},${h*0.26} ${w*0.5},${h*0.26} C${w*0.64},${h*0.26} ${w*0.7},${h*0.7} ${w*0.8},${h*0.7}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
+                    curve = `<path class="sv-node-deco" d="M${w*0.2},${bodyH*0.7} C${w*0.3},${bodyH*0.7} ${w*0.36},${bodyH*0.26} ${w*0.5},${bodyH*0.26} C${w*0.64},${bodyH*0.26} ${w*0.7},${bodyH*0.7} ${w*0.8},${bodyH*0.7}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
                 } else {
                     // notch
-                    curve = `<path class="sv-node-deco" d="M${w*0.2},${h*0.3} C${w*0.3},${h*0.3} ${w*0.38},${h*0.74} ${w*0.5},${h*0.74} C${w*0.62},${h*0.74} ${w*0.7},${h*0.3} ${w*0.8},${h*0.3}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
+                    curve = `<path class="sv-node-deco" d="M${w*0.2},${bodyH*0.3} C${w*0.3},${bodyH*0.3} ${w*0.38},${bodyH*0.74} ${w*0.5},${bodyH*0.74} C${w*0.62},${bodyH*0.74} ${w*0.7},${bodyH*0.3} ${w*0.8},${bodyH*0.3}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
                 }
                 return `
                     <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
                     ${curve}
-                    <text class="sv-node-type-icon" x="${w*0.5}" y="${h*0.90}" text-anchor="middle" font-size="10">${ftLabel}</text>
+                    <text class="sv-node-type-icon" x="${w*0.5}" y="${bodyH*0.90}" text-anchor="middle" font-size="10">${ftLabel}</text>
+                    <line class="sv-node-deco" x1="0" y1="${bodyH}" x2="${w}" y2="${bodyH}" stroke-width="0.5" opacity="0.35"/>
+                    <g data-gain-node-id="${_esc(node.id)}">
+                        <text class="sv-comp-gain-fwd" x="${w*0.5}" y="${bodyH + 10}" text-anchor="middle"></text>
+                        <text class="sv-comp-gain-rfl" x="${w*0.5}" y="${bodyH + 20}" text-anchor="middle"></text>
+                    </g>
                 `;
             },
         },
@@ -377,25 +418,31 @@
             label: 'Directional Coupler',
             category: 'passive',
             width: 130,
-            height: 90,
+            height: 114,
             defaultLabel: 'CPLR',
             ports: [
-                { id: 'in',      side: 'left',   type: 'input',  label: 'In',      yRatio: 0.5 },
-                { id: 'out',     side: 'right',  type: 'output', label: 'Out',     yRatio: 0.5 },
+                { id: 'in',      side: 'left',   type: 'input',  label: 'In',      yRatio: 0.395 },
+                { id: 'out',     side: 'right',  type: 'output', label: 'Out',     yRatio: 0.395 },
                 { id: 'coupled', side: 'bottom', type: 'output', label: 'Coupled', xRatio: 0.5 },
             ],
             renderBody(node) {
                 const w = this.width, h = this.height;
+                const bodyH = h - 24;
                 const cx = w * 0.5;
                 return `
                     <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
-                    <line class="sv-node-deco" x1="${w*0.07}" y1="${h*0.5}" x2="${w*0.93}" y2="${h*0.5}" stroke-width="1.5" stroke-dasharray="5,2" opacity="0.3"/>
-                    <line class="sv-node-deco" x1="${w*0.38}" y1="${h*0.3}" x2="${w*0.62}" y2="${h*0.3}" stroke-width="2" opacity="0.6"/>
-                    <line class="sv-node-deco" x1="${w*0.38}" y1="${h*0.4}" x2="${w*0.62}" y2="${h*0.4}" stroke-width="2" opacity="0.6"/>
-                    <line class="sv-node-deco" x1="${cx}" y1="${h*0.5}"   x2="${cx}" y2="${h*0.87}" stroke-width="1.5" opacity="0.75"/>
-                    <polygon class="sv-node-deco" points="${cx},${h*0.87} ${cx-5},${h*0.76} ${cx+5},${h*0.76}" opacity="0.75"/>
-                    <text class="sv-node-type-icon" x="${cx}" y="${h*0.22}" text-anchor="middle" font-size="12">CPL</text>
-                    <text class="sv-node-label"     x="${w*0.26}" y="${h*0.72}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
+                    <line class="sv-node-deco" x1="${w*0.07}" y1="${bodyH*0.5}" x2="${w*0.93}" y2="${bodyH*0.5}" stroke-width="1.5" stroke-dasharray="5,2" opacity="0.3"/>
+                    <line class="sv-node-deco" x1="${w*0.38}" y1="${bodyH*0.3}" x2="${w*0.62}" y2="${bodyH*0.3}" stroke-width="2" opacity="0.6"/>
+                    <line class="sv-node-deco" x1="${w*0.38}" y1="${bodyH*0.4}" x2="${w*0.62}" y2="${bodyH*0.4}" stroke-width="2" opacity="0.6"/>
+                    <line class="sv-node-deco" x1="${cx}" y1="${bodyH*0.5}"   x2="${cx}" y2="${bodyH*0.87}" stroke-width="1.5" opacity="0.75"/>
+                    <polygon class="sv-node-deco" points="${cx},${bodyH*0.87} ${cx-5},${bodyH*0.76} ${cx+5},${bodyH*0.76}" opacity="0.75"/>
+                    <text class="sv-node-type-icon" x="${cx}" y="${bodyH*0.22}" text-anchor="middle" font-size="12">CPL</text>
+                    <text class="sv-node-label"     x="${w*0.26}" y="${bodyH*0.72}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
+                    <line class="sv-node-deco" x1="0" y1="${bodyH}" x2="${w}" y2="${bodyH}" stroke-width="0.5" opacity="0.35"/>
+                    <g data-gain-node-id="${_esc(node.id)}">
+                        <text class="sv-comp-gain-fwd" x="${w*0.5}" y="${bodyH + 10}" text-anchor="middle"></text>
+                        <text class="sv-comp-gain-rfl" x="${w*0.5}" y="${bodyH + 20}" text-anchor="middle"></text>
+                    </g>
                 `;
             },
         },

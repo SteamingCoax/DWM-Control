@@ -970,6 +970,71 @@
             const fwdEl = nodeG.querySelector('.sv-meter-fwd');
             if (fwdEl) fwdEl.textContent = powerText;
         }
+
+        // ── Per-component gain/loss computation ────────────────────────────────
+        const GAIN_TYPES = ['attenuator', 'amplifier', 'hybrid-3db', 'combiner',
+                            'coax-switch', '4port-switch', 'filter', 'coupler'];
+
+        const getPowerW = (meterNode) => {
+            if (!meterNode?.props?.deviceUid) return null;
+            if (!window.dwm?.meterRegistry) return null;
+            let record = null;
+            for (const rec of window.dwm.meterRegistry.values()) {
+                if (rec.apiUid === meterNode.props.deviceUid) { record = rec; break; }
+            }
+            if (!record || record.connectionState !== 'connected') return null;
+            if (!record.state?.lastSnapshotRaw) return null;
+            const w = parseFloat(record.state.lastSnapshotRaw.avg);
+            return Number.isFinite(w) && w > 0 ? w : null;
+        };
+
+        for (const node of this.sv.nodes.values()) {
+            if (!GAIN_TYPES.includes(node.type)) continue;
+
+            const inputMeters  = { forward: null, reverse: null };
+            const outputMeters = { forward: null, reverse: null };
+
+            for (const conn of this.sv.connections.values()) {
+                if (conn.toNodeId === node.id) {
+                    const srcNode = this.sv.nodes.get(conn.fromNodeId);
+                    if (srcNode?.type === 'dwm-meter') {
+                        const mt = srcNode.props?.measureType === 'reverse' ? 'reverse' : 'forward';
+                        if (!inputMeters[mt]) inputMeters[mt] = srcNode;
+                    }
+                }
+                if (conn.fromNodeId === node.id) {
+                    const dstNode = this.sv.nodes.get(conn.toNodeId);
+                    if (dstNode?.type === 'dwm-meter') {
+                        const mt = dstNode.props?.measureType === 'reverse' ? 'reverse' : 'forward';
+                        if (!outputMeters[mt]) outputMeters[mt] = dstNode;
+                    }
+                }
+            }
+
+            let fwdText = '';
+            const fwdIn  = getPowerW(inputMeters.forward);
+            const fwdOut = getPowerW(outputMeters.forward);
+            if (fwdIn !== null && fwdOut !== null) {
+                const db = 10 * Math.log10(fwdOut / fwdIn);
+                fwdText = (db >= 0 ? '+' : '') + db.toFixed(1) + ' dB FWD';
+            }
+
+            let rflText = '';
+            const rflIn  = getPowerW(inputMeters.reverse);
+            const rflOut = getPowerW(outputMeters.reverse);
+            if (rflIn !== null && rflOut !== null) {
+                const db = 10 * Math.log10(rflOut / rflIn);
+                rflText = (db >= 0 ? '+' : '') + db.toFixed(1) + ' dB RFL';
+            }
+
+            const gainG = nodesLayer.querySelector(`[data-gain-node-id="${CSS.escape(node.id)}"]`);
+            if (gainG) {
+                const fwdEl = gainG.querySelector('.sv-comp-gain-fwd');
+                const rflEl = gainG.querySelector('.sv-comp-gain-rfl');
+                if (fwdEl) fwdEl.textContent = fwdText;
+                if (rflEl) rflEl.textContent = rflText;
+            }
+        }
     };
 
     // ─── Persistence ──────────────────────────────────────────────────────────
