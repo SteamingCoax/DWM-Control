@@ -7,6 +7,7 @@
     <title>DWM Control</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="styles-control.css">
+    <link rel="stylesheet" href="styles-site-view.css">
     <link rel="stylesheet" href="./node_modules/xterm/css/xterm.css">
 </head>
 <body>
@@ -25,6 +26,10 @@
             <button class="tab-button" data-tab="deembed">
                 <span class="tab-icon"></span>
                 <span class="tab-label">De-Embed</span>
+            </button>
+            <button class="tab-button" data-tab="siteview">
+                <span class="tab-icon"></span>
+                <span class="tab-label">Site View</span>
             </button>
             <div class="titlebar-spacer"></div>
             <div class="titlebar-actions">
@@ -285,8 +290,45 @@
                     </div>
                 </div>
             </section>
-        </main>
 
+            <!-- Site View Tab -->
+            <section id="siteview-panel" class="tab-panel">
+                <div class="sv-container">
+                    <!-- Component Palette Sidebar -->
+                    <aside class="sv-sidebar" id="sv-sidebar">
+                        <div class="sv-sidebar-header">Components</div>
+                        <!-- Populated by _svRenderSidebar() -->
+                    </aside>
+
+                    <!-- Canvas Workspace -->
+                    <div class="sv-workspace">
+                        <div class="sv-toolbar" id="sv-toolbar">
+                            <button id="sv-clear-btn" class="sv-toolbar-btn">Clear</button>
+                            <button id="sv-fit-btn" class="sv-toolbar-btn">Fit View</button>
+                            <button id="sv-delete-selected-btn" class="sv-toolbar-btn sv-toolbar-btn-danger">Delete Selected</button>
+                            <span id="sv-save-status" class="sv-save-status">Ready</span>
+                        </div>
+                        <div class="sv-canvas-container" id="sv-canvas-container">
+                            <svg id="sv-canvas-svg" class="sv-canvas-svg" xmlns="http://www.w3.org/2000/svg">
+                                <defs></defs>
+                                <g id="sv-world">
+                                    <g id="sv-connections-layer"></g>
+                                    <g id="sv-nodes-layer"></g>
+                                    <line id="sv-temp-wire" class="sv-connection-temp" x1="0" y1="0" x2="0" y2="0" visibility="hidden"/>
+                                </g>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- Properties Panel -->
+                    <aside class="sv-properties" id="sv-properties">
+                        <div id="sv-props-content">
+                            <p class="sv-props-empty">Select a component to edit its properties.</p>
+                        </div>
+                    </aside>
+                </div>
+            </section>
+        </main>
         <!-- Output Console (Global) -->
         <aside id="output-section" class="console-sidebar">
             <div class="console-header">
@@ -316,5 +358,7 @@
     <script src="renderer/modules/control-history.js"></script>
     <script src="renderer/modules/control-monitor.js"></script>
     <script src="renderer/modules/firmware.js"></script>
+    <script src="renderer/modules/site-view-components.js"></script>
+    <script src="renderer/modules/site-view.js"></script>
 </body>
 </html>

@@ -34,7 +34,8 @@ class DWMControl {
             control: true,    // Control panel tab
             firmware: true,   // Firmware Upload tab
             terminal: false,  // Serial Terminal tab  
-            deembed: true     // De-Embed tab
+            deembed: true,    // De-Embed tab
+            siteview: true    // Site View schematic builder tab
         };
         
         // UI Component Configuration - Set to false to hide components
@@ -64,6 +65,9 @@ class DWMControl {
             
             this.setupDeEmbed();
             console.log('DWM Control: De-Embed setup complete');
+            
+            this.setupSiteView();
+            console.log('DWM Control: Site View setup complete');
             
             this.setupThemeToggle();
             console.log('DWM Control: Theme toggle setup complete');

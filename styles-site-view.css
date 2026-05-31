@@ -1,0 +1,660 @@
+/* =====================================================================
+   styles-site-view.css
+   Site View schematic builder — layout, SVG component styles, palette,
+   toolbar, and properties panel.
+   Relies on CSS custom properties defined in styles.css (:root / [data-theme="dark"]).
+   ===================================================================== */
+
+/* ─── Site View Custom Properties ───────────────────────────────────────── */
+
+:root {
+    /* Selection highlight color for nodes */
+    --sv-select-color: var(--color-primary);
+    /* Canvas dot-grid line color */
+    --sv-grid-color: rgba(100, 116, 139, 0.15);
+    /* Decorative SVG symbol stroke color (dark mode default) */
+    --sv-deco-stroke: rgba(255, 255, 255, 0.65);
+}
+
+[data-theme="light"] {
+    --sv-grid-color: rgba(100, 116, 139, 0.2);
+    --sv-deco-stroke: rgba(15, 23, 42, 0.45);
+}
+
+
+/* ─── Top-Level Panel Layout ─────────────────────────────────────────────── */
+
+#siteview-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Three-column flex container: sidebar | canvas | properties */
+.sv-container {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    gap: 0;
+    min-height: 0; /* allow flex children to shrink past content size */
+}
+
+
+/* ─── Sidebar (Component Palette) ────────────────────────────────────────── */
+
+.sv-sidebar {
+    width: 200px;
+    min-width: 180px;
+    overflow-y: auto;
+    border-right: 1px solid var(--border-light);
+    background: var(--bg-secondary);
+    padding: 12px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.sv-sidebar-title {
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--text-primary);
+    padding: 0 4px 8px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border-light);
+    margin-bottom: 4px;
+}
+
+.sv-category-header {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-tertiary);
+    padding: 8px 4px 4px;
+    user-select: none;
+}
+
+.sv-palette-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    cursor: grab;
+    border: 1px solid var(--border-light);
+    background: var(--bg-card);
+    user-select: none;
+    font-size: 12px;
+    color: var(--text-primary);
+    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+    line-height: 1.3;
+}
+
+.sv-palette-item:hover {
+    border-color: var(--color-primary);
+    background: var(--bg-hover);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.sv-palette-item:active {
+    cursor: grabbing;
+    background: var(--bg-active);
+}
+
+/* Small SVG preview icon inside palette items */
+.sv-palette-item-icon {
+    width: 32px;
+    height: 20px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.75;
+}
+
+.sv-palette-item-label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+/* ─── Workspace (Toolbar + Canvas) ──────────────────────────────────────── */
+
+.sv-workspace {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg-primary);
+    min-width: 0;
+}
+
+/* ── Toolbar ── */
+
+.sv-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--bg-secondary);
+    min-height: 40px;
+    flex-shrink: 0;
+}
+
+.sv-toolbar-separator {
+    width: 1px;
+    height: 20px;
+    background: var(--border-medium);
+    margin: 0 2px;
+    flex-shrink: 0;
+}
+
+.sv-toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-family: var(--font-family);
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.sv-toolbar-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-light);
+}
+
+.sv-toolbar-btn:active {
+    background: var(--bg-active);
+}
+
+.sv-toolbar-btn.sv-btn-danger:hover {
+    background: var(--color-danger-light);
+    color: var(--color-danger);
+    border-color: var(--color-danger);
+}
+
+.sv-toolbar-btn svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+/* Save / autosave status indicator */
+.sv-save-status {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-left: auto;
+    transition: color 0.25s ease;
+    user-select: none;
+}
+
+.sv-save-status.sv-saving { color: var(--color-warning); }
+.sv-save-status.sv-saved  { color: var(--color-success); }
+
+
+/* ─── Canvas ─────────────────────────────────────────────────────────────── */
+
+.sv-canvas-container {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    cursor: grab;
+    min-height: 0;
+}
+
+.sv-canvas-container.sv-panning { cursor: grabbing; }
+
+/* Drop target highlight when dragging a palette component over canvas */
+.sv-canvas-container.sv-drag-over { outline: 2px dashed var(--color-primary); outline-offset: -2px; }
+
+.sv-canvas-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* Dot grid background pattern */
+.sv-grid { pointer-events: none; }
+
+
+/* ─── Properties Panel ───────────────────────────────────────────────────── */
+
+.sv-properties {
+    width: 260px;
+    min-width: 220px;
+    border-left: 1px solid var(--border-light);
+    background: var(--bg-secondary);
+    overflow-y: auto;
+    padding: 16px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.sv-props-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text-primary);
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.sv-props-empty {
+    color: var(--text-tertiary);
+    font-size: 12px;
+    text-align: center;
+    padding: 32px 0;
+    line-height: 1.6;
+}
+
+.sv-props-group {
+    margin-bottom: 14px;
+}
+
+.sv-props-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+    user-select: none;
+}
+
+.sv-props-input,
+.sv-props-select {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 12px;
+    font-family: var(--font-family);
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    box-sizing: border-box;
+}
+
+.sv-props-input:focus,
+.sv-props-select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-primary-light);
+}
+
+.sv-props-input[type="number"] {
+    font-family: var(--font-mono);
+}
+
+/* Node type badge shown in properties header */
+.sv-props-type-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: var(--color-primary-light);
+    color: var(--color-primary);
+    margin-bottom: 10px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+/* Node position readout */
+.sv-props-position {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-tertiary);
+    margin-bottom: 14px;
+}
+
+/* Delete / disconnect action buttons */
+.sv-props-delete-btn {
+    width: 100%;
+    margin-top: 16px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-family: var(--font-family);
+    font-weight: 500;
+    color: var(--color-danger);
+    background: transparent;
+    border: 1px solid var(--color-danger);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sv-props-delete-btn:hover {
+    background: var(--color-danger-light);
+}
+
+.sv-props-delete-btn:active {
+    background: var(--color-danger);
+    color: #fff;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SVG COMPONENT STYLES
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* All text inside nodes inherits the app font */
+.sv-node text {
+    font-family: var(--font-family, sans-serif);
+    pointer-events: none;
+}
+
+/* ── Node Body (generic, overridden per type below) ── */
+
+.sv-node-body {
+    fill: var(--bg-card);
+    stroke: var(--border-medium);
+    stroke-width: 1.5;
+    transition: stroke 0.15s ease, stroke-width 0.15s ease;
+}
+
+/* ── Selected state: stroke color and selection rect visibility ── */
+
+.sv-node.sv-selected .sv-node-body {
+    stroke: var(--color-primary);
+    stroke-width: 2;
+}
+
+.sv-node.sv-selected .sv-node-selection {
+    visibility: visible !important;
+}
+
+/* ── Hover highlight when hovering a node (but not selected) ── */
+
+.sv-node:not(.sv-selected):hover .sv-node-body {
+    stroke-width: 2;
+    filter: brightness(1.12);
+}
+
+/* ── Decorative symbol lines (override in light mode via CSS, dark mode via inline attr) ── */
+
+.sv-node-deco {
+    pointer-events: none;
+    fill: var(--sv-deco-stroke);
+    stroke: var(--sv-deco-stroke);
+}
+
+/* ── Type text labels ── */
+
+.sv-node-type-icon {
+    fill: rgba(255, 255, 255, 0.92);
+    font-weight: 700;
+    font-size: 13px;
+    pointer-events: none;
+}
+
+.sv-node-label {
+    fill: rgba(255, 255, 255, 0.65);
+    font-size: 11px;
+    pointer-events: none;
+}
+
+/* Selection rect — hidden by default, shown when node has .sv-selected class */
+.sv-node-selection {
+    pointer-events: none;
+}
+
+
+/* ── Per-Type Body Colors ──────────────────────────────────────────────────
+   Each type has a unique color identity for quick visual scanning.
+   Dark mode: rich, saturated fills with colored strokes.
+   Light mode: light pastels with same stroke hues.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Transmitter — blue */
+.sv-node-transmitter .sv-node-body {
+    fill: #1e3a5f;
+    stroke: #3b82f6;
+}
+
+/* Amplifier — green */
+.sv-node-amplifier .sv-node-body {
+    fill: #1a3a1a;
+    stroke: #22c55e;
+}
+
+/* Attenuator — amber */
+.sv-node-attenuator .sv-node-body {
+    fill: #3b2b00;
+    stroke: #f59e0b;
+}
+
+/* DWM Power Meter — purple */
+.sv-node-dwm-meter .sv-node-body {
+    fill: #2d1b4e;
+    stroke: #a855f7;
+}
+
+/* 3dB Hybrid — cyan */
+.sv-node-hybrid-3db .sv-node-body {
+    fill: #0d2b35;
+    stroke: #06b6d4;
+}
+
+/* Combiner/Splitter — cyan (same family as hybrid) */
+.sv-node-combiner .sv-node-body {
+    fill: #0d2b35;
+    stroke: #06b6d4;
+}
+
+/* Antenna — violet */
+.sv-node-antenna .sv-node-body {
+    fill: #1e1a35;
+    stroke: #8b5cf6;
+}
+
+/* Coax Switch — red */
+.sv-node-coax-switch .sv-node-body {
+    fill: #2e1515;
+    stroke: #ef4444;
+}
+
+/* Directional Coupler — cyan */
+.sv-node-coupler .sv-node-body {
+    fill: #0d2b35;
+    stroke: #06b6d4;
+}
+
+
+/* ── Port Styles ────────────────────────────────────────────────────────── */
+
+/* Transparent hit area — receives pointer events for drag-to-connect */
+.sv-port-hit {
+    fill: transparent;
+    cursor: crosshair;
+}
+
+/* Visual port circle */
+.sv-port {
+    fill: var(--bg-primary);
+    stroke: #94a3b8;
+    stroke-width: 1.5;
+    transition: r 0.1s ease;
+}
+
+.sv-port.sv-port-input  { stroke: #4ade80; }
+.sv-port.sv-port-output { stroke: #60a5fa; }
+.sv-port.sv-port-bidirectional { stroke: #fb923c; }
+
+/* Enlarge port when its hit area is hovered */
+.sv-port-hit:hover + .sv-port { r: 8; }
+
+/* Highlight when a connection drag is in progress targeting this port */
+.sv-port.sv-port-connecting {
+    stroke: #fbbf24;
+    fill: #fbbf24;
+    r: 8;
+}
+
+/* Port label text */
+.sv-port-label {
+    fill: rgba(255, 255, 255, 0.45);
+    font-size: 9px;
+    pointer-events: none;
+    font-family: var(--font-family, sans-serif);
+}
+
+
+/* ── Connection (Wire) Styles ──────────────────────────────────────────── */
+
+.sv-connection {
+    fill: none;
+    stroke: #64748b;
+    stroke-width: 2;
+    pointer-events: stroke;
+    cursor: pointer;
+    transition: stroke 0.12s ease, stroke-width 0.12s ease;
+}
+
+.sv-connection:hover {
+    stroke: #94a3b8;
+    stroke-width: 3;
+}
+
+.sv-connection.sv-connection-selected {
+    stroke: var(--color-primary);
+    stroke-width: 2.5;
+}
+
+/* Temporary line drawn while dragging to create a new connection */
+.sv-connection-temp {
+    fill: none;
+    stroke: #fbbf24;
+    stroke-width: 2;
+    stroke-dasharray: 8, 4;
+    pointer-events: none;
+}
+
+
+/* ── DWM Meter Power Readout ──────────────────────────────────────────── */
+
+.sv-meter-power-fwd {
+    fill: #4ade80;
+    font-size: 11px;
+    font-family: var(--font-mono, monospace);
+    font-weight: 600;
+}
+
+.sv-meter-power-rfl {
+    fill: #f87171;
+    font-size: 11px;
+    font-family: var(--font-mono, monospace);
+    font-weight: 600;
+}
+
+.sv-meter-label {
+    fill: rgba(255, 255, 255, 0.58);
+    font-size: 10px;
+    pointer-events: none;
+}
+
+
+/* ─────────────────────────────────────────────────────────────────────────
+   LIGHT THEME OVERRIDES  [data-theme="light"]
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Node text: switch to dark ink on light backgrounds */
+[data-theme="light"] .sv-node-type-icon {
+    fill: #1e293b;
+}
+
+[data-theme="light"] .sv-node-label {
+    fill: #475569;
+}
+
+/* Decorative SVG symbol lines: dark ink in light mode */
+[data-theme="light"] .sv-node-deco {
+    fill: rgba(15, 23, 42, 0.45);
+    stroke: rgba(15, 23, 42, 0.45);
+}
+
+/* Per-type body fills: light pastel backgrounds */
+[data-theme="light"] .sv-node-transmitter .sv-node-body {
+    fill: #dbeafe;
+    stroke: #3b82f6;
+}
+
+[data-theme="light"] .sv-node-amplifier .sv-node-body {
+    fill: #dcfce7;
+    stroke: #16a34a;
+}
+
+[data-theme="light"] .sv-node-attenuator .sv-node-body {
+    fill: #fef3c7;
+    stroke: #d97706;
+}
+
+[data-theme="light"] .sv-node-dwm-meter .sv-node-body {
+    fill: #f3e8ff;
+    stroke: #9333ea;
+}
+
+[data-theme="light"] .sv-node-hybrid-3db .sv-node-body {
+    fill: #cffafe;
+    stroke: #0891b2;
+}
+
+[data-theme="light"] .sv-node-combiner .sv-node-body {
+    fill: #cffafe;
+    stroke: #0891b2;
+}
+
+[data-theme="light"] .sv-node-antenna .sv-node-body {
+    fill: #ede9fe;
+    stroke: #7c3aed;
+}
+
+[data-theme="light"] .sv-node-coax-switch .sv-node-body {
+    fill: #fee2e2;
+    stroke: #dc2626;
+}
+
+[data-theme="light"] .sv-node-coupler .sv-node-body {
+    fill: #cffafe;
+    stroke: #0891b2;
+}
+
+/* Port circles */
+[data-theme="light"] .sv-port {
+    fill: var(--bg-primary);
+}
+
+[data-theme="light"] .sv-port.sv-port-input  { stroke: #16a34a; }
+[data-theme="light"] .sv-port.sv-port-output { stroke: #2563eb; }
+
+/* Port labels */
+[data-theme="light"] .sv-port-label {
+    fill: rgba(0, 0, 0, 0.4);
+}
+
+/* Meter readout */
+[data-theme="light"] .sv-meter-power-fwd { fill: #16a34a; }
+[data-theme="light"] .sv-meter-power-rfl { fill: #dc2626; }
+[data-theme="light"] .sv-meter-label     { fill: rgba(0, 0, 0, 0.4); }
+
+/* Connection wires */
+[data-theme="light"] .sv-connection { stroke: #94a3b8; }
+[data-theme="light"] .sv-connection:hover { stroke: #64748b; }
