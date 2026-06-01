@@ -277,6 +277,25 @@
     margin-bottom: 14px;
 }
 
+.sv-props-field {
+    margin-bottom: 10px;
+}
+
+.sv-props-field--action {
+    margin-top: 14px;
+    margin-bottom: 10px;
+}
+
+.sv-props-section {
+    margin-bottom: 6px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.sv-props-section:last-child {
+    border-bottom: none;
+}
+
 .sv-props-label {
     display: block;
     font-size: 11px;
@@ -797,4 +816,48 @@
 .sv-settings-row-inline {
     display: flex;
     align-items: center;
+}
+
+/* ── Gauge display mode ────────────────────────────────────────── */
+.sv-gauge-bg {
+    fill: rgba(255,255,255,0.07);
+    stroke: rgba(255,255,255,0.15);
+    stroke-width: 0.5;
+}
+
+.sv-gauge-fill {
+    fill: #4ade80;
+}
+
+/* ── Graph (sparkline) display mode ────────────────────────────── */
+.sv-graph-bg {
+    fill: rgba(255,255,255,0.04);
+    stroke: rgba(255,255,255,0.10);
+    stroke-width: 0.5;
+}
+
+.sv-graph-line {
+    stroke: #4ade80;
+    stroke-width: 1.5;
+    fill: none;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+[data-theme="light"] .sv-gauge-bg {
+    fill: rgba(0,0,0,0.05);
+    stroke: rgba(0,0,0,0.12);
+}
+
+[data-theme="light"] .sv-gauge-fill {
+    fill: #16a34a;
+}
+
+[data-theme="light"] .sv-graph-bg {
+    fill: rgba(0,0,0,0.03);
+    stroke: rgba(0,0,0,0.08);
+}
+
+[data-theme="light"] .sv-graph-line {
+    stroke: #16a34a;
 }

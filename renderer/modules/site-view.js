@@ -32,6 +32,8 @@
             saveTimer:      null,
             powerTimer:     null,
             isDirty:        false,
+            meterGraphHistory: new Map(),   // nodeId -> number[] ring buffer for graph mode
+            meterMaxW:         new Map(),   // nodeId -> number running max for gauge mode
         };
         this._svLoadSettings();
         this._svLoadSchematic();
@@ -288,10 +290,10 @@
         document.addEventListener('mousemove', (e) => this._svOnMouseMove(e));
         document.addEventListener('mouseup',   (e) => this._svOnMouseUp(e));
 
-        // ── Scroll to pan; Ctrl+scroll to zoom ────────────────────────────────
+        // ── Scroll to pan; Ctrl/Shift+scroll to zoom ─────────────────────────
         svg.addEventListener('wheel', (e) => {
             e.preventDefault();
-            if (e.ctrlKey || e.metaKey) {
+            if (e.ctrlKey || e.metaKey || e.shiftKey) {
                 // Zoom toward mouse cursor
                 const rect      = svg.getBoundingClientRect();
                 const mouseX    = e.clientX - rect.left;
@@ -672,8 +674,8 @@
     <input class="sv-props-input" type="text" id="sv-prop-label"
            value="${_esc(node.label)}" placeholder="Label">
 </div>
-<div class="sv-props-field">
-    <button class="sv-props-flip-btn" id="sv-prop-flip-btn">⇄ Flip</button>
+<div class="sv-props-field sv-props-field--action">
+    <button class="sv-props-flip-btn" id="sv-prop-flip-btn">&#8644; Flip</button>
 </div>`;
 
             // ── DWM Power Meter ───────────────────────────────────────────────
@@ -712,7 +714,15 @@
     </select>
 </div>
 <div class="sv-props-field">
-    <button class="sv-props-identify-btn" id="sv-prop-identify-btn"${!node.props.deviceUid ? ' disabled' : ''}>🔦 Identify</button>
+    <label class="sv-props-label">Display Mode</label>
+    <select class="sv-props-select" id="sv-prop-display-mode">
+        <option value="numeric"${(node.props.displayMode || 'numeric') === 'numeric' ? ' selected' : ''}>Numeric</option>
+        <option value="gauge"${node.props.displayMode === 'gauge' ? ' selected' : ''}>Gauge</option>
+        <option value="graph"${node.props.displayMode === 'graph' ? ' selected' : ''}>Graph</option>
+    </select>
+</div>
+<div class="sv-props-field sv-props-field--action">
+    <button class="sv-props-identify-btn" id="sv-prop-identify-btn"${!node.props.deviceUid ? ' disabled' : ''}>Identify</button>
 </div>`;
             }
 
@@ -786,6 +796,21 @@
     <label class="sv-props-label">Frequency (MHz)</label>
     <input class="sv-props-input" type="number" id="sv-prop-tx-freq"
            value="${_esc(String(node.props.freqMHz ?? ''))}" placeholder="e.g. 98.1" min="0" step="0.001">
+</div>`;
+            }
+
+            // ── Gain Readout Power (all GAIN_TYPE components) ─────────────────
+            const _GAIN_TYPES_ARR = ['attenuator', 'amplifier', 'hybrid-3db', 'combiner',
+                                     'coax-switch', '4port-switch', 'filter', 'coupler'];
+            if (_GAIN_TYPES_ARR.includes(node.type)) {
+                html += `
+<div class="sv-props-field">
+    <label class="sv-props-label">Gain Readout Power</label>
+    <select class="sv-props-select" id="sv-prop-gain-power-type">
+        <option value="avg"${(node.props.gainPowerType || 'avg') === 'avg' ? ' selected' : ''}>AVG — Average Power</option>
+        <option value="peak"${node.props.gainPowerType === 'peak' ? ' selected' : ''}>PEP — Peak Envelope</option>
+        <option value="inst"${node.props.gainPowerType === 'inst' ? ' selected' : ''}>INST — Instantaneous</option>
+    </select>
 </div>`;
             }
 
@@ -874,9 +899,28 @@
                 if (identifyBtn) {
                     identifyBtn.addEventListener('click', () => {
                         const uid = node.props.deviceUid;
-                        if (uid && typeof this.identifyMeter === 'function') {
-                            this.identifyMeter(uid);
+                        if (uid && typeof this.identifyMeter === 'function' && window.dwm?.meterRegistry) {
+                            let mapKey = null;
+                            for (const [key, rec] of window.dwm.meterRegistry.entries()) {
+                                if ((rec.apiUid || rec.key) === uid || key === uid) {
+                                    mapKey = key;
+                                    break;
+                                }
+                            }
+                            if (mapKey !== null) this.identifyMeter(mapKey);
                         }
+                    });
+                }
+
+                const displayModeSel = document.getElementById('sv-prop-display-mode');
+                if (displayModeSel) {
+                    displayModeSel.addEventListener('change', () => {
+                        node.props.displayMode = displayModeSel.value;
+                        // Reset history/max when mode changes
+                        this.sv.meterGraphHistory.delete(node.id);
+                        this.sv.meterMaxW.delete(node.id);
+                        this._svRender();
+                        this._svMarkDirty();
                     });
                 }
             }
@@ -963,6 +1007,15 @@
                 }
             }
 
+            // Wire up gain readout power type (all GAIN_TYPE components)
+            const gainPtSel = document.getElementById('sv-prop-gain-power-type');
+            if (gainPtSel) {
+                gainPtSel.addEventListener('change', () => {
+                    node.props.gainPowerType = gainPtSel.value;
+                    this._svMarkDirty();
+                });
+            }
+
             // Delete button
             const delBtn = document.getElementById('sv-prop-delete-btn');
             if (delBtn) delBtn.addEventListener('click', () => this._svDeleteSelected());
@@ -1015,7 +1068,7 @@
 <div class="sv-props-section">
 <div class="sv-props-title">Bulk Meter Settings</div>
 <div class="sv-props-field">
-    <label class="sv-props-label">Set All Meters To</label>
+    <label class="sv-props-label">All Meter Power Type</label>
     <select class="sv-props-select" id="sv-ws-bulk-power-type">
         <option value="avg">AVG — Average Power</option>
         <option value="peak">PEP — Peak Envelope</option>
@@ -1025,8 +1078,17 @@
         <option value="dev">DEV — Deviation</option>
     </select>
 </div>
+</div>
+
+<div class="sv-props-section">
+<div class="sv-props-title">Gain/Loss Display</div>
 <div class="sv-props-field">
-    <button class="sv-props-btn" id="sv-ws-bulk-apply-btn">Apply to All Meters</button>
+    <label class="sv-props-label">All Gain Components Use</label>
+    <select class="sv-props-select" id="sv-ws-bulk-gain-type">
+        <option value="avg">AVG — Average Power</option>
+        <option value="peak">PEP — Peak Envelope</option>
+        <option value="inst">INST — Instantaneous</option>
+    </select>
 </div>
 </div>`;
 
@@ -1047,23 +1109,31 @@
                 if (el) el.addEventListener('change', applyWsSettings);
             });
 
-            const bulkApplyBtn = document.getElementById('sv-ws-bulk-apply-btn');
-            if (bulkApplyBtn) {
-                bulkApplyBtn.addEventListener('click', () => {
-                    const bulkSel = document.getElementById('sv-ws-bulk-power-type');
-                    if (!bulkSel) return;
-                    const pt = bulkSel.value;
+            // Bulk meter power type — auto-apply on change
+            const bulkPtSel = document.getElementById('sv-ws-bulk-power-type');
+            if (bulkPtSel) {
+                bulkPtSel.addEventListener('change', () => {
+                    const pt = bulkPtSel.value;
                     let changed = false;
-                    for (const node of this.sv.nodes.values()) {
-                        if (node.type === 'dwm-meter') {
-                            node.props.powerType = pt;
-                            changed = true;
-                        }
+                    for (const n of this.sv.nodes.values()) {
+                        if (n.type === 'dwm-meter') { n.props.powerType = pt; changed = true; }
                     }
-                    if (changed) {
-                        this._svRender();
-                        this._svMarkDirty();
+                    if (changed) { this._svRender(); this._svMarkDirty(); }
+                });
+            }
+
+            // Bulk gain/loss power type — auto-apply on change
+            const bulkGainSel = document.getElementById('sv-ws-bulk-gain-type');
+            if (bulkGainSel) {
+                bulkGainSel.addEventListener('change', () => {
+                    const pt = bulkGainSel.value;
+                    const GAIN_TYPES_SET = new Set(['attenuator', 'amplifier', 'hybrid-3db', 'combiner',
+                                                    'coax-switch', '4port-switch', 'filter', 'coupler']);
+                    let changed = false;
+                    for (const n of this.sv.nodes.values()) {
+                        if (GAIN_TYPES_SET.has(n.type)) { n.props.gainPowerType = pt; changed = true; }
                     }
+                    if (changed) this._svMarkDirty();
                 });
             }
         }
@@ -1131,6 +1201,7 @@
             if (node.type !== 'dwm-meter') continue;
 
             let powerText = '-- --';
+            let powerW    = null;
 
             const deviceUid = node.props.deviceUid;
             if (deviceUid && window.dwm?.meterRegistry) {
@@ -1143,13 +1214,14 @@
                     record.connectionState === 'connected' &&
                     record.state?.lastSnapshotRaw) {
 
-                    const snap = record.state.lastSnapshotRaw;
+                    const snap      = record.state.lastSnapshotRaw;
                     const powerType = node.props.powerType || 'avg';
-                    const rawVal = snap[powerType] ?? snap.avg;
-                    const powerW = parseFloat(rawVal);
+                    const rawVal    = snap[powerType] ?? snap.avg;
+                    const w         = parseFloat(rawVal);
 
-                    if (Number.isFinite(powerW) && typeof window.dwm.scalePower === 'function') {
-                        const { scaled, unit } = window.dwm.scalePower(powerW);
+                    if (Number.isFinite(w) && typeof window.dwm.scalePower === 'function') {
+                        powerW = w >= 0 ? w : 0;
+                        const { scaled, unit } = window.dwm.scalePower(w);
                         powerText = `${scaled.toFixed(2)} ${unit}`;
                     }
                 }
@@ -1157,15 +1229,56 @@
 
             const nodeG = nodesLayer.querySelector(`[data-node-id="${CSS.escape(node.id)}"]`);
             if (!nodeG) continue;
+
+            // Always update the numeric text element
             const fwdEl = nodeG.querySelector('.sv-meter-fwd');
             if (fwdEl) fwdEl.textContent = powerText;
+
+            const displayMode = node.props.displayMode || 'numeric';
+
+            if (displayMode === 'gauge' && powerW !== null) {
+                const gaugeEl = nodeG.querySelector('.sv-gauge-fill');
+                if (gaugeEl) {
+                    const maxBarW = parseFloat(gaugeEl.getAttribute('data-bar-max-w') || '0');
+                    if (maxBarW > 0) {
+                        const prevMax = this.sv.meterMaxW.get(node.id) || 0;
+                        const curMax  = Math.max(prevMax, powerW);
+                        this.sv.meterMaxW.set(node.id, curMax);
+                        const fillW = curMax > 0 ? Math.min(maxBarW, (powerW / curMax) * maxBarW) : 0;
+                        gaugeEl.setAttribute('width', String(fillW.toFixed(1)));
+                    }
+                }
+
+            } else if (displayMode === 'graph') {
+                const history = this.sv.meterGraphHistory.get(node.id) || [];
+                history.push(powerW !== null ? powerW : 0);
+                if (history.length > 20) history.shift();
+                this.sv.meterGraphHistory.set(node.id, history);
+
+                const polyEl = nodeG.querySelector('.sv-graph-line');
+                if (polyEl && history.length > 1) {
+                    const cx    = parseFloat(polyEl.getAttribute('data-chart-x') || '0');
+                    const cy    = parseFloat(polyEl.getAttribute('data-chart-y') || '0');
+                    const cw    = parseFloat(polyEl.getAttribute('data-chart-w') || '100');
+                    const ch    = parseFloat(polyEl.getAttribute('data-chart-h') || '30');
+                    const minV  = Math.min(...history);
+                    const maxV  = Math.max(...history);
+                    const range = maxV - minV || 1;
+                    const pts   = history.map((v, i) => {
+                        const px = cx + (i / (history.length - 1)) * cw;
+                        const py = cy + ch - ((v - minV) / range) * ch;
+                        return `${px.toFixed(1)},${py.toFixed(1)}`;
+                    }).join(' ');
+                    polyEl.setAttribute('points', pts);
+                }
+            }
         }
 
         // ── Per-component gain/loss computation ────────────────────────────────
         const GAIN_TYPES = ['attenuator', 'amplifier', 'hybrid-3db', 'combiner',
                             'coax-switch', '4port-switch', 'filter', 'coupler'];
 
-        const getPowerW = (meterNode) => {
+        const getPowerW = (meterNode, powerType) => {
             if (!meterNode?.props?.deviceUid) return null;
             if (!window.dwm?.meterRegistry) return null;
             let record = null;
@@ -1174,27 +1287,28 @@
             }
             if (!record || record.connectionState !== 'connected') return null;
             if (!record.state?.lastSnapshotRaw) return null;
-            const powerType = meterNode.props?.powerType || 'avg';
-            const w = parseFloat(record.state.lastSnapshotRaw[powerType] ?? record.state.lastSnapshotRaw.avg);
+            const pt = powerType || meterNode.props?.powerType || 'avg';
+            const w = parseFloat(record.state.lastSnapshotRaw[pt] ?? record.state.lastSnapshotRaw.avg);
             return Number.isFinite(w) && w > 0 ? w : null;
         };
 
         for (const node of this.sv.nodes.values()) {
             if (!GAIN_TYPES.includes(node.type)) continue;
 
+            const gainPt = node.props.gainPowerType || 'avg';
             const { input: inputMeters, output: outputMeters } = this._svFindFlankingMeters(node.id);
 
             let fwdText = '';
-            const fwdIn  = getPowerW(inputMeters.forward);
-            const fwdOut = getPowerW(outputMeters.forward);
+            const fwdIn  = getPowerW(inputMeters.forward,  gainPt);
+            const fwdOut = getPowerW(outputMeters.forward, gainPt);
             if (fwdIn !== null && fwdOut !== null) {
                 const db = 10 * Math.log10(fwdOut / fwdIn);
                 fwdText = (db >= 0 ? '+' : '') + db.toFixed(1) + ' dB FWD';
             }
 
             let rflText = '';
-            const rflIn  = getPowerW(inputMeters.reverse);
-            const rflOut = getPowerW(outputMeters.reverse);
+            const rflIn  = getPowerW(inputMeters.reverse,  gainPt);
+            const rflOut = getPowerW(outputMeters.reverse, gainPt);
             if (rflIn !== null && rflOut !== null) {
                 const db = 10 * Math.log10(rflOut / rflIn);
                 rflText = (db >= 0 ? '+' : '') + db.toFixed(1) + ' dB RFL';
@@ -1407,13 +1521,15 @@
     }
 
     function _defaultProps(typeId) {
-        if (typeId === 'attenuator')   return { attenuationDb: 3 };
-        if (typeId === 'dwm-meter')    return { deviceUid: null, deviceName: null, measureType: 'forward', powerType: 'avg' };
-        if (typeId === 'amplifier')    return { gainDb: null };
+        const gpt = { gainPowerType: 'avg' };
+        if (typeId === 'attenuator')   return { attenuationDb: 3, ...gpt };
+        if (typeId === 'dwm-meter')    return { deviceUid: null, deviceName: null, measureType: 'forward', powerType: 'avg', displayMode: 'numeric' };
+        if (typeId === 'amplifier')    return { gainDb: null, ...gpt };
         if (typeId === 'transmitter')  return { powerW: null, freqMHz: null };
-        if (typeId === 'filter')       return { filterType: 'lowpass' };
-        if (typeId === '4port-switch') return { mode: 'through' };
-        if (typeId === 'coax-switch')  return { activePort: 1 };
+        if (typeId === 'filter')       return { filterType: 'lowpass', ...gpt };
+        if (typeId === '4port-switch') return { mode: 'through', ...gpt };
+        if (typeId === 'coax-switch')  return { activePort: 1, ...gpt };
+        if (['hybrid-3db', 'combiner', 'coupler'].includes(typeId)) return { ...gpt };
         return {};
     }
 
