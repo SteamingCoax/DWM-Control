@@ -154,43 +154,17 @@
             ],
             renderBody(node) {
                 const w = this.width, h = this.height;
-                const isReverse   = node.props?.measureType === 'reverse';
-                const dirLabel    = isReverse ? 'REFLECTED' : 'FORWARD';
-                const ptLabel     = { inst: 'INST', avg: 'AVG', peak: 'PEP', max: 'MAX', min: 'MIN', dev: 'DEV' }[node.props?.powerType || 'avg'] || 'AVG';
-                const devName     = node.props?.deviceName || (node.props?.deviceUid ? '' : 'Unlinked');
-                const displayMode = node.props?.displayMode || 'numeric';
-
-                const bg      = `<rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>`;
-                const dirText = `<text class="sv-meter-dir" x="${w*0.5}" y="${h*0.26}" text-anchor="middle" font-size="10">${_esc(dirLabel)} · ${_esc(ptLabel)}</text>`;
-                const divider = `<line class="sv-node-deco" x1="${w*0.06}" y1="${h*0.76}" x2="${w*0.94}" y2="${h*0.76}" stroke-width="0.5" opacity="0.3"/>`;
-                const nameEl  = `<text class="sv-node-label" x="${w*0.5}" y="${h*0.92}" text-anchor="middle" font-size="9">${_esc(devName || node.label)}</text>`;
-
-                if (displayMode === 'gauge') {
-                    const bx = w * 0.06, bw = w * 0.88, bh = 13, by = h * 0.35;
-                    return `${bg}${dirText}
-                    <rect class="sv-gauge-bg"   x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="3"/>
-                    <rect class="sv-gauge-fill" x="${bx}" y="${by}" width="0"    height="${bh}" rx="3"
-                          data-bar-x="${bx}" data-bar-max-w="${bw}"/>
-                    <text class="sv-meter-fwd" x="${w*0.5}" y="${by + bh + 19}" text-anchor="middle" font-size="14">-- --</text>
-                    ${divider}${nameEl}`;
-                }
-
-                if (displayMode === 'graph') {
-                    const cx = w * 0.04, cy = h * 0.30, cw = w * 0.92, ch = h * 0.34;
-                    return `${bg}${dirText}
-                    <rect class="sv-graph-bg" x="${cx}" y="${cy}" width="${cw}" height="${ch}" rx="2"/>
-                    <polyline class="sv-graph-line" points="${cx + cw*0.5},${cy + ch*0.5}"
-                              data-chart-x="${cx}" data-chart-y="${cy}"
-                              data-chart-w="${cw}" data-chart-h="${ch}"/>
-                    <text class="sv-meter-fwd" x="${w*0.5}" y="${cy + ch + 16}" text-anchor="middle" font-size="12">-- --</text>
-                    ${divider}${nameEl}`;
-                }
-
-                // Numeric (default)
-                return `${bg}${dirText}
+                const isReverse = node.props?.measureType === 'reverse';
+                const dirLabel  = isReverse ? 'REFLECTED' : 'FORWARD';
+                const ptLabel   = { inst: 'INST', avg: 'AVG', peak: 'PEP', max: 'MAX', min: 'MIN', dev: 'DEV' }[node.props?.powerType || 'avg'] || 'AVG';
+                const devName   = node.props?.deviceName || (node.props?.deviceUid ? '' : 'Unlinked');
+                return `
+                    <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
+                    <text class="sv-meter-dir" x="${w*0.5}" y="${h*0.26}" text-anchor="middle" font-size="10">${_esc(dirLabel)} · ${_esc(ptLabel)}</text>
                     <text class="sv-meter-fwd" x="${w*0.5}" y="${h*0.60}" text-anchor="middle">-- --</text>
                     <line class="sv-node-deco" x1="${w*0.06}" y1="${h*0.70}" x2="${w*0.94}" y2="${h*0.70}" stroke-width="0.5" opacity="0.3"/>
-                    <text class="sv-node-label" x="${w*0.5}" y="${h*0.86}" text-anchor="middle" font-size="9">${_esc(devName || node.label)}</text>`;
+                    <text class="sv-node-label" x="${w*0.5}" y="${h*0.86}" text-anchor="middle" font-size="9">${_esc(devName || node.label)}</text>
+                `;
             },
         },
 
@@ -421,6 +395,35 @@
             },
         },
 
+        // ── Return Loss / SWR ─────────────────────────────────────────────────
+        'return-loss': {
+            id: 'return-loss',
+            label: 'Return Loss / SWR',
+            category: 'meters',
+            width: 150,
+            height: 90,
+            defaultLabel: 'RL/SWR',
+            ports: [
+                { id: 'in',  side: 'left',  type: 'input',  label: 'In',  yRatio: 0.5 },
+                { id: 'out', side: 'right', type: 'output', label: 'Out', yRatio: 0.5 },
+            ],
+            renderBody(node) {
+                const w = this.width, h = this.height;
+                const mode      = node.props?.displayMode || 'rl';
+                const modeLabel = mode === 'swr' ? 'SWR' : 'Return Loss';
+                const fwdName   = node.props?.fwdDeviceName || (node.props?.fwdDeviceUid ? '' : 'Unlinked');
+                const rflName   = node.props?.rflDeviceName || (node.props?.rflDeviceUid ? '' : 'Unlinked');
+                return `
+                    <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
+                    <text class="sv-meter-dir" x="${w*0.5}" y="${h*0.20}" text-anchor="middle" font-size="10">${_esc(modeLabel)}</text>
+                    <text class="sv-rl-value sv-meter-fwd" x="${w*0.5}" y="${h*0.56}" text-anchor="middle">-- --</text>
+                    <line class="sv-node-deco" x1="${w*0.06}" y1="${h*0.66}" x2="${w*0.94}" y2="${h*0.66}" stroke-width="0.5" opacity="0.3"/>
+                    <text class="sv-meter-label" x="${w*0.06}" y="${h*0.82}" text-anchor="start" font-size="8">FWD: ${_esc(fwdName)}</text>
+                    <text class="sv-meter-label" x="${w*0.94}" y="${h*0.82}" text-anchor="end"   font-size="8">RFL: ${_esc(rflName)}</text>
+                `;
+            },
+        },
+
     };
 
     function createNode(type, x, y) {
@@ -429,13 +432,14 @@
 
         let props = {};
         if (type === 'attenuator')   props = { attenuationDb: 3, gainPowerType: 'avg' };
-        if (type === 'dwm-meter')    props = { deviceUid: null, deviceName: null, measureType: 'forward', powerType: 'avg', displayMode: 'numeric' };
+        if (type === 'dwm-meter')    props = { deviceUid: null, deviceName: null, measureType: 'forward', powerType: 'avg' };
         if (type === 'amplifier')    props = { gainDb: null, gainPowerType: 'avg' };
         if (type === 'transmitter')  props = { powerW: null, freqMHz: null };
         if (type === 'filter')       props = { filterType: 'lowpass', gainPowerType: 'avg' };
         if (type === '4port-switch') props = { mode: 'through', gainPowerType: 'avg' };
         if (type === 'coax-switch')  props = { activePort: 1, gainPowerType: 'avg' };
         if (type === 'hybrid-3db' || type === 'combiner' || type === 'coupler') props = { gainPowerType: 'avg' };
+        if (type === 'return-loss')  props = { fwdDeviceUid: null, fwdDeviceName: null, rflDeviceUid: null, rflDeviceName: null, displayMode: 'rl' };
 
         return {
             id:    'node-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),

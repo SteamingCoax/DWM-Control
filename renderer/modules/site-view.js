@@ -32,8 +32,6 @@
             saveTimer:      null,
             powerTimer:     null,
             isDirty:        false,
-            meterGraphHistory: new Map(),   // nodeId -> number[] ring buffer for graph mode
-            meterMaxW:         new Map(),   // nodeId -> number running max for gauge mode
         };
         this._svLoadSettings();
         this._svLoadSchematic();
@@ -290,10 +288,10 @@
         document.addEventListener('mousemove', (e) => this._svOnMouseMove(e));
         document.addEventListener('mouseup',   (e) => this._svOnMouseUp(e));
 
-        // ── Scroll to pan; Ctrl/Shift+scroll to zoom ─────────────────────────
+        // ── Scroll to pan; Ctrl+scroll to zoom ────────────────────────────────
         svg.addEventListener('wheel', (e) => {
             e.preventDefault();
-            if (e.ctrlKey || e.metaKey || e.shiftKey) {
+            if (e.ctrlKey || e.metaKey) {
                 // Zoom toward mouse cursor
                 const rect      = svg.getBoundingClientRect();
                 const mouseX    = e.clientX - rect.left;
@@ -325,6 +323,8 @@
         // ── Toolbar buttons ───────────────────────────────────────────────────
         const clearBtn    = document.getElementById('sv-clear-btn');
         const fitBtn      = document.getElementById('sv-fit-btn');
+        const zoomInBtn   = document.getElementById('sv-zoom-in-btn');
+        const zoomOutBtn  = document.getElementById('sv-zoom-out-btn');
         const deleteBtn   = document.getElementById('sv-delete-selected-btn');
         const saveFileBtn = document.getElementById('sv-save-file-btn');
         const loadFileBtn = document.getElementById('sv-load-file-btn');
@@ -333,6 +333,21 @@
         if (deleteBtn)   deleteBtn.addEventListener('click',   () => this._svDeleteSelected());
         if (saveFileBtn) saveFileBtn.addEventListener('click', () => this._svSaveToFile());
         if (loadFileBtn) loadFileBtn.addEventListener('click', () => this._svLoadFromFile());
+
+        const _svDoZoom = (factor) => {
+            const container = document.getElementById('sv-canvas-container');
+            const rect = container ? container.getBoundingClientRect() : { left: 0, top: 0, width: 800, height: 600 };
+            const cx = rect.width  / 2;
+            const cy = rect.height / 2;
+            const prev = this.sv.viewport.scale;
+            const next = Math.min(4, Math.max(0.2, prev * factor));
+            this.sv.viewport.x     = cx - (cx - this.sv.viewport.x) * (next / prev);
+            this.sv.viewport.y     = cy - (cy - this.sv.viewport.y) * (next / prev);
+            this.sv.viewport.scale = next;
+            this._svApplyViewport();
+        };
+        if (zoomInBtn)  zoomInBtn.addEventListener('click',  () => _svDoZoom(1.2));
+        if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => _svDoZoom(1 / 1.2));
 
         const settingsBtn = document.getElementById('sv-settings-btn');
         if (settingsBtn) {
@@ -713,14 +728,6 @@
         <option value="dev"${node.props.powerType === 'dev' ? ' selected' : ''}>DEV — Deviation</option>
     </select>
 </div>
-<div class="sv-props-field">
-    <label class="sv-props-label">Display Mode</label>
-    <select class="sv-props-select" id="sv-prop-display-mode">
-        <option value="numeric"${(node.props.displayMode || 'numeric') === 'numeric' ? ' selected' : ''}>Numeric</option>
-        <option value="gauge"${node.props.displayMode === 'gauge' ? ' selected' : ''}>Gauge</option>
-        <option value="graph"${node.props.displayMode === 'graph' ? ' selected' : ''}>Graph</option>
-    </select>
-</div>
 <div class="sv-props-field sv-props-field--action">
     <button class="sv-props-identify-btn" id="sv-prop-identify-btn"${!node.props.deviceUid ? ' disabled' : ''}>Identify</button>
 </div>`;
@@ -796,6 +803,38 @@
     <label class="sv-props-label">Frequency (MHz)</label>
     <input class="sv-props-input" type="number" id="sv-prop-tx-freq"
            value="${_esc(String(node.props.freqMHz ?? ''))}" placeholder="e.g. 98.1" min="0" step="0.001">
+</div>`;
+            }
+
+            // ── Return Loss / SWR ─────────────────────────────────────────────
+            if (node.type === 'return-loss') {
+                const rlMeters = [];
+                if (window.dwm?.meterRegistry) {
+                    for (const [, record] of window.dwm.meterRegistry.entries()) {
+                        const uid  = record.apiUid || record.key;
+                        const name = record.friendlyName || record.portPath || record.key;
+                        rlMeters.push({ uid, name });
+                    }
+                }
+                const fwdOptions = '<option value="">-- None --</option>' +
+                    rlMeters.map(m => `<option value="${_esc(m.uid)}"${node.props.fwdDeviceUid === m.uid ? ' selected' : ''}>${_esc(m.name)}</option>`).join('');
+                const rflOptions = '<option value="">-- None --</option>' +
+                    rlMeters.map(m => `<option value="${_esc(m.uid)}"${node.props.rflDeviceUid === m.uid ? ' selected' : ''}>${_esc(m.name)}</option>`).join('');
+                html += `
+<div class="sv-props-field">
+    <label class="sv-props-label">Forward Power Meter</label>
+    <select class="sv-props-select" id="sv-prop-rl-fwd">${fwdOptions}</select>
+</div>
+<div class="sv-props-field">
+    <label class="sv-props-label">Reflected Power Meter</label>
+    <select class="sv-props-select" id="sv-prop-rl-rfl">${rflOptions}</select>
+</div>
+<div class="sv-props-field">
+    <label class="sv-props-label">Display Mode</label>
+    <select class="sv-props-select" id="sv-prop-rl-mode">
+        <option value="rl"${(node.props.displayMode || 'rl') === 'rl' ? ' selected' : ''}>Return Loss (dB)</option>
+        <option value="swr"${node.props.displayMode === 'swr' ? ' selected' : ''}>SWR</option>
+    </select>
 </div>`;
             }
 
@@ -912,20 +951,7 @@
                     });
                 }
 
-                const displayModeSel = document.getElementById('sv-prop-display-mode');
-                if (displayModeSel) {
-                    displayModeSel.addEventListener('change', () => {
-                        node.props.displayMode = displayModeSel.value;
-                        // Reset history/max when mode changes
-                        this.sv.meterGraphHistory.delete(node.id);
-                        this.sv.meterMaxW.delete(node.id);
-                        this._svRender();
-                        this._svMarkDirty();
-                    });
-                }
             }
-
-            // Wire up attenuator dB input
             if (node.type === 'attenuator') {
                 const attInput = document.getElementById('sv-prop-att-db');
                 if (attInput) {
@@ -1014,6 +1040,49 @@
                     node.props.gainPowerType = gainPtSel.value;
                     this._svMarkDirty();
                 });
+            }
+
+            // Wire up return-loss props
+            if (node.type === 'return-loss') {
+                const rlFwdSel  = document.getElementById('sv-prop-rl-fwd');
+                const rlRflSel  = document.getElementById('sv-prop-rl-rfl');
+                const rlModeSel = document.getElementById('sv-prop-rl-mode');
+                const rlMeters  = [];
+                if (window.dwm?.meterRegistry) {
+                    for (const [, record] of window.dwm.meterRegistry.entries()) {
+                        const uid  = record.apiUid || record.key;
+                        const name = record.friendlyName || record.portPath || record.key;
+                        rlMeters.push({ uid, name });
+                    }
+                }
+                const _findRLMeter = uid => rlMeters.find(m => m.uid === uid);
+                if (rlFwdSel) {
+                    rlFwdSel.addEventListener('change', () => {
+                        const uid = rlFwdSel.value;
+                        const m   = _findRLMeter(uid);
+                        node.props.fwdDeviceUid  = uid || null;
+                        node.props.fwdDeviceName = m ? m.name : null;
+                        this._svRender();
+                        this._svMarkDirty();
+                    });
+                }
+                if (rlRflSel) {
+                    rlRflSel.addEventListener('change', () => {
+                        const uid = rlRflSel.value;
+                        const m   = _findRLMeter(uid);
+                        node.props.rflDeviceUid  = uid || null;
+                        node.props.rflDeviceName = m ? m.name : null;
+                        this._svRender();
+                        this._svMarkDirty();
+                    });
+                }
+                if (rlModeSel) {
+                    rlModeSel.addEventListener('change', () => {
+                        node.props.displayMode = rlModeSel.value;
+                        this._svRender();
+                        this._svMarkDirty();
+                    });
+                }
             }
 
             // Delete button
@@ -1230,47 +1299,46 @@
             const nodeG = nodesLayer.querySelector(`[data-node-id="${CSS.escape(node.id)}"]`);
             if (!nodeG) continue;
 
-            // Always update the numeric text element
             const fwdEl = nodeG.querySelector('.sv-meter-fwd');
             if (fwdEl) fwdEl.textContent = powerText;
+        }
 
-            const displayMode = node.props.displayMode || 'numeric';
-
-            if (displayMode === 'gauge' && powerW !== null) {
-                const gaugeEl = nodeG.querySelector('.sv-gauge-fill');
-                if (gaugeEl) {
-                    const maxBarW = parseFloat(gaugeEl.getAttribute('data-bar-max-w') || '0');
-                    if (maxBarW > 0) {
-                        const prevMax = this.sv.meterMaxW.get(node.id) || 0;
-                        const curMax  = Math.max(prevMax, powerW);
-                        this.sv.meterMaxW.set(node.id, curMax);
-                        const fillW = curMax > 0 ? Math.min(maxBarW, (powerW / curMax) * maxBarW) : 0;
-                        gaugeEl.setAttribute('width', String(fillW.toFixed(1)));
-                    }
+        // ── Return Loss / SWR nodes ────────────────────────────────────────────
+        const getRLPowerW = (deviceUid) => {
+            if (!deviceUid || !window.dwm?.meterRegistry) return null;
+            for (const rec of window.dwm.meterRegistry.values()) {
+                if ((rec.apiUid || rec.key) === deviceUid) {
+                    if (rec.connectionState !== 'connected' || !rec.state?.lastSnapshotRaw) return null;
+                    const w = parseFloat(rec.state.lastSnapshotRaw.avg);
+                    return Number.isFinite(w) && w > 0 ? w : null;
                 }
+            }
+            return null;
+        };
 
-            } else if (displayMode === 'graph') {
-                const history = this.sv.meterGraphHistory.get(node.id) || [];
-                history.push(powerW !== null ? powerW : 0);
-                if (history.length > 20) history.shift();
-                this.sv.meterGraphHistory.set(node.id, history);
+        for (const node of this.sv.nodes.values()) {
+            if (node.type !== 'return-loss') continue;
+            const nodeG = nodesLayer.querySelector(`[data-node-id="${CSS.escape(node.id)}"]`);
+            if (!nodeG) continue;
+            const rlEl = nodeG.querySelector('.sv-rl-value');
+            if (!rlEl) continue;
 
-                const polyEl = nodeG.querySelector('.sv-graph-line');
-                if (polyEl && history.length > 1) {
-                    const cx    = parseFloat(polyEl.getAttribute('data-chart-x') || '0');
-                    const cy    = parseFloat(polyEl.getAttribute('data-chart-y') || '0');
-                    const cw    = parseFloat(polyEl.getAttribute('data-chart-w') || '100');
-                    const ch    = parseFloat(polyEl.getAttribute('data-chart-h') || '30');
-                    const minV  = Math.min(...history);
-                    const maxV  = Math.max(...history);
-                    const range = maxV - minV || 1;
-                    const pts   = history.map((v, i) => {
-                        const px = cx + (i / (history.length - 1)) * cw;
-                        const py = cy + ch - ((v - minV) / range) * ch;
-                        return `${px.toFixed(1)},${py.toFixed(1)}`;
-                    }).join(' ');
-                    polyEl.setAttribute('points', pts);
+            const pfwd = getRLPowerW(node.props?.fwdDeviceUid);
+            const prfl = getRLPowerW(node.props?.rflDeviceUid);
+            const mode = node.props?.displayMode || 'rl';
+
+            if (pfwd !== null && prfl !== null) {
+                const ratio = Math.min(prfl / pfwd, 0.9999);
+                if (mode === 'swr') {
+                    const gamma = Math.sqrt(ratio);
+                    const swr   = (1 + gamma) / (1 - gamma);
+                    rlEl.textContent = swr.toFixed(2) + ' : 1';
+                } else {
+                    const rl = -10 * Math.log10(ratio);
+                    rlEl.textContent = rl.toFixed(1) + ' dB';
                 }
+            } else {
+                rlEl.textContent = '-- --';
             }
         }
 
@@ -1523,13 +1591,14 @@
     function _defaultProps(typeId) {
         const gpt = { gainPowerType: 'avg' };
         if (typeId === 'attenuator')   return { attenuationDb: 3, ...gpt };
-        if (typeId === 'dwm-meter')    return { deviceUid: null, deviceName: null, measureType: 'forward', powerType: 'avg', displayMode: 'numeric' };
+        if (typeId === 'dwm-meter')    return { deviceUid: null, deviceName: null, measureType: 'forward', powerType: 'avg' };
         if (typeId === 'amplifier')    return { gainDb: null, ...gpt };
         if (typeId === 'transmitter')  return { powerW: null, freqMHz: null };
         if (typeId === 'filter')       return { filterType: 'lowpass', ...gpt };
         if (typeId === '4port-switch') return { mode: 'through', ...gpt };
         if (typeId === 'coax-switch')  return { activePort: 1, ...gpt };
         if (['hybrid-3db', 'combiner', 'coupler'].includes(typeId)) return { ...gpt };
+        if (typeId === 'return-loss')  return { fwdDeviceUid: null, fwdDeviceName: null, rflDeviceUid: null, rflDeviceName: null, displayMode: 'rl' };
         return {};
     }
 

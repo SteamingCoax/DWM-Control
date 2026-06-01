@@ -818,46 +818,14 @@
     align-items: center;
 }
 
-/* ── Gauge display mode ────────────────────────────────────────── */
-.sv-gauge-bg {
-    fill: rgba(255,255,255,0.07);
-    stroke: rgba(255,255,255,0.15);
-    stroke-width: 0.5;
-}
-
-.sv-gauge-fill {
+/* ── Return Loss / SWR value display ──────────────────────────── */
+.sv-rl-value {
+    font-size: 20px;
+    font-weight: 700;
     fill: #4ade80;
+    font-family: 'Courier New', monospace;
 }
 
-/* ── Graph (sparkline) display mode ────────────────────────────── */
-.sv-graph-bg {
-    fill: rgba(255,255,255,0.04);
-    stroke: rgba(255,255,255,0.10);
-    stroke-width: 0.5;
-}
-
-.sv-graph-line {
-    stroke: #4ade80;
-    stroke-width: 1.5;
-    fill: none;
-    stroke-linejoin: round;
-    stroke-linecap: round;
-}
-
-[data-theme="light"] .sv-gauge-bg {
-    fill: rgba(0,0,0,0.05);
-    stroke: rgba(0,0,0,0.12);
-}
-
-[data-theme="light"] .sv-gauge-fill {
-    fill: #16a34a;
-}
-
-[data-theme="light"] .sv-graph-bg {
-    fill: rgba(0,0,0,0.03);
-    stroke: rgba(0,0,0,0.08);
-}
-
-[data-theme="light"] .sv-graph-line {
-    stroke: #16a34a;
+[data-theme="light"] .sv-rl-value {
+    fill: #166534;
 }
