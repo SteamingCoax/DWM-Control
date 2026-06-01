@@ -263,6 +263,36 @@
             },
         },
 
+        // ── Load (Dummy Load / Terminator) ────────────────────────────────────
+        'load-terminator': {
+            id: 'load-terminator',
+            label: 'Load',
+            category: 'load',
+            width: 90,
+            height: 70,
+            defaultLabel: 'LOAD',
+            ports: [
+                { id: 'in', side: 'left', type: 'input', label: 'In', yRatio: 0.5 },
+            ],
+            renderBody(node) {
+                const w = this.width, h = this.height;
+                const feedY = h * 0.5;
+                const bx1   = w * 0.32, bx2 = w * 0.80;
+                const by1   = h * 0.28, by2 = h * 0.72;
+                const bxMid = (bx1 + bx2) / 2;
+                return `
+                    <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
+                    <line class="sv-node-deco" x1="0" y1="${feedY}" x2="${bx1}" y2="${feedY}" stroke-width="1.5" opacity="0.7"/>
+                    <rect class="sv-node-deco" x="${bx1}" y="${by1}" width="${bx2-bx1}" height="${by2-by1}" fill="none" stroke-width="1.8" opacity="0.85" rx="3"/>
+                    <text class="sv-node-label" x="${bxMid}" y="${feedY + 3.5}" text-anchor="middle" font-size="9">${_esc(node.label)}</text>
+                    <line class="sv-node-deco" x1="${bxMid}" y1="${by2}" x2="${bxMid}" y2="${h*0.84}" stroke-width="1.5" opacity="0.7"/>
+                    <line class="sv-node-deco" x1="${bxMid-8}" y1="${h*0.84}" x2="${bxMid+8}" y2="${h*0.84}" stroke-width="1.5" opacity="0.7"/>
+                    <line class="sv-node-deco" x1="${bxMid-5}" y1="${h*0.91}" x2="${bxMid+5}" y2="${h*0.91}" stroke-width="1.3" opacity="0.5"/>
+                    <line class="sv-node-deco" x1="${bxMid-2}" y1="${h*0.97}" x2="${bxMid+2}" y2="${h*0.97}" stroke-width="1.1" opacity="0.3"/>
+                `;
+            },
+        },
+
         // ── Coax Switch (1-in, 2-out) ─────────────────────────────────────────
         'coax-switch': {
             id: 'coax-switch',
@@ -458,10 +488,17 @@
         const port = typeDef.ports.find(p => p.id === portId);
         if (!port) return null;
         const local = _portLocalPos(typeDef, port);
-        const absX = (node.flipped ?? false)
+        const flipped = node.flipped ?? false;
+        const absX = flipped
             ? node.x + typeDef.width - local.x
             : node.x + local.x;
-        return { x: absX, y: node.y + local.y, side: port.side };
+        // When flipped, left↔right sides are mirrored so bezier curves exit correctly
+        let effectiveSide = port.side;
+        if (flipped) {
+            if (effectiveSide === 'left')       effectiveSide = 'right';
+            else if (effectiveSide === 'right') effectiveSide = 'left';
+        }
+        return { x: absX, y: node.y + local.y, side: effectiveSide };
     }
 
     function getPortScreenPos(node, portId, viewport) {

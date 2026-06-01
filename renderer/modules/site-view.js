@@ -29,6 +29,9 @@
             panStart:       null,        // { clientX, clientY, vpX, vpY } while panning
             dragNodeId:     null,        // id of node currently being dragged
             dragOffset:     { x: 0, y: 0 },
+            dragOrigX:      null,        // position before drag started (for revert)
+            dragOrigY:      null,
+            dragOverlapId:  null,        // id of node being overlapped during drag
             saveTimer:      null,
             powerTimer:     null,
             isDirty:        false,
@@ -130,6 +133,7 @@
         this._svRenderConnections();
         this._svRenderNodes();
         this._svUpdateSelectionVisuals();
+        this._svUpdateOverlapVisuals();
     };
 
     DWMControl.prototype._svRenderConnections = function () {
@@ -248,6 +252,12 @@
             const snapSize = this.sv.settings.snapEnabled ? this.sv.settings.snapSize : 1;
             const snappedX = Math.round((wx - comp.width  / 2) / snapSize) * snapSize;
             const snappedY = Math.round((wy - comp.height / 2) / snapSize) * snapSize;
+
+            // Reject drop if it would overlap an existing node
+            const tempNode = { type, x: snappedX, y: snappedY };
+            for (const other of this.sv.nodes.values()) {
+                if (this._svNodesOverlap(tempNode, other)) return;
+            }
 
             const node = createNode(type, snappedX, snappedY);
             this.sv.nodes.set(node.id, node);
@@ -392,6 +402,9 @@
 
         this.sv.dragNodeId = nodeId;
         this.sv.dragOffset = { x: wx - node.x, y: wy - node.y };
+        this.sv.dragOrigX  = node.x;
+        this.sv.dragOrigY  = node.y;
+        this.sv.dragOverlapId = null;
         this._svSelectNode(nodeId);
     };
 
@@ -442,6 +455,15 @@
             const snapSize = this.sv.settings.snapEnabled ? this.sv.settings.snapSize : 1;
             node.x = Math.round((wx - this.sv.dragOffset.x) / snapSize) * snapSize;
             node.y = Math.round((wy - this.sv.dragOffset.y) / snapSize) * snapSize;
+
+            // Check for overlap with any other node
+            let overlapId = null;
+            for (const other of this.sv.nodes.values()) {
+                if (other.id === node.id) continue;
+                if (this._svNodesOverlap(node, other)) { overlapId = other.id; break; }
+            }
+            this.sv.dragOverlapId = overlapId;
+
             this._svRender();
             return;
         }
@@ -466,7 +488,17 @@
         }
 
         if (this.sv.dragNodeId) {
-            this.sv.dragNodeId = null;
+            const node = this.sv.nodes.get(this.sv.dragNodeId);
+            if (node && this.sv.dragOverlapId !== null) {
+                // Revert to original position
+                node.x = this.sv.dragOrigX;
+                node.y = this.sv.dragOrigY;
+            }
+            this.sv.dragNodeId    = null;
+            this.sv.dragOverlapId = null;
+            this.sv.dragOrigX     = null;
+            this.sv.dragOrigY     = null;
+            this._svRender();
             this._svMarkDirty();
             return;
         }
@@ -1555,6 +1587,38 @@
     };
 
     // ─── Bezier connection path ───────────────────────────────────────────────
+
+    DWMControl.prototype._svNodeBounds = function (node) {
+        const typeDef = window.SiteViewComponents.COMPONENT_TYPES[node.type];
+        if (!typeDef) return null;
+        return { x: node.x, y: node.y, w: typeDef.width, h: typeDef.height };
+    };
+
+    DWMControl.prototype._svNodesOverlap = function (a, b) {
+        const ba = this._svNodeBounds(a);
+        const bb = this._svNodeBounds(b);
+        if (!ba || !bb) return false;
+        const pad = 4;
+        return ba.x < bb.x + bb.w - pad &&
+               ba.x + ba.w - pad > bb.x &&
+               ba.y < bb.y + bb.h - pad &&
+               ba.y + ba.h - pad > bb.y;
+    };
+
+    DWMControl.prototype._svUpdateOverlapVisuals = function () {
+        const nodesLayer = document.getElementById('sv-nodes-layer');
+        if (!nodesLayer) return;
+        // Clear any previous overlap class
+        nodesLayer.querySelectorAll('.sv-drag-overlap').forEach(el => {
+            el.classList.remove('sv-drag-overlap');
+        });
+        if (this.sv.dragOverlapId) {
+            const el = nodesLayer.querySelector(
+                `[data-node-id="${CSS.escape(this.sv.dragOverlapId)}"]`
+            );
+            if (el) el.classList.add('sv-drag-overlap');
+        }
+    };
 
     DWMControl.prototype._svConnectionPath = function (fromNode, fromPortId, toNode, toPortId) {
         const fp = window.SiteViewComponents.getPortAbsolutePos(fromNode, fromPortId);

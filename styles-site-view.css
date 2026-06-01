@@ -829,3 +829,14 @@
 [data-theme="light"] .sv-rl-value {
     fill: #166534;
 }
+
+/* ── Drag overlap warning ──────────────────────────────────────── */
+.sv-drag-overlap {
+    opacity: 0.55;
+}
+
+.sv-drag-overlap .sv-node-body {
+    fill: rgba(239, 68, 68, 0.25) !important;
+    stroke: #ef4444 !important;
+    stroke-width: 2.5 !important;
+}
