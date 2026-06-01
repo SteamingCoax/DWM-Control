@@ -149,6 +149,126 @@
   --color-info-light: rgba(8, 145, 178, 0.2);
 }
 
+/* Ocean Theme — deep-sea blue */
+[data-theme="ocean"] {
+  --bg-primary: #0d1b2a;
+  --bg-secondary: #162032;
+  --bg-tertiary: #1e2d42;
+  --bg-card: #162032;
+  --bg-hover: #1e2d42;
+  --bg-active: #253852;
+
+  --text-primary: #c8d8e8;
+  --text-secondary: #7aaac8;
+  --text-tertiary: #4e7898;
+  --text-inverse: #0d1b2a;
+
+  --border-light: #1e3350;
+  --border-medium: #2a4870;
+  --border-dark: #3a6090;
+
+  --color-primary: #0ea5e9;
+  --color-primary-hover: #38bdf8;
+  --color-primary-light: rgba(14, 165, 233, 0.18);
+  --color-success: #10b981;
+  --color-success-hover: #34d399;
+  --color-success-light: rgba(16, 185, 129, 0.18);
+  --color-danger: #f43f5e;
+  --color-danger-hover: #fb7185;
+  --color-danger-light: rgba(244, 63, 94, 0.18);
+  --color-warning: #f59e0b;
+  --color-warning-hover: #fbbf24;
+  --color-warning-light: rgba(245, 158, 11, 0.18);
+  --color-info: #22d3ee;
+  --color-info-hover: #67e8f9;
+  --color-info-light: rgba(34, 211, 238, 0.18);
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+}
+
+/* Carbon Theme — VS Code–inspired charcoal */
+[data-theme="carbon"] {
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252526;
+  --bg-tertiary: #2d2d2d;
+  --bg-card: #252526;
+  --bg-hover: #2d2d2d;
+  --bg-active: #3c3c3c;
+
+  --text-primary: #d4d4d4;
+  --text-secondary: #9d9d9d;
+  --text-tertiary: #6a6a6a;
+  --text-inverse: #1e1e1e;
+
+  --border-light: #3c3c3c;
+  --border-medium: #505050;
+  --border-dark: #646464;
+
+  --color-primary: #569cd6;
+  --color-primary-hover: #9cdcfe;
+  --color-primary-light: rgba(86, 156, 214, 0.18);
+  --color-success: #4ec9b0;
+  --color-success-hover: #9cdcfe;
+  --color-success-light: rgba(78, 201, 176, 0.18);
+  --color-danger: #f44747;
+  --color-danger-hover: #ff6b6b;
+  --color-danger-light: rgba(244, 71, 71, 0.18);
+  --color-warning: #ce9178;
+  --color-warning-hover: #e8b899;
+  --color-warning-light: rgba(206, 145, 120, 0.18);
+  --color-info: #4fc1ff;
+  --color-info-hover: #9cdcfe;
+  --color-info-light: rgba(79, 193, 255, 0.18);
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.35), 0 2px 4px -1px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.35), 0 4px 6px -2px rgba(0, 0, 0, 0.25);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.35), 0 10px 10px -5px rgba(0, 0, 0, 0.25);
+}
+
+/* Amber Theme — warm dark amber */
+[data-theme="amber"] {
+  --bg-primary: #1c1200;
+  --bg-secondary: #251900;
+  --bg-tertiary: #312200;
+  --bg-card: #251900;
+  --bg-hover: #312200;
+  --bg-active: #3f2d00;
+
+  --text-primary: #f5d87a;
+  --text-secondary: #c4a040;
+  --text-tertiary: #8a6a18;
+  --text-inverse: #1c1200;
+
+  --border-light: #3f2d00;
+  --border-medium: #5c4500;
+  --border-dark: #7a5c00;
+
+  --color-primary: #f59e0b;
+  --color-primary-hover: #fbbf24;
+  --color-primary-light: rgba(245, 158, 11, 0.2);
+  --color-success: #84cc16;
+  --color-success-hover: #a3e635;
+  --color-success-light: rgba(132, 204, 22, 0.2);
+  --color-danger: #ef4444;
+  --color-danger-hover: #f87171;
+  --color-danger-light: rgba(239, 68, 68, 0.2);
+  --color-warning: #fb923c;
+  --color-warning-hover: #fdba74;
+  --color-warning-light: rgba(251, 146, 60, 0.2);
+  --color-info: #38bdf8;
+  --color-info-hover: #7dd3fc;
+  --color-info-light: rgba(56, 189, 248, 0.2);
+
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+}
+
 /* ===============================================
    Base Styles
    =============================================== */
@@ -277,23 +397,66 @@ body {
   font-weight: var(--font-weight-medium);
 }
 
-/* Theme Toggle Button */
+/* Theme Toggle Button (hidden — replaced by theme-select) */
 #theme-toggle {
-  color: var(--text-inverse) !important;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.70);
+  display: none;
+}
+
+/* Theme Select Dropdown */
+#theme-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: var(--radius-md);
+  color: var(--text-inverse);
+  cursor: pointer;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  padding: 5px 28px 5px 10px;
+  height: 32px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.40);
+  /* custom caret */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,255,0.75)'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
 
-#theme-toggle:hover {
-  background: rgba(255, 255, 255, 0.26) !important;
-  border-color: rgba(255, 255, 255, 0.88);
-  transform: scale(1.05);
+#theme-select:hover {
+  background-color: rgba(255, 255, 255, 0.24);
+  border-color: rgba(255, 255, 255, 0.80);
+  transform: scale(1.02);
 }
 
-#theme-toggle:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.75);
+#theme-select:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.70);
   outline-offset: 2px;
+}
+
+#theme-select option {
+  background: #1e293b;
+  color: #e2e8f0;
+}
+
+[data-theme="light"] #theme-select {
+  background-color: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.28);
+  color: #1e293b;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(30,41,59,0.6)'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+}
+
+[data-theme="light"] #theme-select:hover {
+  background-color: rgba(0, 0, 0, 0.10);
+  border-color: rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="light"] #theme-select option {
+  background: #f8fafc;
+  color: #1e293b;
 }
 
 /* ===============================================
@@ -354,22 +517,6 @@ body {
 .update-btn:focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.75);
   outline-offset: 2px;
-}
-
-[data-theme="light"] #theme-toggle {
-  color: #1f2937 !important;
-  background: rgba(255, 255, 255, 0.90);
-  border-color: rgba(31, 41, 55, 0.42);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
-}
-
-[data-theme="light"] #theme-toggle:hover {
-  background: rgba(255, 255, 255, 1) !important;
-  border-color: rgba(31, 41, 55, 0.62);
-}
-
-[data-theme="light"] #theme-toggle:focus-visible {
-  outline: 2px solid rgba(30, 64, 175, 0.55);
 }
 
 [data-theme="light"] .update-btn {

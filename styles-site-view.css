@@ -901,3 +901,111 @@
     stroke: #ef4444 !important;
     stroke-width: 2.5 !important;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   OCEAN THEME OVERRIDES  [data-theme="ocean"]
+   ───────────────────────────────────────────────────────────────────────── */
+
+[data-theme="ocean"] .sv-canvas-container { background: #0a1520; }
+[data-theme="ocean"] .sv-toolbar          { background: #0d1b2a; border-bottom-color: #1e3350; }
+[data-theme="ocean"] .sv-sidebar          { background: #0d1b2a; border-right-color:  #1e3350; }
+[data-theme="ocean"] .sv-properties       { background: #0d1b2a; border-left-color:   #1e3350; }
+[data-theme="ocean"] .sv-category-header  { background: #0f2035; color: #7aaac8; }
+[data-theme="ocean"] .sv-palette-item     { background: #162032; border-color: #1e3350; color: #c8d8e8; }
+[data-theme="ocean"] .sv-palette-item:hover { background: #1e2d42; border-color: #0ea5e9; }
+
+[data-theme="ocean"] .sv-node-type-icon   { fill: #c8d8e8; }
+[data-theme="ocean"] .sv-node-label       { fill: #7aaac8; }
+[data-theme="ocean"] .sv-node-deco        { fill: rgba(200, 216, 232, 0.4); stroke: rgba(200, 216, 232, 0.4); }
+
+[data-theme="ocean"] .sv-node-transmitter .sv-node-body  { fill: #0c2a40; stroke: #0ea5e9; }
+[data-theme="ocean"] .sv-node-amplifier .sv-node-body    { fill: #0a2a1e; stroke: #10b981; }
+[data-theme="ocean"] .sv-node-attenuator .sv-node-body   { fill: #1a1a00; stroke: #f59e0b; }
+[data-theme="ocean"] .sv-node-dwm-meter .sv-node-body    { fill: #1a0a35; stroke: #a78bfa; }
+[data-theme="ocean"] .sv-node-hybrid-3db .sv-node-body   { fill: #032030; stroke: #22d3ee; }
+[data-theme="ocean"] .sv-node-combiner .sv-node-body     { fill: #032030; stroke: #22d3ee; }
+[data-theme="ocean"] .sv-node-coupler .sv-node-body      { fill: #032030; stroke: #22d3ee; }
+[data-theme="ocean"] .sv-node-coax-switch .sv-node-body  { fill: #2a0a0a; stroke: #f43f5e; }
+[data-theme="ocean"] .sv-node-4port-switch .sv-node-body { fill: #2a0a0a; stroke: #fb923c; }
+[data-theme="ocean"] .sv-node-antenna .sv-node-body      { fill: #1a0a35; stroke: #818cf8; }
+[data-theme="ocean"] .sv-node-filter .sv-node-body       { fill: #1a1200; stroke: #fbbf24; }
+[data-theme="ocean"] .sv-node-load-terminator .sv-node-body { fill: #0d1b2a; stroke: #4b6cb7; }
+[data-theme="ocean"] .sv-node-return-loss .sv-node-body  { fill: #1a0a35; stroke: #818cf8; }
+
+[data-theme="ocean"] .sv-connection       { stroke: #2a6090; stroke-width: 2; }
+[data-theme="ocean"] .sv-connection:hover { stroke: #0ea5e9; }
+[data-theme="ocean"] .sv-meter-power-fwd  { fill: #10b981; }
+[data-theme="ocean"] .sv-meter-power-rfl  { fill: #f43f5e; }
+[data-theme="ocean"] .sv-rl-value         { fill: #34d399; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   CARBON THEME OVERRIDES  [data-theme="carbon"]
+   ───────────────────────────────────────────────────────────────────────── */
+
+[data-theme="carbon"] .sv-canvas-container { background: #1a1a1a; }
+[data-theme="carbon"] .sv-toolbar          { background: #1e1e1e; border-bottom-color: #3c3c3c; }
+[data-theme="carbon"] .sv-sidebar          { background: #1e1e1e; border-right-color:  #3c3c3c; }
+[data-theme="carbon"] .sv-properties       { background: #1e1e1e; border-left-color:   #3c3c3c; }
+[data-theme="carbon"] .sv-category-header  { background: #252526; color: #9d9d9d; }
+[data-theme="carbon"] .sv-palette-item     { background: #2d2d2d; border-color: #3c3c3c; color: #d4d4d4; }
+[data-theme="carbon"] .sv-palette-item:hover { background: #3c3c3c; border-color: #569cd6; }
+
+[data-theme="carbon"] .sv-node-type-icon   { fill: #d4d4d4; }
+[data-theme="carbon"] .sv-node-label       { fill: #9d9d9d; }
+[data-theme="carbon"] .sv-node-deco        { fill: rgba(212, 212, 212, 0.35); stroke: rgba(212, 212, 212, 0.35); }
+
+[data-theme="carbon"] .sv-node-transmitter .sv-node-body  { fill: #1a2535; stroke: #569cd6; }
+[data-theme="carbon"] .sv-node-amplifier .sv-node-body    { fill: #0e2018; stroke: #4ec9b0; }
+[data-theme="carbon"] .sv-node-attenuator .sv-node-body   { fill: #2a1a0e; stroke: #ce9178; }
+[data-theme="carbon"] .sv-node-dwm-meter .sv-node-body    { fill: #1e1535; stroke: #c586c0; }
+[data-theme="carbon"] .sv-node-hybrid-3db .sv-node-body   { fill: #0d2030; stroke: #4fc1ff; }
+[data-theme="carbon"] .sv-node-combiner .sv-node-body     { fill: #0d2030; stroke: #4fc1ff; }
+[data-theme="carbon"] .sv-node-coupler .sv-node-body      { fill: #0d2030; stroke: #4fc1ff; }
+[data-theme="carbon"] .sv-node-coax-switch .sv-node-body  { fill: #2a1010; stroke: #f44747; }
+[data-theme="carbon"] .sv-node-4port-switch .sv-node-body { fill: #2a1a10; stroke: #d16969; }
+[data-theme="carbon"] .sv-node-antenna .sv-node-body      { fill: #1e1535; stroke: #b5cea8; }
+[data-theme="carbon"] .sv-node-filter .sv-node-body       { fill: #201800; stroke: #dcdcaa; }
+[data-theme="carbon"] .sv-node-load-terminator .sv-node-body { fill: #252526; stroke: #646464; }
+[data-theme="carbon"] .sv-node-return-loss .sv-node-body  { fill: #1e1535; stroke: #c586c0; }
+
+[data-theme="carbon"] .sv-connection       { stroke: #3c5070; stroke-width: 2; }
+[data-theme="carbon"] .sv-connection:hover { stroke: #569cd6; }
+[data-theme="carbon"] .sv-meter-power-fwd  { fill: #4ec9b0; }
+[data-theme="carbon"] .sv-meter-power-rfl  { fill: #f44747; }
+[data-theme="carbon"] .sv-rl-value         { fill: #4ec9b0; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   AMBER THEME OVERRIDES  [data-theme="amber"]
+   ───────────────────────────────────────────────────────────────────────── */
+
+[data-theme="amber"] .sv-canvas-container { background: #150e00; }
+[data-theme="amber"] .sv-toolbar          { background: #1c1200; border-bottom-color: #3f2d00; }
+[data-theme="amber"] .sv-sidebar          { background: #1c1200; border-right-color:  #3f2d00; }
+[data-theme="amber"] .sv-properties       { background: #1c1200; border-left-color:   #3f2d00; }
+[data-theme="amber"] .sv-category-header  { background: #251900; color: #c4a040; }
+[data-theme="amber"] .sv-palette-item     { background: #312200; border-color: #3f2d00; color: #f5d87a; }
+[data-theme="amber"] .sv-palette-item:hover { background: #3f2d00; border-color: #f59e0b; }
+
+[data-theme="amber"] .sv-node-type-icon   { fill: #f5d87a; }
+[data-theme="amber"] .sv-node-label       { fill: #c4a040; }
+[data-theme="amber"] .sv-node-deco        { fill: rgba(245, 216, 122, 0.35); stroke: rgba(245, 216, 122, 0.35); }
+
+[data-theme="amber"] .sv-node-transmitter .sv-node-body  { fill: #1a1200; stroke: #f59e0b; }
+[data-theme="amber"] .sv-node-amplifier .sv-node-body    { fill: #0a2010; stroke: #84cc16; }
+[data-theme="amber"] .sv-node-attenuator .sv-node-body   { fill: #2a1800; stroke: #fb923c; }
+[data-theme="amber"] .sv-node-dwm-meter .sv-node-body    { fill: #1a1200; stroke: #f59e0b; }
+[data-theme="amber"] .sv-node-hybrid-3db .sv-node-body   { fill: #001a20; stroke: #38bdf8; }
+[data-theme="amber"] .sv-node-combiner .sv-node-body     { fill: #001a20; stroke: #38bdf8; }
+[data-theme="amber"] .sv-node-coupler .sv-node-body      { fill: #001a20; stroke: #38bdf8; }
+[data-theme="amber"] .sv-node-coax-switch .sv-node-body  { fill: #2a0a00; stroke: #ef4444; }
+[data-theme="amber"] .sv-node-4port-switch .sv-node-body { fill: #2a1000; stroke: #fb923c; }
+[data-theme="amber"] .sv-node-antenna .sv-node-body      { fill: #1a1200; stroke: #a78bfa; }
+[data-theme="amber"] .sv-node-filter .sv-node-body       { fill: #1a1200; stroke: #fbbf24; }
+[data-theme="amber"] .sv-node-load-terminator .sv-node-body { fill: #251900; stroke: #8a6a18; }
+[data-theme="amber"] .sv-node-return-loss .sv-node-body  { fill: #1a1200; stroke: #fde68a; }
+
+[data-theme="amber"] .sv-connection       { stroke: #5c4500; stroke-width: 2; }
+[data-theme="amber"] .sv-connection:hover { stroke: #f59e0b; }
+[data-theme="amber"] .sv-meter-power-fwd  { fill: #84cc16; }
+[data-theme="amber"] .sv-meter-power-rfl  { fill: #ef4444; }
+[data-theme="amber"] .sv-rl-value         { fill: #84cc16; }

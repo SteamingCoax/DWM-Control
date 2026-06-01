@@ -184,6 +184,7 @@
             renderBody(node) {
                 const w = this.width, h = this.height; // w=120, h=90
                 return `
+                    <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
                     <line class="sv-node-deco" x1="${w*0.35}" y1="${h*0.25}" x2="${w*0.35}" y2="${h*0.75}" stroke-width="1.5" opacity="0.55"/>
                     <line class="sv-node-deco" x1="${w*0.22}" y1="${h*0.5}"  x2="${w*0.48}" y2="${h*0.5}"  stroke-width="1.5" opacity="0.55"/>
                     <circle class="sv-node-deco" cx="${w*0.35}" cy="${h*0.5}" r="3" opacity="0.8"/>
@@ -357,6 +358,7 @@
                         <line class="sv-node-deco" x1="${lx1}" y1="${in2Y}" x2="${lx2}" y2="${out1Y}" stroke-width="2" opacity="0.85"/>`;
                 }
                 return `
+                    <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
                     ${paths}
                     <text class="sv-node-type-icon" x="${w*0.5}" y="${h*0.30}" text-anchor="middle" font-size="9">4P-SW</text>
                     <text class="sv-node-label"     x="${w*0.5}" y="${h*0.56}" text-anchor="middle" font-size="9">${_esc(node.label)}</text>
@@ -423,6 +425,7 @@
                 const w = this.width, h = this.height; // w=130, h=90
                 const cx = w * 0.5;
                 return `
+                    <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
                     <line class="sv-node-deco" x1="${w*0.07}" y1="${h*0.5}" x2="${w*0.93}" y2="${h*0.5}" stroke-width="1.5" stroke-dasharray="5,2" opacity="0.3"/>
                     <line class="sv-node-deco" x1="${w*0.38}" y1="${h*0.3}" x2="${w*0.62}" y2="${h*0.3}" stroke-width="2" opacity="0.6"/>
                     <line class="sv-node-deco" x1="${w*0.38}" y1="${h*0.4}" x2="${w*0.62}" y2="${h*0.4}" stroke-width="2" opacity="0.6"/>
