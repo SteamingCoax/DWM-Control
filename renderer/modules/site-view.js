@@ -35,6 +35,9 @@
             saveTimer:      null,
             powerTimer:     null,
             isDirty:        false,
+            undoStack:      [],
+            redoStack:      [],
+            isLocked:       false,
         };
         this._svLoadSettings();
         this._svLoadSchematic();
@@ -107,7 +110,7 @@
 </marker>
 <pattern id="sv-grid-pattern" width="20" height="20" patternUnits="userSpaceOnUse"
     patternTransform="translate(${vp.x},${vp.y}) scale(${vp.scale})">
-    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
+    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="${document.documentElement.getAttribute('data-theme') === 'light' ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.06)'}" stroke-width="0.5"/>
 </pattern>`;
 
         // Grid background rect (behind #sv-world)
@@ -212,6 +215,73 @@
         }
     };
 
+    // ─── Undo / Redo ──────────────────────────────────────────────────────────
+
+    DWMControl.prototype._svSnapshot = function () {
+        return {
+            nodes:       JSON.parse(JSON.stringify([...this.sv.nodes.entries()])),
+            connections: JSON.parse(JSON.stringify([...this.sv.connections.entries()])),
+        };
+    };
+
+    DWMControl.prototype._svPushUndo = function () {
+        this.sv.undoStack.push(this._svSnapshot());
+        if (this.sv.undoStack.length > 50) this.sv.undoStack.shift();
+        this.sv.redoStack = [];
+        this._svUpdateUndoRedoBtns();
+    };
+
+    DWMControl.prototype._svUndo = function () {
+        if (!this.sv.undoStack.length) return;
+        this.sv.redoStack.push(this._svSnapshot());
+        const state = this.sv.undoStack.pop();
+        this.sv.nodes       = new Map(state.nodes);
+        this.sv.connections = new Map(state.connections);
+        this.sv.selectedNodeId = null;
+        this.sv.selectedConnId = null;
+        this._svRender();
+        this._svRenderProperties();
+        this._svMarkDirty();
+        this._svUpdateUndoRedoBtns();
+    };
+
+    DWMControl.prototype._svRedo = function () {
+        if (!this.sv.redoStack.length) return;
+        this.sv.undoStack.push(this._svSnapshot());
+        const state = this.sv.redoStack.pop();
+        this.sv.nodes       = new Map(state.nodes);
+        this.sv.connections = new Map(state.connections);
+        this.sv.selectedNodeId = null;
+        this.sv.selectedConnId = null;
+        this._svRender();
+        this._svRenderProperties();
+        this._svMarkDirty();
+        this._svUpdateUndoRedoBtns();
+    };
+
+    DWMControl.prototype._svUpdateUndoRedoBtns = function () {
+        const undoBtn = document.getElementById('sv-undo-btn');
+        const redoBtn = document.getElementById('sv-redo-btn');
+        if (undoBtn) undoBtn.disabled = this.sv.undoStack.length === 0;
+        if (redoBtn) redoBtn.disabled = this.sv.redoStack.length === 0;
+    };
+
+    // ─── Lock ─────────────────────────────────────────────────────────────────
+
+    DWMControl.prototype._svSetLocked = function (locked) {
+        this.sv.isLocked = locked;
+        const lockBtn    = document.getElementById('sv-lock-btn');
+        const deleteBtn  = document.getElementById('sv-delete-selected-btn');
+        const clearBtn   = document.getElementById('sv-clear-btn');
+        const saveBtn    = document.getElementById('sv-save-file-btn');
+        const svgEl      = document.getElementById('sv-canvas-svg');
+        if (lockBtn)   lockBtn.textContent = locked ? '🔒 Locked' : '🔓 Lock';
+        if (deleteBtn) deleteBtn.disabled  = locked;
+        if (clearBtn)  clearBtn.disabled   = locked;
+        if (saveBtn)   saveBtn.disabled    = locked;
+        if (svgEl)     svgEl.classList.toggle('sv-canvas-locked', locked);
+    };
+
     // ─── Event wiring ─────────────────────────────────────────────────────────
 
     DWMControl.prototype._svSetupEvents = function () {
@@ -238,6 +308,7 @@
 
         svg.addEventListener('drop', (e) => {
             e.preventDefault();
+            if (this.sv.isLocked) return;
             const type = e.dataTransfer.getData('text/plain');
             const { COMPONENT_TYPES, createNode } = window.SiteViewComponents;
             if (!type || !COMPONENT_TYPES[type]) return;
@@ -259,6 +330,7 @@
                 if (this._svNodesOverlap(tempNode, other)) return;
             }
 
+            this._svPushUndo();
             const node = createNode(type, snappedX, snappedY);
             this.sv.nodes.set(node.id, node);
             this._svRender();
@@ -326,7 +398,19 @@
             if (!panel || !panel.classList.contains('active')) return;
             if ((e.key === 'Delete' || e.key === 'Backspace') &&
                 !e.target.matches('input, textarea, select')) {
-                this._svDeleteSelected();
+                if (!this.sv.isLocked) this._svDeleteSelected();
+            }
+            if (e.ctrlKey && !e.shiftKey && e.key === 'z' &&
+                !e.target.matches('input, textarea, select')) {
+                e.preventDefault();
+                this._svUndo();
+            }
+            if ((e.ctrlKey && e.key === 'y') ||
+                (e.ctrlKey && e.shiftKey && e.key === 'z')) {
+                if (!e.target.matches('input, textarea, select')) {
+                    e.preventDefault();
+                    this._svRedo();
+                }
             }
         });
 
@@ -338,11 +422,18 @@
         const deleteBtn   = document.getElementById('sv-delete-selected-btn');
         const saveFileBtn = document.getElementById('sv-save-file-btn');
         const loadFileBtn = document.getElementById('sv-load-file-btn');
+        const undoBtn     = document.getElementById('sv-undo-btn');
+        const redoBtn     = document.getElementById('sv-redo-btn');
+        const lockBtn     = document.getElementById('sv-lock-btn');
         if (clearBtn)    clearBtn.addEventListener('click',    () => this._svClear());
         if (fitBtn)      fitBtn.addEventListener('click',      () => this._svFitView());
         if (deleteBtn)   deleteBtn.addEventListener('click',   () => this._svDeleteSelected());
         if (saveFileBtn) saveFileBtn.addEventListener('click', () => this._svSaveToFile());
         if (loadFileBtn) loadFileBtn.addEventListener('click', () => this._svLoadFromFile());
+        if (undoBtn)     undoBtn.addEventListener('click',     () => this._svUndo());
+        if (redoBtn)     redoBtn.addEventListener('click',     () => this._svRedo());
+        if (lockBtn)     lockBtn.addEventListener('click',     () => this._svSetLocked(!this.sv.isLocked));
+        this._svUpdateUndoRedoBtns();
 
         const _svDoZoom = (factor) => {
             const container = document.getElementById('sv-canvas-container');
@@ -390,6 +481,7 @@
     // ─── Node drag ────────────────────────────────────────────────────────────
 
     DWMControl.prototype._svStartDragNode = function (nodeId, e) {
+        if (this.sv.isLocked) return;
         const node = this.sv.nodes.get(nodeId);
         if (!node) return;
 
@@ -400,6 +492,7 @@
         const wx   = (e.clientX - rect.left - vp.x) / vp.scale;
         const wy   = (e.clientY - rect.top  - vp.y) / vp.scale;
 
+        this._svPushUndo();
         this.sv.dragNodeId = nodeId;
         this.sv.dragOffset = { x: wx - node.x, y: wy - node.y };
         this.sv.dragOrigX  = node.x;
@@ -411,6 +504,7 @@
     // ─── Connection drawing ───────────────────────────────────────────────────
 
     DWMControl.prototype._svStartConnecting = function (nodeId, portId, portType, e) {
+        if (this.sv.isLocked) return;
         const node = this.sv.nodes.get(nodeId);
         if (!node) return;
 
@@ -569,6 +663,7 @@
             }
 
             const connId = 'conn-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+            this._svPushUndo();
             this.sv.connections.set(connId, {
                 id: connId,
                 fromNodeId: fnId, fromPortId: fpId,
@@ -648,7 +743,9 @@
     // ─── Clear ────────────────────────────────────────────────────────────────
 
     DWMControl.prototype._svClear = function () {
+        if (this.sv.isLocked) return;
         if (!window.confirm('Clear all nodes and connections? This cannot be undone.')) return;
+        this._svPushUndo();
         this.sv.nodes.clear();
         this.sv.connections.clear();
         this.sv.selectedNodeId = null;
@@ -662,7 +759,9 @@
     // ─── Delete selected ──────────────────────────────────────────────────────
 
     DWMControl.prototype._svDeleteSelected = function () {
+        if (this.sv.isLocked) return;
         if (this.sv.selectedNodeId) {
+            this._svPushUndo();
             const nodeId = this.sv.selectedNodeId;
             this.sv.nodes.delete(nodeId);
 
@@ -679,6 +778,7 @@
             this._svMarkDirty();
 
         } else if (this.sv.selectedConnId) {
+            this._svPushUndo();
             this.sv.connections.delete(this.sv.selectedConnId);
             this.sv.selectedConnId = null;
             this._svRender();
@@ -810,6 +910,26 @@
         <option value="bandpass"${node.props.filterType === 'bandpass'               ? ' selected' : ''}>Band Pass</option>
         <option value="notch"${node.props.filterType === 'notch'                     ? ' selected' : ''}>Notch</option>
     </select>
+</div>
+<div class="sv-props-field">
+    <label class="sv-props-label">Frequency (MHz)</label>
+    <input class="sv-props-input" type="number" id="sv-prop-filter-freq"
+           value="${_esc(String(node.props.freqMHz ?? ''))}" placeholder="e.g. 98.1" min="0" step="0.001">
+</div>
+<div class="sv-props-field">
+    <label class="sv-props-label">Bandwidth (MHz)</label>
+    <input class="sv-props-input" type="number" id="sv-prop-filter-bw"
+           value="${_esc(String(node.props.bandwidthMHz ?? ''))}" placeholder="e.g. 0.2" min="0" step="0.001">
+</div>`;
+            }
+
+            // ── Antenna ───────────────────────────────────────────────────────
+            if (node.type === 'antenna') {
+                html += `
+<div class="sv-props-field">
+    <label class="sv-props-label">Frequency (MHz)</label>
+    <input class="sv-props-input" type="number" id="sv-prop-antenna-freq"
+           value="${_esc(String(node.props.freqMHz ?? ''))}" placeholder="e.g. 98.1" min="0" step="0.001">
 </div>`;
             }
 
@@ -871,8 +991,7 @@
             }
 
             // ── Gain Readout Power (all GAIN_TYPE components) ─────────────────
-            const _GAIN_TYPES_ARR = ['attenuator', 'amplifier', 'hybrid-3db', 'combiner',
-                                     'coax-switch', '4port-switch', 'filter', 'coupler'];
+            const _GAIN_TYPES_ARR = ['attenuator', 'amplifier', 'filter'];
             if (_GAIN_TYPES_ARR.includes(node.type)) {
                 html += `
 <div class="sv-props-field">
@@ -928,6 +1047,7 @@
 
                 if (deviceSel) {
                     deviceSel.addEventListener('change', () => {
+                        this._svPushUndo();
                         const uid = deviceSel.value;
                         if (!uid) {
                             node.props.deviceUid  = null;
@@ -951,6 +1071,7 @@
 
                 if (measureSel) {
                     measureSel.addEventListener('change', () => {
+                        this._svPushUndo();
                         node.props.measureType = measureSel.value;
                         this._svRender();
                         this._svMarkDirty();
@@ -960,6 +1081,7 @@
                 const ptSel = document.getElementById('sv-prop-power-type');
                 if (ptSel) {
                     ptSel.addEventListener('change', () => {
+                        this._svPushUndo();
                         node.props.powerType = ptSel.value;
                         this._svRender();
                         this._svMarkDirty();
@@ -988,6 +1110,7 @@
                 const attInput = document.getElementById('sv-prop-att-db');
                 if (attInput) {
                     attInput.addEventListener('change', () => {
+                        this._svPushUndo();
                         node.props.attenuationDb = parseFloat(attInput.value) || 0;
                         this._svRender();
                         this._svMarkDirty();
@@ -1000,6 +1123,7 @@
                 const portSel = document.getElementById('sv-prop-active-port');
                 if (portSel) {
                     portSel.addEventListener('change', () => {
+                        this._svPushUndo();
                         node.props.activePort = parseInt(portSel.value, 10);
                         this._svMarkDirty();
                     });
@@ -1011,6 +1135,7 @@
                 const modeSel = document.getElementById('sv-prop-sw-mode');
                 if (modeSel) {
                     modeSel.addEventListener('change', () => {
+                        this._svPushUndo();
                         node.props.mode = modeSel.value;
                         this._svRender();
                         this._svMarkDirty();
@@ -1018,12 +1143,47 @@
                 }
             }
 
-            // Wire up filter type
+            // Wire up filter type + freq + bandwidth
             if (node.type === 'filter') {
-                const ftSel = document.getElementById('sv-prop-filter-type');
+                const ftSel  = document.getElementById('sv-prop-filter-type');
+                const fFreq  = document.getElementById('sv-prop-filter-freq');
+                const fBw    = document.getElementById('sv-prop-filter-bw');
                 if (ftSel) {
                     ftSel.addEventListener('change', () => {
+                        this._svPushUndo();
                         node.props.filterType = ftSel.value;
+                        this._svRender();
+                        this._svMarkDirty();
+                    });
+                }
+                if (fFreq) {
+                    fFreq.addEventListener('change', () => {
+                        this._svPushUndo();
+                        const v = fFreq.value.trim();
+                        node.props.freqMHz = v === '' ? null : parseFloat(v);
+                        this._svRender();
+                        this._svMarkDirty();
+                    });
+                }
+                if (fBw) {
+                    fBw.addEventListener('change', () => {
+                        this._svPushUndo();
+                        const v = fBw.value.trim();
+                        node.props.bandwidthMHz = v === '' ? null : parseFloat(v);
+                        this._svRender();
+                        this._svMarkDirty();
+                    });
+                }
+            }
+
+            // Wire up antenna frequency
+            if (node.type === 'antenna') {
+                const aFreq = document.getElementById('sv-prop-antenna-freq');
+                if (aFreq) {
+                    aFreq.addEventListener('change', () => {
+                        this._svPushUndo();
+                        const v = aFreq.value.trim();
+                        node.props.freqMHz = v === '' ? null : parseFloat(v);
                         this._svRender();
                         this._svMarkDirty();
                     });
@@ -1035,6 +1195,7 @@
                 const gainInput = document.getElementById('sv-prop-gain-db');
                 if (gainInput) {
                     gainInput.addEventListener('change', () => {
+                        this._svPushUndo();
                         const v = gainInput.value.trim();
                         node.props.gainDb = v === '' ? null : parseFloat(v);
                         this._svRender();
@@ -1049,6 +1210,7 @@
                 const txFreq = document.getElementById('sv-prop-tx-freq');
                 if (txPwr) {
                     txPwr.addEventListener('change', () => {
+                        this._svPushUndo();
                         const v = txPwr.value.trim();
                         node.props.powerW = v === '' ? null : parseFloat(v);
                         this._svRender();
@@ -1057,6 +1219,7 @@
                 }
                 if (txFreq) {
                     txFreq.addEventListener('change', () => {
+                        this._svPushUndo();
                         const v = txFreq.value.trim();
                         node.props.freqMHz = v === '' ? null : parseFloat(v);
                         this._svRender();
@@ -1069,6 +1232,7 @@
             const gainPtSel = document.getElementById('sv-prop-gain-power-type');
             if (gainPtSel) {
                 gainPtSel.addEventListener('change', () => {
+                    this._svPushUndo();
                     node.props.gainPowerType = gainPtSel.value;
                     this._svMarkDirty();
                 });
@@ -1090,6 +1254,7 @@
                 const _findRLMeter = uid => rlMeters.find(m => m.uid === uid);
                 if (rlFwdSel) {
                     rlFwdSel.addEventListener('change', () => {
+                        this._svPushUndo();
                         const uid = rlFwdSel.value;
                         const m   = _findRLMeter(uid);
                         node.props.fwdDeviceUid  = uid || null;
@@ -1100,6 +1265,7 @@
                 }
                 if (rlRflSel) {
                     rlRflSel.addEventListener('change', () => {
+                        this._svPushUndo();
                         const uid = rlRflSel.value;
                         const m   = _findRLMeter(uid);
                         node.props.rflDeviceUid  = uid || null;
@@ -1110,6 +1276,7 @@
                 }
                 if (rlModeSel) {
                     rlModeSel.addEventListener('change', () => {
+                        this._svPushUndo();
                         node.props.displayMode = rlModeSel.value;
                         this._svRender();
                         this._svMarkDirty();
@@ -1228,8 +1395,7 @@
             if (bulkGainSel) {
                 bulkGainSel.addEventListener('change', () => {
                     const pt = bulkGainSel.value;
-                    const GAIN_TYPES_SET = new Set(['attenuator', 'amplifier', 'hybrid-3db', 'combiner',
-                                                    'coax-switch', '4port-switch', 'filter', 'coupler']);
+                    const GAIN_TYPES_SET = new Set(['attenuator', 'amplifier', 'filter']);
                     let changed = false;
                     for (const n of this.sv.nodes.values()) {
                         if (GAIN_TYPES_SET.has(n.type)) { n.props.gainPowerType = pt; changed = true; }
@@ -1277,8 +1443,7 @@
     };
 
     DWMControl.prototype._svGetNodeGainCtx = function (nodeId) {
-        const GAIN_TYPES = ['attenuator', 'amplifier', 'hybrid-3db', 'combiner',
-                            'coax-switch', '4port-switch', 'filter', 'coupler'];
+        const GAIN_TYPES = ['attenuator', 'amplifier', 'filter'];
         const node = this.sv.nodes.get(nodeId);
         if (!node || !GAIN_TYPES.includes(node.type)) return { hasFwd: false, hasRfl: false };
 
@@ -1375,8 +1540,7 @@
         }
 
         // ── Per-component gain/loss computation ────────────────────────────────
-        const GAIN_TYPES = ['attenuator', 'amplifier', 'hybrid-3db', 'combiner',
-                            'coax-switch', '4port-switch', 'filter', 'coupler'];
+        const GAIN_TYPES = ['attenuator', 'amplifier', 'filter'];
 
         const getPowerW = (meterNode, powerType) => {
             if (!meterNode?.props?.deviceUid) return null;
@@ -1658,10 +1822,11 @@
         if (typeId === 'dwm-meter')    return { deviceUid: null, deviceName: null, measureType: 'forward', powerType: 'avg' };
         if (typeId === 'amplifier')    return { gainDb: null, ...gpt };
         if (typeId === 'transmitter')  return { powerW: null, freqMHz: null };
-        if (typeId === 'filter')       return { filterType: 'lowpass', ...gpt };
-        if (typeId === '4port-switch') return { mode: 'through', ...gpt };
-        if (typeId === 'coax-switch')  return { activePort: 1, ...gpt };
-        if (['hybrid-3db', 'combiner', 'coupler'].includes(typeId)) return { ...gpt };
+        if (typeId === 'filter')       return { filterType: 'lowpass', ...gpt, freqMHz: null, bandwidthMHz: null };
+        if (typeId === '4port-switch') return { mode: 'through' };
+        if (typeId === 'coax-switch')  return { activePort: 1 };
+        if (['hybrid-3db', 'combiner', 'coupler'].includes(typeId)) return {};
+        if (typeId === 'antenna')      return { freqMHz: null };
         if (typeId === 'return-loss')  return { fwdDeviceUid: null, fwdDeviceName: null, rflDeviceUid: null, rflDeviceName: null, displayMode: 'rl' };
         return {};
     }

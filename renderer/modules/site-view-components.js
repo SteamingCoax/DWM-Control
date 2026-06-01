@@ -43,8 +43,7 @@
     }
 
     const STRIP_H = 28;
-    const GAIN_TYPES = new Set(['amplifier', 'attenuator', 'hybrid-3db', 'combiner',
-                                 'coax-switch', '4port-switch', 'filter', 'coupler']);
+    const GAIN_TYPES = new Set(['amplifier', 'attenuator', 'filter']);
 
     const CATEGORIES = [
         { id: 'sources',       label: 'Sources' },
@@ -120,7 +119,7 @@
             id: 'attenuator',
             label: 'Attenuator',
             category: 'passive',
-            width: 110,
+            width: 140,
             height: 60,
             defaultLabel: 'ATT',
             ports: [
@@ -128,7 +127,7 @@
                 { id: 'out', side: 'right', type: 'output', label: 'Out', yRatio: 0.5 },
             ],
             renderBody(node) {
-                const w = this.width, h = this.height; // w=110, h=60
+                const w = this.width, h = this.height; // w=140, h=60
                 const db = node.props?.attenuationDb != null ? node.props.attenuationDb : '--';
                 return `
                     <line class="sv-node-deco" x1="${w*0.28}" y1="${h*0.28}" x2="${w*0.28}" y2="${h*0.72}" stroke-width="1.5" opacity="0.5"/>
@@ -243,6 +242,7 @@
                 const mx    = w * 0.5;
                 const feedY = h * 0.5;   // matches port yRatio: 0.5
                 const mastTopY = h * 0.08;
+                const freqText = node.props?.freqMHz != null ? `${node.props.freqMHz} MHz` : '';
                 return `
                     <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
                     <!-- Feed line from left port to mast base -->
@@ -255,6 +255,7 @@
                     <line class="sv-node-deco" x1="${w*0.29}" y1="${h*0.28}"     x2="${w*0.71}" y2="${h*0.28}"     stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
                     <line class="sv-node-deco" x1="${w*0.37}" y1="${h*0.38}"     x2="${w*0.63}" y2="${h*0.38}"     stroke-width="1.5" stroke-linecap="round" opacity="0.45"/>
                     <text class="sv-node-label" x="${mx}" y="${h*0.72}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
+                    ${freqText ? `<text class="sv-node-label" x="${mx}" y="${h*0.78}" text-anchor="middle" font-size="8">${_esc(freqText)}</text>` : ''}
                     <!-- Ground symbol -->
                     <line class="sv-node-deco" x1="${w*0.35}" y1="${h*0.80}" x2="${w*0.65}" y2="${h*0.80}" stroke-width="1.5" opacity="0.6"/>
                     <line class="sv-node-deco" x1="${w*0.42}" y1="${h*0.87}" x2="${w*0.58}" y2="${h*0.87}" stroke-width="1.5" opacity="0.45"/>
@@ -369,15 +370,15 @@
             id: 'filter',
             label: 'Filter',
             category: 'passive',
-            width: 110,
-            height: 60,
+            width: 140,
+            height: 80,
             defaultLabel: 'FILT',
             ports: [
                 { id: 'in',  side: 'left',  type: 'input',  label: 'In',  yRatio: 0.5 },
                 { id: 'out', side: 'right', type: 'output', label: 'Out', yRatio: 0.5 },
             ],
             renderBody(node) {
-                const w = this.width, h = this.height; // w=110, h=60
+                const w = this.width, h = this.height; // w=140, h=80
                 const ft = node.props?.filterType || 'lowpass';
                 const ftLabel = { lowpass: 'LP', highpass: 'HP', bandpass: 'BP', notch: 'NOTCH' }[ft] || ft.toUpperCase();
                 let curve = '';
@@ -390,9 +391,17 @@
                 } else {
                     curve = `<path class="sv-node-deco" d="M${w*0.2},${h*0.3} C${w*0.3},${h*0.3} ${w*0.38},${h*0.74} ${w*0.5},${h*0.74} C${w*0.62},${h*0.74} ${w*0.7},${h*0.3} ${w*0.8},${h*0.3}" fill="none" stroke-width="1.5" opacity="0.75"/>`;
                 }
+                const freqText = node.props?.freqMHz != null ? `${node.props.freqMHz} MHz` : '';
+                const bwMHz = parseFloat(node.props?.bandwidthMHz);
+                const bwText = node.props?.bandwidthMHz != null && !isNaN(bwMHz)
+                    ? (bwMHz < 1 ? `BW: ${(bwMHz * 1000).toFixed(0)} kHz` : `BW: ${bwMHz} MHz`)
+                    : '';
                 return `
+                    <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
                     ${curve}
-                    <text class="sv-node-type-icon" x="${w*0.5}" y="${h*0.90}" text-anchor="middle" font-size="10">${ftLabel}</text>
+                    <text class="sv-node-type-icon" x="${w*0.5}" y="${h*0.62}" text-anchor="middle" font-size="10">${ftLabel}</text>
+                    ${freqText ? `<text class="sv-node-label" x="${w*0.5}" y="${h*0.78}" text-anchor="middle" font-size="9">${_esc(freqText)}</text>` : ''}
+                    ${bwText   ? `<text class="sv-node-label" x="${w*0.5}" y="${h*0.92}" text-anchor="middle" font-size="8">${_esc(bwText)}</text>` : ''}
                 `;
             },
         },
@@ -448,8 +457,8 @@
                     <text class="sv-meter-dir" x="${w*0.5}" y="${h*0.20}" text-anchor="middle" font-size="10">${_esc(modeLabel)}</text>
                     <text class="sv-rl-value sv-meter-fwd" x="${w*0.5}" y="${h*0.56}" text-anchor="middle">-- --</text>
                     <line class="sv-node-deco" x1="${w*0.06}" y1="${h*0.66}" x2="${w*0.94}" y2="${h*0.66}" stroke-width="0.5" opacity="0.3"/>
-                    <text class="sv-meter-label" x="${w*0.06}" y="${h*0.82}" text-anchor="start" font-size="8">FWD: ${_esc(fwdName)}</text>
-                    <text class="sv-meter-label" x="${w*0.94}" y="${h*0.82}" text-anchor="end"   font-size="8">RFL: ${_esc(rflName)}</text>
+                    <text class="sv-meter-label" x="${w*0.06}" y="${h*0.77}" text-anchor="start" font-size="8">FWD: ${_esc(fwdName)}</text>
+                    <text class="sv-meter-label" x="${w*0.06}" y="${h*0.90}" text-anchor="start" font-size="8">RFL: ${_esc(rflName)}</text>
                 `;
             },
         },
@@ -465,10 +474,11 @@
         if (type === 'dwm-meter')    props = { deviceUid: null, deviceName: null, measureType: 'forward', powerType: 'avg' };
         if (type === 'amplifier')    props = { gainDb: null, gainPowerType: 'avg' };
         if (type === 'transmitter')  props = { powerW: null, freqMHz: null };
-        if (type === 'filter')       props = { filterType: 'lowpass', gainPowerType: 'avg' };
-        if (type === '4port-switch') props = { mode: 'through', gainPowerType: 'avg' };
-        if (type === 'coax-switch')  props = { activePort: 1, gainPowerType: 'avg' };
-        if (type === 'hybrid-3db' || type === 'combiner' || type === 'coupler') props = { gainPowerType: 'avg' };
+        if (type === 'filter')       props = { filterType: 'lowpass', gainPowerType: 'avg', freqMHz: null, bandwidthMHz: null };
+        if (type === '4port-switch') props = { mode: 'through' };
+        if (type === 'coax-switch')  props = { activePort: 1 };
+        if (type === 'hybrid-3db' || type === 'combiner' || type === 'coupler') props = {};
+        if (type === 'antenna')      props = { freqMHz: null };
         if (type === 'return-loss')  props = { fwdDeviceUid: null, fwdDeviceName: null, rflDeviceUid: null, rflDeviceName: null, displayMode: 'rl' };
 
         return {

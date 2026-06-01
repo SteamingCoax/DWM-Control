@@ -240,6 +240,18 @@
 /* Dot grid background pattern */
 .sv-grid { pointer-events: none; }
 
+/* Locked canvas — prevent interaction cursor */
+.sv-canvas-svg.sv-canvas-locked {
+    cursor: not-allowed !important;
+}
+
+/* ─── Connection wires ───────────────────────────────────────────────────── */
+
+.sv-connection {
+    stroke: rgba(148, 163, 184, 0.6);
+    stroke-width: 2;
+}
+
 
 /* ─── Properties Panel ───────────────────────────────────────────────────── */
 
@@ -697,8 +709,57 @@
 [data-theme="light"] .sv-meter-label     { fill: rgba(0, 0, 0, 0.4); }
 
 /* Connection wires */
-[data-theme="light"] .sv-connection { stroke: #94a3b8; }
-[data-theme="light"] .sv-connection:hover { stroke: #64748b; }
+[data-theme="light"] .sv-connection { stroke: #64748b; stroke-width: 2; }
+[data-theme="light"] .sv-connection:hover { stroke: #334155; }
+
+/* ─── Additional light-mode component body fills ─── */
+[data-theme="light"] .sv-node-filter .sv-node-body {
+    fill: #fef9c3;
+    stroke: #ca8a04;
+}
+
+[data-theme="light"] .sv-node-4port-switch .sv-node-body {
+    fill: #ffe4e6;
+    stroke: #e11d48;
+}
+
+[data-theme="light"] .sv-node-load-terminator .sv-node-body {
+    fill: #f1f5f9;
+    stroke: #64748b;
+}
+
+[data-theme="light"] .sv-node-return-loss .sv-node-body {
+    fill: #ecfdf5;
+    stroke: #059669;
+}
+
+/* ─── Canvas background in light mode ─── */
+[data-theme="light"] .sv-canvas-container {
+    background: #f8fafc;
+}
+
+/* ─── Toolbar light mode ─── */
+[data-theme="light"] .sv-toolbar {
+    background: #f1f5f9;
+    border-bottom-color: #cbd5e1;
+}
+
+/* ─── Sidebar light mode ─── */
+[data-theme="light"] .sv-sidebar {
+    background: #f8fafc;
+    border-right-color: #cbd5e1;
+}
+
+/* ─── Properties panel light mode ─── */
+[data-theme="light"] .sv-properties {
+    background: #f8fafc;
+    border-left-color: #cbd5e1;
+}
+
+/* ─── Thicker strokes for node bodies in light mode ─── */
+[data-theme="light"] .sv-node-body {
+    stroke-width: 1.5;
+}
 
 /* ─── Component Gain/Loss Overlay Text ─── */
 .sv-comp-gain-fwd {
