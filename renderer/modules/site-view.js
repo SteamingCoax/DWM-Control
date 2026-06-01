@@ -931,35 +931,50 @@
 
     // ─── Live power readouts ──────────────────────────────────────────────────
 
+    // BFS through chains of meters (meters are transparent — they don't affect signal).
+    // Returns the closest meter of each type on each side of nodeId.
+    DWMControl.prototype._svFindFlankingMeters = function (nodeId) {
+        const findMeters = (startId, side) => {
+            const result = { forward: null, reverse: null };
+            const visited = new Set();
+            const queue   = [startId];
+            while (queue.length > 0) {
+                const curId = queue.shift();
+                if (visited.has(curId)) continue;
+                visited.add(curId);
+                for (const conn of this.sv.connections.values()) {
+                    const neighborId = side === 'input'
+                        ? (conn.toNodeId   === curId ? conn.fromNodeId : null)
+                        : (conn.fromNodeId === curId ? conn.toNodeId   : null);
+                    if (!neighborId || visited.has(neighborId)) continue;
+                    const neighbor = this.sv.nodes.get(neighborId);
+                    if (!neighbor) continue;
+                    if (neighbor.type === 'dwm-meter') {
+                        const mt = neighbor.props?.measureType === 'reverse' ? 'reverse' : 'forward';
+                        if (!result[mt]) result[mt] = neighbor; // keep closest
+                        queue.push(neighborId); // continue through the meter
+                    }
+                    // non-meter nodes are opaque — do not traverse further
+                }
+            }
+            return result;
+        };
+        return {
+            input:  findMeters(nodeId, 'input'),
+            output: findMeters(nodeId, 'output'),
+        };
+    };
+
     DWMControl.prototype._svGetNodeGainCtx = function (nodeId) {
         const GAIN_TYPES = ['attenuator', 'amplifier', 'hybrid-3db', 'combiner',
                             'coax-switch', '4port-switch', 'filter', 'coupler'];
         const node = this.sv.nodes.get(nodeId);
         if (!node || !GAIN_TYPES.includes(node.type)) return { hasFwd: false, hasRfl: false };
 
-        const inputMeters  = { forward: false, reverse: false };
-        const outputMeters = { forward: false, reverse: false };
-
-        for (const conn of this.sv.connections.values()) {
-            if (conn.toNodeId === nodeId) {
-                const src = this.sv.nodes.get(conn.fromNodeId);
-                if (src?.type === 'dwm-meter') {
-                    const mt = src.props?.measureType === 'reverse' ? 'reverse' : 'forward';
-                    inputMeters[mt] = true;
-                }
-            }
-            if (conn.fromNodeId === nodeId) {
-                const dst = this.sv.nodes.get(conn.toNodeId);
-                if (dst?.type === 'dwm-meter') {
-                    const mt = dst.props?.measureType === 'reverse' ? 'reverse' : 'forward';
-                    outputMeters[mt] = true;
-                }
-            }
-        }
-
+        const { input, output } = this._svFindFlankingMeters(nodeId);
         return {
-            hasFwd: inputMeters.forward  && outputMeters.forward,
-            hasRfl: inputMeters.reverse  && outputMeters.reverse,
+            hasFwd: !!(input.forward && output.forward),
+            hasRfl: !!(input.reverse && output.reverse),
         };
     };
 
@@ -1024,25 +1039,7 @@
         for (const node of this.sv.nodes.values()) {
             if (!GAIN_TYPES.includes(node.type)) continue;
 
-            const inputMeters  = { forward: null, reverse: null };
-            const outputMeters = { forward: null, reverse: null };
-
-            for (const conn of this.sv.connections.values()) {
-                if (conn.toNodeId === node.id) {
-                    const srcNode = this.sv.nodes.get(conn.fromNodeId);
-                    if (srcNode?.type === 'dwm-meter') {
-                        const mt = srcNode.props?.measureType === 'reverse' ? 'reverse' : 'forward';
-                        if (!inputMeters[mt]) inputMeters[mt] = srcNode;
-                    }
-                }
-                if (conn.fromNodeId === node.id) {
-                    const dstNode = this.sv.nodes.get(conn.toNodeId);
-                    if (dstNode?.type === 'dwm-meter') {
-                        const mt = dstNode.props?.measureType === 'reverse' ? 'reverse' : 'forward';
-                        if (!outputMeters[mt]) outputMeters[mt] = dstNode;
-                    }
-                }
-            }
+            const { input: inputMeters, output: outputMeters } = this._svFindFlankingMeters(node.id);
 
             let fwdText = '';
             const fwdIn  = getPowerW(inputMeters.forward);
