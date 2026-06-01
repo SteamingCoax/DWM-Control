@@ -26,9 +26,14 @@
         }
     }
 
-    function _portLabelPos(port, px, py) {
+    function _portLabelPos(port, px, py, flipped = false) {
         const off = 14;
-        switch (port.side) {
+        let side = port.side;
+        if (flipped) {
+            if (side === 'left')       side = 'right';
+            else if (side === 'right') side = 'left';
+        }
+        switch (side) {
             case 'left':   return { x: px - off, y: py + 3.5, anchor: 'end' };
             case 'right':  return { x: px + off, y: py + 3.5, anchor: 'start' };
             case 'top':    return { x: px,        y: py - off, anchor: 'middle' };
@@ -151,10 +156,11 @@
                 const w = this.width, h = this.height;
                 const isReverse = node.props?.measureType === 'reverse';
                 const dirLabel  = isReverse ? 'REFLECTED' : 'FORWARD';
+                const ptLabel   = { avg: 'AVG', peak: 'PEAK', min: 'MIN', burst: 'BURST' }[node.props?.powerType || 'avg'] || 'AVG';
                 const devName   = node.props?.deviceName || (node.props?.deviceUid ? '' : 'Unlinked');
                 return `
                     <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
-                    <text class="sv-meter-dir" x="${w*0.5}" y="${h*0.26}" text-anchor="middle" font-size="10">${_esc(dirLabel)}</text>
+                    <text class="sv-meter-dir" x="${w*0.5}" y="${h*0.26}" text-anchor="middle" font-size="10">${_esc(dirLabel)} · ${_esc(ptLabel)}</text>
                     <g data-node-id="${_esc(node.id)}">
                         <text class="sv-meter-fwd" x="${w*0.5}" y="${h*0.60}" text-anchor="middle">-- --</text>
                     </g>
@@ -399,7 +405,7 @@
 
         let props = {};
         if (type === 'attenuator')   props = { attenuationDb: 3 };
-        if (type === 'dwm-meter')    props = { deviceUid: null, deviceName: null, measureType: 'forward' };
+        if (type === 'dwm-meter')    props = { deviceUid: null, deviceName: null, measureType: 'forward', powerType: 'avg' };
         if (type === 'amplifier')    props = { gainDb: null };
         if (type === 'transmitter')  props = { powerW: null, freqMHz: null };
         if (type === 'filter')       props = { filterType: 'lowpass' };
@@ -412,6 +418,7 @@
             x,
             y,
             label: typeDef.defaultLabel,
+            flipped: false,
             props,
         };
     }
@@ -422,7 +429,10 @@
         const port = typeDef.ports.find(p => p.id === portId);
         if (!port) return null;
         const local = _portLocalPos(typeDef, port);
-        return { x: node.x + local.x, y: node.y + local.y, side: port.side };
+        const absX = (node.flipped ?? false)
+            ? node.x + typeDef.width - local.x
+            : node.x + local.x;
+        return { x: absX, y: node.y + local.y, side: port.side };
     }
 
     function getPortScreenPos(node, portId, viewport) {
@@ -463,27 +473,35 @@
         <text class="sv-comp-gain-rfl" x="${w * 0.5}" y="${baseH + STRIP_H * 0.73}" text-anchor="middle"></text>` : '';
 
         // Port SVG elements (positions based on baseH — unchanged)
+        const nodeFlipped = node.flipped ?? false;
         const portsHtml = typeDef.ports.map(port => {
             const { x: px, y: py } = _portLocalPos(typeDef, port);
-            const lp  = _portLabelPos(port, px, py);
+            // Mirror port x when flipped
+            const flippedPx = nodeFlipped ? w - px : px;
+            const lp  = _portLabelPos(port, flippedPx, py, nodeFlipped);
             const pid = _esc(port.id);
             return (
-                `<circle class="sv-port-hit" cx="${px}" cy="${py}" r="12"` +
+                `<circle class="sv-port-hit" cx="${flippedPx}" cy="${py}" r="12"` +
                     ` data-node-id="${nid}" data-port-id="${pid}"` +
                     ` data-port-type="${port.type}" data-port-side="${port.side}"/>` +
-                `<circle class="sv-port sv-port-${port.type}" cx="${px}" cy="${py}" r="6"` +
+                `<circle class="sv-port sv-port-${port.type}" cx="${flippedPx}" cy="${py}" r="6"` +
                     ` pointer-events="none" data-node-id="${nid}" data-port-id="${pid}"/>` +
                 `<text class="sv-port-label" x="${lp.x}" y="${lp.y}"` +
                     ` font-size="9" text-anchor="${lp.anchor}">${_esc(port.label)}</text>`
             );
         }).join('\n        ');
 
+        const rawBody = typeDef.renderBody(node);
+        const bodyHtml = nodeFlipped
+            ? `<g transform="translate(${w},0) scale(-1,1)">${rawBody}</g>`
+            : rawBody;
+
         return (
             `<g id="sv-node-${nid}" class="sv-node sv-node-${_esc(node.type)}"` +
             ` transform="translate(${node.x},${node.y})" data-node-id="${nid}">` +
             `\n    ${bgRect}` +
             `\n    ${topStripHtml}` +
-            `\n    ${typeDef.renderBody(node)}` +
+            `\n    ${bodyHtml}` +
             `\n    ${botStripHtml}` +
             `\n    <rect class="sv-node-selection" x="-4" y="${-topH - 4}"` +
             ` width="${w + 8}" height="${effectiveH + 8}" rx="8"` +

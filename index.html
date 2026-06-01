@@ -309,6 +309,7 @@
                             <div class="sv-toolbar-sep"></div>
                             <button id="sv-save-file-btn" class="sv-toolbar-btn">Save File</button>
                             <button id="sv-load-file-btn" class="sv-toolbar-btn">Load File</button>
+                            <button id="sv-settings-btn" class="sv-toolbar-btn">⚙ Settings</button>
                             <span id="sv-save-status" class="sv-save-status">Ready</span>
                         </div>
                         <div class="sv-canvas-container" id="sv-canvas-container">
@@ -330,6 +331,37 @@
                         </div>
                     </aside>
                 </div>
+
+                <!-- Workspace Settings Dialog -->
+                <dialog id="sv-settings-dialog" class="sv-settings-dialog">
+                    <div class="sv-settings-header">Workspace Settings</div>
+                    <div class="sv-settings-body">
+                        <div class="sv-settings-row">
+                            <label class="sv-settings-label">
+                                <input type="checkbox" id="sv-setting-snap-enabled" checked>
+                                Grid Snap
+                            </label>
+                        </div>
+                        <div class="sv-settings-row">
+                            <label class="sv-settings-label">Snap Size</label>
+                            <select id="sv-setting-snap-size" class="sv-props-select">
+                                <option value="10">10 px</option>
+                                <option value="20" selected>20 px</option>
+                                <option value="40">40 px</option>
+                            </select>
+                        </div>
+                        <div class="sv-settings-row">
+                            <label class="sv-settings-label">
+                                <input type="checkbox" id="sv-setting-grid-visible" checked>
+                                Show Grid
+                            </label>
+                        </div>
+                    </div>
+                    <div class="sv-settings-footer">
+                        <button id="sv-settings-cancel" class="sv-toolbar-btn">Cancel</button>
+                        <button id="sv-settings-apply" class="sv-toolbar-btn">Apply</button>
+                    </div>
+                </dialog>
             </section>
         </main>
         <!-- Output Console (Global) -->

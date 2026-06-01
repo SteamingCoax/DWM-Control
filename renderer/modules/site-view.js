@@ -22,6 +22,7 @@
             nodes:          new Map(),   // id -> node object
             connections:    new Map(),   // id -> connection object
             viewport:       { x: 0, y: 0, scale: 1.0 },
+            settings:       { snapEnabled: true, snapSize: 20, gridVisible: true },
             selectedNodeId: null,
             selectedConnId: null,
             connectingFrom: null,        // { nodeId, portId, portType } while drawing a wire
@@ -32,6 +33,7 @@
             powerTimer:     null,
             isDirty:        false,
         };
+        this._svLoadSettings();
         this._svLoadSchematic();
         this._svRenderSidebar();
         this._svRender();
@@ -117,6 +119,7 @@
         }
         gridBg.setAttribute('width', svgEl.clientWidth || 2000);
         gridBg.setAttribute('height', svgEl.clientHeight || 1500);
+        gridBg.setAttribute('visibility', this.sv.settings?.gridVisible !== false ? 'visible' : 'hidden');
 
         // World transform
         const worldEl = document.getElementById('sv-world');
@@ -241,9 +244,10 @@
             const wx   = (e.clientX - rect.left - vp.x) / vp.scale;
             const wy   = (e.clientY - rect.top  - vp.y) / vp.scale;
 
-            // Snap center of component to 20-px grid
-            const snappedX = Math.round((wx - comp.width  / 2) / 20) * 20;
-            const snappedY = Math.round((wy - comp.height / 2) / 20) * 20;
+            // Snap center of component to grid
+            const snapSize = this.sv.settings.snapEnabled ? this.sv.settings.snapSize : 1;
+            const snappedX = Math.round((wx - comp.width  / 2) / snapSize) * snapSize;
+            const snappedY = Math.round((wy - comp.height / 2) / snapSize) * snapSize;
 
             const node = createNode(type, snappedX, snappedY);
             this.sv.nodes.set(node.id, node);
@@ -327,6 +331,9 @@
         if (deleteBtn)   deleteBtn.addEventListener('click',   () => this._svDeleteSelected());
         if (saveFileBtn) saveFileBtn.addEventListener('click', () => this._svSaveToFile());
         if (loadFileBtn) loadFileBtn.addEventListener('click', () => this._svLoadFromFile());
+
+        const settingsBtn = document.getElementById('sv-settings-btn');
+        if (settingsBtn) settingsBtn.addEventListener('click', () => this._svOpenSettings());
     };
 
     // ─── Pan ──────────────────────────────────────────────────────────────────
@@ -407,8 +414,9 @@
             if (!node) return;
             const wx = (e.clientX - rect.left - vp.x) / vp.scale;
             const wy = (e.clientY - rect.top  - vp.y) / vp.scale;
-            node.x = Math.round((wx - this.sv.dragOffset.x) / 20) * 20;
-            node.y = Math.round((wy - this.sv.dragOffset.y) / 20) * 20;
+            const snapSize = this.sv.settings.snapEnabled ? this.sv.settings.snapSize : 1;
+            node.x = Math.round((wx - this.sv.dragOffset.x) / snapSize) * snapSize;
+            node.y = Math.round((wy - this.sv.dragOffset.y) / snapSize) * snapSize;
             this._svRender();
             return;
         }
@@ -495,11 +503,11 @@
                 [fnId, fpId, tnId, tpId] = [tnId, tpId, fnId, fpId];
             }
 
-            // Reject duplicates
-            for (const conn of this.sv.connections.values()) {
-                if (conn.fromNodeId === fnId && conn.fromPortId === fpId &&
-                    conn.toNodeId   === tnId && conn.toPortId   === tpId) {
-                    return;
+            // Replace any existing connection on the same port — one connection per port
+            for (const [existingId, existing] of this.sv.connections) {
+                if ((existing.fromNodeId === fnId && existing.fromPortId === fpId) ||
+                    (existing.toNodeId   === tnId && existing.toPortId   === tpId)) {
+                    this.sv.connections.delete(existingId);
                 }
             }
 
@@ -655,6 +663,9 @@
     <label class="sv-props-label">Label</label>
     <input class="sv-props-input" type="text" id="sv-prop-label"
            value="${_esc(node.label)}" placeholder="Label">
+</div>
+<div class="sv-props-field">
+    <button class="sv-props-flip-btn" id="sv-prop-flip-btn">⇄ Flip</button>
 </div>`;
 
             // ── DWM Power Meter ───────────────────────────────────────────────
@@ -679,6 +690,15 @@
     <select class="sv-props-select" id="sv-prop-measure">
         <option value="forward"${node.props.measureType === 'forward'  ? ' selected' : ''}>Forward</option>
         <option value="reverse"${node.props.measureType === 'reverse'  ? ' selected' : ''}>Reflect</option>
+    </select>
+</div>
+<div class="sv-props-field">
+    <label class="sv-props-label">Power Type</label>
+    <select class="sv-props-select" id="sv-prop-power-type">
+        <option value="avg"${(node.props.powerType || 'avg') === 'avg' ? ' selected' : ''}>Average</option>
+        <option value="peak"${node.props.powerType === 'peak' ? ' selected' : ''}>Peak</option>
+        <option value="min"${node.props.powerType === 'min' ? ' selected' : ''}>Minimum</option>
+        <option value="burst"${node.props.powerType === 'burst' ? ' selected' : ''}>Burst</option>
     </select>
 </div>`;
             }
@@ -782,6 +802,16 @@
                 });
             }
 
+            // Wire up flip button
+            const flipBtn = document.getElementById('sv-prop-flip-btn');
+            if (flipBtn) {
+                flipBtn.addEventListener('click', () => {
+                    node.flipped = !node.flipped;
+                    this._svRender();
+                    this._svMarkDirty();
+                });
+            }
+
             // Wire up DWM meter selectors
             if (node.type === 'dwm-meter') {
                 const deviceSel  = document.getElementById('sv-prop-device');
@@ -813,6 +843,15 @@
                 if (measureSel) {
                     measureSel.addEventListener('change', () => {
                         node.props.measureType = measureSel.value;
+                        this._svRender();
+                        this._svMarkDirty();
+                    });
+                }
+
+                const ptSel = document.getElementById('sv-prop-power-type');
+                if (ptSel) {
+                    ptSel.addEventListener('change', () => {
+                        node.props.powerType = ptSel.value;
                         this._svRender();
                         this._svMarkDirty();
                     });
@@ -1004,10 +1043,12 @@
                     record.state?.lastSnapshotRaw) {
 
                     const snap = record.state.lastSnapshotRaw;
-                    const avgW = parseFloat(snap.avg);
+                    const powerType = node.props.powerType || 'avg';
+                    const rawVal = snap[powerType] ?? snap.avg;
+                    const powerW = parseFloat(rawVal);
 
-                    if (Number.isFinite(avgW) && typeof window.dwm.scalePower === 'function') {
-                        const { scaled, unit } = window.dwm.scalePower(avgW);
+                    if (Number.isFinite(powerW) && typeof window.dwm.scalePower === 'function') {
+                        const { scaled, unit } = window.dwm.scalePower(powerW);
                         powerText = `${scaled.toFixed(2)} ${unit}`;
                     }
                 }
@@ -1265,7 +1306,7 @@
 
     function _defaultProps(typeId) {
         if (typeId === 'attenuator')   return { attenuationDb: 3 };
-        if (typeId === 'dwm-meter')    return { deviceUid: null, deviceName: null, measureType: 'forward' };
+        if (typeId === 'dwm-meter')    return { deviceUid: null, deviceName: null, measureType: 'forward', powerType: 'avg' };
         if (typeId === 'amplifier')    return { gainDb: null };
         if (typeId === 'transmitter')  return { powerW: null, freqMHz: null };
         if (typeId === 'filter')       return { filterType: 'lowpass' };
@@ -1273,5 +1314,61 @@
         if (typeId === 'coax-switch')  return { activePort: 1 };
         return {};
     }
+
+    // ─── Settings ─────────────────────────────────────────────────────────────
+
+    DWMControl.prototype._svOpenSettings = function () {
+        const dialog = document.getElementById('sv-settings-dialog');
+        if (!dialog) return;
+
+        const snapEnableEl = dialog.querySelector('#sv-setting-snap-enabled');
+        const snapSizeEl   = dialog.querySelector('#sv-setting-snap-size');
+        const gridVisEl    = dialog.querySelector('#sv-setting-grid-visible');
+
+        if (snapEnableEl) snapEnableEl.checked = this.sv.settings.snapEnabled;
+        if (snapSizeEl)   snapSizeEl.value     = String(this.sv.settings.snapSize);
+        if (gridVisEl)    gridVisEl.checked    = this.sv.settings.gridVisible;
+
+        dialog.showModal();
+
+        const applyBtn  = dialog.querySelector('#sv-settings-apply');
+        const cancelBtn = dialog.querySelector('#sv-settings-cancel');
+
+        const applyFn = () => {
+            if (snapEnableEl) this.sv.settings.snapEnabled = snapEnableEl.checked;
+            if (snapSizeEl)   this.sv.settings.snapSize    = parseInt(snapSizeEl.value, 10) || 20;
+            if (gridVisEl)    this.sv.settings.gridVisible = gridVisEl.checked;
+            this._svRender();
+            this._svSaveSettings();
+            dialog.close();
+            applyBtn.removeEventListener('click', applyFn);
+            cancelBtn.removeEventListener('click', cancelFn);
+        };
+        const cancelFn = () => {
+            dialog.close();
+            applyBtn.removeEventListener('click', applyFn);
+            cancelBtn.removeEventListener('click', cancelFn);
+        };
+        applyBtn.addEventListener('click', applyFn);
+        cancelBtn.addEventListener('click', cancelFn);
+    };
+
+    DWMControl.prototype._svSaveSettings = function () {
+        try {
+            localStorage.setItem('dwm-siteview-settings', JSON.stringify(this.sv.settings));
+        } catch (_) {}
+    };
+
+    DWMControl.prototype._svLoadSettings = function () {
+        try {
+            const raw = localStorage.getItem('dwm-siteview-settings');
+            if (raw) {
+                const s = JSON.parse(raw);
+                if (typeof s.snapEnabled === 'boolean')  this.sv.settings.snapEnabled = s.snapEnabled;
+                if (typeof s.snapSize    === 'number')    this.sv.settings.snapSize    = s.snapSize;
+                if (typeof s.gridVisible === 'boolean')   this.sv.settings.gridVisible = s.gridVisible;
+            }
+        } catch (_) {}
+    };
 
 })();
