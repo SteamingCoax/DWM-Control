@@ -768,3 +768,33 @@
 .sv-props-flip-btn:hover {
     background: var(--bg-hover, #45475a);
 }
+
+/* Generic props button (identify, bulk apply, etc.) */
+.sv-props-btn,
+.sv-props-identify-btn {
+    width: 100%;
+    padding: 5px 8px;
+    font-size: 12px;
+    background: var(--bg-card, #313244);
+    color: var(--text-primary, #cdd6f4);
+    border: 1px solid var(--border-light, #45475a);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.sv-props-btn:hover,
+.sv-props-identify-btn:hover {
+    background: var(--bg-hover, #45475a);
+}
+
+.sv-props-btn:disabled,
+.sv-props-identify-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.sv-settings-row-inline {
+    display: flex;
+    align-items: center;
+}

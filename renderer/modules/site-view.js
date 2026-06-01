@@ -333,7 +333,15 @@
         if (loadFileBtn) loadFileBtn.addEventListener('click', () => this._svLoadFromFile());
 
         const settingsBtn = document.getElementById('sv-settings-btn');
-        if (settingsBtn) settingsBtn.addEventListener('click', () => this._svOpenSettings());
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', () => {
+                // Deselect everything — workspace settings appear in the properties pane
+                this.sv.selectedNodeId = null;
+                this.sv.selectedConnId = null;
+                this._svUpdateSelectionVisuals();
+                this._svRenderProperties();
+            });
+        }
     };
 
     // ─── Pan ──────────────────────────────────────────────────────────────────
@@ -695,11 +703,16 @@
 <div class="sv-props-field">
     <label class="sv-props-label">Power Type</label>
     <select class="sv-props-select" id="sv-prop-power-type">
-        <option value="avg"${(node.props.powerType || 'avg') === 'avg' ? ' selected' : ''}>Average</option>
-        <option value="peak"${node.props.powerType === 'peak' ? ' selected' : ''}>Peak</option>
-        <option value="min"${node.props.powerType === 'min' ? ' selected' : ''}>Minimum</option>
-        <option value="burst"${node.props.powerType === 'burst' ? ' selected' : ''}>Burst</option>
+        <option value="avg"${(node.props.powerType || 'avg') === 'avg' ? ' selected' : ''}>AVG — Average Power</option>
+        <option value="peak"${node.props.powerType === 'peak' ? ' selected' : ''}>PEP — Peak Envelope</option>
+        <option value="inst"${node.props.powerType === 'inst' ? ' selected' : ''}>INST — Instantaneous</option>
+        <option value="max"${node.props.powerType === 'max' ? ' selected' : ''}>MAX — Running Maximum</option>
+        <option value="min"${node.props.powerType === 'min' ? ' selected' : ''}>MIN — Running Minimum</option>
+        <option value="dev"${node.props.powerType === 'dev' ? ' selected' : ''}>DEV — Deviation</option>
     </select>
+</div>
+<div class="sv-props-field">
+    <button class="sv-props-identify-btn" id="sv-prop-identify-btn"${!node.props.deviceUid ? ' disabled' : ''}>🔦 Identify</button>
 </div>`;
             }
 
@@ -856,6 +869,16 @@
                         this._svMarkDirty();
                     });
                 }
+
+                const identifyBtn = document.getElementById('sv-prop-identify-btn');
+                if (identifyBtn) {
+                    identifyBtn.addEventListener('click', () => {
+                        const uid = node.props.deviceUid;
+                        if (uid && typeof this.identifyMeter === 'function') {
+                            this.identifyMeter(uid);
+                        }
+                    });
+                }
             }
 
             // Wire up attenuator dB input
@@ -963,8 +986,86 @@
             if (delBtn) delBtn.addEventListener('click', () => this._svDeleteSelected());
 
         } else {
-            content.innerHTML =
-                '<div class="sv-props-empty">Select a component or connection to edit its properties.</div>';
+            // Show workspace settings in the properties pane when nothing is selected
+            const s = this.sv.settings;
+            content.innerHTML = `
+<div class="sv-props-section">
+<div class="sv-props-title">Workspace Settings</div>
+
+<div class="sv-props-field sv-settings-row-inline">
+    <label class="sv-props-label">
+        <input type="checkbox" id="sv-ws-snap-enabled"${s.snapEnabled ? ' checked' : ''}> Grid Snap
+    </label>
+</div>
+<div class="sv-props-field">
+    <label class="sv-props-label">Snap Size</label>
+    <select class="sv-props-select" id="sv-ws-snap-size">
+        <option value="10"${s.snapSize === 10 ? ' selected' : ''}>10 px</option>
+        <option value="20"${s.snapSize === 20 ? ' selected' : ''}>20 px</option>
+        <option value="40"${s.snapSize === 40 ? ' selected' : ''}>40 px</option>
+    </select>
+</div>
+<div class="sv-props-field sv-settings-row-inline">
+    <label class="sv-props-label">
+        <input type="checkbox" id="sv-ws-grid-visible"${s.gridVisible ? ' checked' : ''}> Show Grid
+    </label>
+</div>
+</div>
+
+<div class="sv-props-section">
+<div class="sv-props-title">Bulk Meter Settings</div>
+<div class="sv-props-field">
+    <label class="sv-props-label">Set All Meters To</label>
+    <select class="sv-props-select" id="sv-ws-bulk-power-type">
+        <option value="avg">AVG — Average Power</option>
+        <option value="peak">PEP — Peak Envelope</option>
+        <option value="inst">INST — Instantaneous</option>
+        <option value="max">MAX — Running Maximum</option>
+        <option value="min">MIN — Running Minimum</option>
+        <option value="dev">DEV — Deviation</option>
+    </select>
+</div>
+<div class="sv-props-field">
+    <button class="sv-props-btn" id="sv-ws-bulk-apply-btn">Apply to All Meters</button>
+</div>
+</div>`;
+
+            // Wire workspace settings
+            const snapEnabledEl = document.getElementById('sv-ws-snap-enabled');
+            const snapSizeEl    = document.getElementById('sv-ws-snap-size');
+            const gridVisEl     = document.getElementById('sv-ws-grid-visible');
+
+            const applyWsSettings = () => {
+                if (snapEnabledEl) this.sv.settings.snapEnabled = snapEnabledEl.checked;
+                if (snapSizeEl)   this.sv.settings.snapSize    = parseInt(snapSizeEl.value, 10) || 20;
+                if (gridVisEl)    this.sv.settings.gridVisible  = gridVisEl.checked;
+                this._svRender();
+                this._svSaveSettings();
+            };
+
+            [snapEnabledEl, snapSizeEl, gridVisEl].forEach(el => {
+                if (el) el.addEventListener('change', applyWsSettings);
+            });
+
+            const bulkApplyBtn = document.getElementById('sv-ws-bulk-apply-btn');
+            if (bulkApplyBtn) {
+                bulkApplyBtn.addEventListener('click', () => {
+                    const bulkSel = document.getElementById('sv-ws-bulk-power-type');
+                    if (!bulkSel) return;
+                    const pt = bulkSel.value;
+                    let changed = false;
+                    for (const node of this.sv.nodes.values()) {
+                        if (node.type === 'dwm-meter') {
+                            node.props.powerType = pt;
+                            changed = true;
+                        }
+                    }
+                    if (changed) {
+                        this._svRender();
+                        this._svMarkDirty();
+                    }
+                });
+            }
         }
     };
 
@@ -1019,7 +1120,7 @@
 
     DWMControl.prototype._svStartPowerUpdates = function () {
         if (this.sv.powerTimer) clearInterval(this.sv.powerTimer);
-        this.sv.powerTimer = setInterval(() => this._svUpdatePowerReadouts(), 500);
+        this.sv.powerTimer = setInterval(() => this._svUpdatePowerReadouts(), 80);
     };
 
     DWMControl.prototype._svUpdatePowerReadouts = function () {
@@ -1073,7 +1174,8 @@
             }
             if (!record || record.connectionState !== 'connected') return null;
             if (!record.state?.lastSnapshotRaw) return null;
-            const w = parseFloat(record.state.lastSnapshotRaw.avg);
+            const powerType = meterNode.props?.powerType || 'avg';
+            const w = parseFloat(record.state.lastSnapshotRaw[powerType] ?? record.state.lastSnapshotRaw.avg);
             return Number.isFinite(w) && w > 0 ? w : null;
         };
 

@@ -156,7 +156,7 @@
                 const w = this.width, h = this.height;
                 const isReverse = node.props?.measureType === 'reverse';
                 const dirLabel  = isReverse ? 'REFLECTED' : 'FORWARD';
-                const ptLabel   = { avg: 'AVG', peak: 'PEAK', min: 'MIN', burst: 'BURST' }[node.props?.powerType || 'avg'] || 'AVG';
+                const ptLabel   = { inst: 'INST', avg: 'AVG', peak: 'PEP', max: 'MAX', min: 'MIN', dev: 'DEV' }[node.props?.powerType || 'avg'] || 'AVG';
                 const devName   = node.props?.deviceName || (node.props?.deviceUid ? '' : 'Unlinked');
                 return `
                     <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
@@ -492,9 +492,23 @@
         }).join('\n        ');
 
         const rawBody = typeDef.renderBody(node);
-        const bodyHtml = nodeFlipped
-            ? `<g transform="translate(${w},0) scale(-1,1)">${rawBody}</g>`
-            : rawBody;
+        let bodyHtml;
+        if (nodeFlipped) {
+            // Counter-flip every <text> element inside the body so text stays readable.
+            // Inside the outer translate(w,0) scale(-1,1) group a text at cx appears at
+            // screen x = w-cx but mirrored. We add a per-text transform that flips it
+            // back: translate(cx,0) scale(-1,1) translate(-cx,0) restores normal direction
+            // while keeping the visual position unchanged.
+            const fixedBody = rawBody.replace(/<text([^>]*?)(\s*\/>|>)/g, (match, attrs) => {
+                const xMatch = attrs.match(/\bx="([^"]+)"/);
+                const cx = xMatch ? parseFloat(xMatch[1]) : w * 0.5;
+                const closing = match.slice(attrs.length + '<text'.length);
+                return `<text${attrs} transform="translate(${cx},0) scale(-1,1) translate(${-cx},0)"${closing}`;
+            });
+            bodyHtml = `<g transform="translate(${w},0) scale(-1,1)">${fixedBody}</g>`;
+        } else {
+            bodyHtml = rawBody;
+        }
 
         return (
             `<g id="sv-node-${nid}" class="sv-node sv-node-${_esc(node.type)}"` +
