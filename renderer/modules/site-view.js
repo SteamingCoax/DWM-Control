@@ -275,7 +275,7 @@
         const clearBtn   = document.getElementById('sv-clear-btn');
         const saveBtn    = document.getElementById('sv-save-file-btn');
         const svgEl      = document.getElementById('sv-canvas-svg');
-        if (lockBtn)   lockBtn.textContent = locked ? '🔒 Locked' : '🔓 Lock';
+        if (lockBtn)   lockBtn.textContent = locked ? 'Unlock' : 'Lock';
         if (deleteBtn) deleteBtn.disabled  = locked;
         if (clearBtn)  clearBtn.disabled   = locked;
         if (saveBtn)   saveBtn.disabled    = locked;
