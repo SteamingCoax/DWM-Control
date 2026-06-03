@@ -1777,16 +1777,13 @@
         }
 
         const csvContent = rows.join('\r\n');
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url  = URL.createObjectURL(blob);
-        const ts   = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        const a    = document.createElement('a');
-        a.href     = url;
-        a.download = `site-data-${ts}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        window.electronAPI.svSaveFile({
+            defaultName: `site-data-${ts}.csv`,
+            content:     csvContent,
+            filterName:  'CSV Files',
+            ext:         'csv',
+        }).catch(err => console.error('Export failed:', err));
     };
 
     // ─── Persistence ──────────────────────────────────────────────────────────
@@ -1887,68 +1884,55 @@
             connections: [...this.sv.connections.values()],
             viewport:    { ...this.sv.viewport },
         };
-        const json = JSON.stringify(data, null, 2);
-        const blob = new Blob([json], { type: 'application/json' });
-        const url  = URL.createObjectURL(blob);
-        const a    = document.createElement('a');
-        a.href     = url;
-        a.download = 'site-schematic.json';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        this._svSetSaveStatus('saved');
+        const content = JSON.stringify(data, null, 2);
+        window.electronAPI.svSaveFile({
+            defaultName: 'site-schematic.json',
+            content,
+            filterName: 'Site Schematic',
+            ext: 'json',
+        }).then(result => {
+            if (result?.success) this._svSetSaveStatus('saved');
+        }).catch(err => console.error('Save failed:', err));
     };
 
     DWMControl.prototype._svLoadFromFile = function () {
-        const input = document.createElement('input');
-        input.type   = 'file';
-        input.accept = '.json,application/json';
-        input.onchange = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                try {
-                    const data = JSON.parse(ev.target.result);
-                    if (!data || data.version !== 1) {
-                        alert('Invalid schematic file (version mismatch).');
-                        return;
-                    }
-                    if (!window.confirm('Load this schematic? Current workspace will be replaced.')) return;
-                    this.sv.nodes.clear();
-                    this.sv.connections.clear();
-                    this.sv.selectedNodeId = null;
-                    this.sv.selectedConnId = null;
-                    if (Array.isArray(data.nodes)) {
-                        for (const node of data.nodes) {
-                            if (node?.id && node.type) this.sv.nodes.set(node.id, node);
-                        }
-                    }
-                    if (Array.isArray(data.connections)) {
-                        for (const conn of data.connections) {
-                            if (conn?.id) this.sv.connections.set(conn.id, conn);
-                        }
-                    }
-                    if (data.viewport && typeof data.viewport.scale === 'number') {
-                        this.sv.viewport = {
-                            x:     data.viewport.x ?? 0,
-                            y:     data.viewport.y ?? 0,
-                            scale: Math.min(4, Math.max(0.2, data.viewport.scale)),
-                        };
-                    }
-                    this._svRender();
-                    this._svRenderProperties();
-                    this._svMarkDirty();
-                } catch (err) {
-                    alert('Failed to load schematic: ' + err.message);
+        window.electronAPI.svLoadFile({ filterName: 'Site Schematic', ext: 'json' })
+            .then(result => {
+                if (!result?.success) return;
+                let data;
+                try { data = JSON.parse(result.content); } catch (e) {
+                    alert('Failed to parse schematic file: ' + e.message); return;
                 }
-            };
-            reader.readAsText(file);
-        };
-        document.body.appendChild(input);
-        input.click();
-        document.body.removeChild(input);
+                if (!data || data.version !== 1) {
+                    alert('Invalid schematic file (version mismatch).'); return;
+                }
+                if (!window.confirm('Load this schematic? Current workspace will be replaced.')) return;
+                this.sv.nodes.clear();
+                this.sv.connections.clear();
+                this.sv.selectedNodeId = null;
+                this.sv.selectedConnId = null;
+                if (Array.isArray(data.nodes)) {
+                    for (const node of data.nodes) {
+                        if (node?.id && node.type) this.sv.nodes.set(node.id, node);
+                    }
+                }
+                if (Array.isArray(data.connections)) {
+                    for (const conn of data.connections) {
+                        if (conn?.id) this.sv.connections.set(conn.id, conn);
+                    }
+                }
+                if (data.viewport && typeof data.viewport.scale === 'number') {
+                    this.sv.viewport = {
+                        x:     data.viewport.x ?? 0,
+                        y:     data.viewport.y ?? 0,
+                        scale: Math.min(4, Math.max(0.2, data.viewport.scale)),
+                    };
+                }
+                this._svRender();
+                this._svRenderProperties();
+                this._svMarkDirty();
+            })
+            .catch(err => console.error('Load failed:', err));
     };
 
     // ─── Bezier connection path ───────────────────────────────────────────────

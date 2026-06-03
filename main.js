@@ -818,6 +818,38 @@ ipcMain.handle('select-hex-file', async () => {
   return { success: false };
 });
 
+// ─── Site View file I/O (routed through main to avoid macOS XPC view-bridge errors) ───
+
+ipcMain.handle('sv-save-file', async (_event, { defaultName, content, filterName, ext }) => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Save Site View',
+    defaultPath: path.join(os.homedir(), defaultName),
+    filters: [{ name: filterName, extensions: [ext] }],
+  });
+  if (result.canceled || !result.filePath) return { success: false };
+  try {
+    fs.writeFileSync(result.filePath, content, 'utf8');
+    return { success: true, filePath: result.filePath };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle('sv-load-file', async (_event, { filterName, ext }) => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Load Site View',
+    filters: [{ name: filterName, extensions: [ext] }],
+    properties: ['openFile'],
+  });
+  if (result.canceled || !result.filePaths.length) return { success: false };
+  try {
+    const content = fs.readFileSync(result.filePaths[0], 'utf8');
+    return { success: true, content };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
 // Get file statistics — path is restricted to the user's home directory
 ipcMain.handle('get-file-stats', async (event, filePath) => {
   try {

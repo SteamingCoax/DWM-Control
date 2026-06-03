@@ -47,6 +47,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateDownloadProgress: (callback) => ipcRenderer.on('update-download-progress', callback),
   onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', callback),
   
+  // Site View file I/O
+  svSaveFile: (opts) => ipcRenderer.invoke('sv-save-file', opts),
+  svLoadFile: (opts) => ipcRenderer.invoke('sv-load-file', opts),
+
   // Native menu action relay
   onMenuAction: (channel, callback) => {
     const MENU_CHANNELS = [
