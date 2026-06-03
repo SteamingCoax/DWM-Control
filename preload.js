@@ -47,11 +47,27 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateDownloadProgress: (callback) => ipcRenderer.on('update-download-progress', callback),
   onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', callback),
   
+  // Native menu action relay
+  onMenuAction: (channel, callback) => {
+    const MENU_CHANNELS = [
+      'menu-sv-save', 'menu-sv-load', 'menu-sv-export',
+      'menu-sv-undo', 'menu-sv-redo', 'menu-sv-fit',
+      'menu-sv-zoom-in', 'menu-sv-zoom-out', 'menu-check-updates',
+    ];
+    if (!MENU_CHANNELS.includes(channel)) return;
+    const listener = () => callback();
+    ipcRenderer.on(channel, listener);
+    return () => ipcRenderer.removeListener(channel, listener);
+  },
+
   // Remove listeners — restricted to known safe channels
   removeAllListeners: (channel) => {
     const ALLOWED_CHANNELS = [
       'serial-data', 'upload-progress', 'update-available', 'update-not-available',
-      'update-error', 'update-download-progress', 'update-downloaded'
+      'update-error', 'update-download-progress', 'update-downloaded',
+      'menu-sv-save', 'menu-sv-load', 'menu-sv-export',
+      'menu-sv-undo', 'menu-sv-redo', 'menu-sv-fit',
+      'menu-sv-zoom-in', 'menu-sv-zoom-out', 'menu-check-updates',
     ];
     if (ALLOWED_CHANNELS.includes(channel)) {
       ipcRenderer.removeAllListeners(channel);

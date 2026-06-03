@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const { spawn, exec, execFile } = require('child_process');
@@ -237,7 +237,147 @@ function createWindow() {
 }
 
 // This method will be called when Electron has finished initialization
+function buildAppMenu() {
+  const isMac = process.platform === 'darwin';
+
+  const sendToFocusedWindow = (channel, ...args) => {
+    const win = BrowserWindow.getFocusedWindow() || mainWindow;
+    if (win) win.webContents.send(channel, ...args);
+  };
+
+  const template = [
+    // macOS app menu
+    ...(isMac ? [{
+      label: app.name,
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    }] : []),
+
+    // File
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'Save Site View',
+          accelerator: 'CmdOrCtrl+S',
+          click() { sendToFocusedWindow('menu-sv-save'); },
+        },
+        {
+          label: 'Load Site View…',
+          accelerator: 'CmdOrCtrl+O',
+          click() { sendToFocusedWindow('menu-sv-load'); },
+        },
+        {
+          label: 'Export Site Data (CSV)…',
+          accelerator: 'CmdOrCtrl+Shift+E',
+          click() { sendToFocusedWindow('menu-sv-export'); },
+        },
+        { type: 'separator' },
+        isMac ? { role: 'close' } : { role: 'quit' },
+      ],
+    },
+
+    // Edit
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+        { type: 'separator' },
+        {
+          label: 'Undo Schematic Action',
+          accelerator: 'CmdOrCtrl+Z',
+          click() { sendToFocusedWindow('menu-sv-undo'); },
+        },
+        {
+          label: 'Redo Schematic Action',
+          accelerator: 'CmdOrCtrl+Shift+Z',
+          click() { sendToFocusedWindow('menu-sv-redo'); },
+        },
+      ],
+    },
+
+    // View
+    {
+      label: 'View',
+      submenu: [
+        {
+          label: 'Fit Site View',
+          accelerator: 'CmdOrCtrl+Shift+F',
+          click() { sendToFocusedWindow('menu-sv-fit'); },
+        },
+        {
+          label: 'Zoom In',
+          accelerator: 'CmdOrCtrl+Plus',
+          click() { sendToFocusedWindow('menu-sv-zoom-in'); },
+        },
+        {
+          label: 'Zoom Out',
+          accelerator: 'CmdOrCtrl+-',
+          click() { sendToFocusedWindow('menu-sv-zoom-out'); },
+        },
+        { type: 'separator' },
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+      ],
+    },
+
+    // Window
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        ...(isMac ? [
+          { type: 'separator' },
+          { role: 'front' },
+        ] : [{ role: 'close' }]),
+      ],
+    },
+
+    // Help
+    {
+      role: 'help',
+      submenu: [
+        {
+          label: 'Check for Updates',
+          click() { sendToFocusedWindow('menu-check-updates'); },
+        },
+        { type: 'separator' },
+        {
+          label: 'DWM Control on GitHub',
+          click() { shell.openExternal('https://github.com/SteamingCoax/DWM-Control'); },
+        },
+      ],
+    },
+  ];
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
 app.whenReady().then(() => {
+  buildAppMenu();
   try {
     createWindow();
   } catch (error) {

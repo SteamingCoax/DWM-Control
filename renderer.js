@@ -49,7 +49,9 @@ class DWMControl {
         
         // Initialize auto-updater system
         this.setupAutoUpdater();
-        this.setupHelpDropdown();
+
+        // Wire native macOS menu actions → in-app actions
+        this.setupNativeMenuActions();
     }
 
     initializeApp() {

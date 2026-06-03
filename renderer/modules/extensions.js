@@ -742,38 +742,27 @@
         }
     };
 
-    DWMControl.prototype.setupHelpDropdown = function setupHelpDropdown() {
-        const dropdown  = document.getElementById('help-dropdown');
-        const trigger   = document.getElementById('help-dropdown-trigger');
-        const menu      = document.getElementById('help-dropdown-menu');
-        const versionEl = document.getElementById('help-app-version');
-        if (!dropdown || !trigger || !menu) return;
+    DWMControl.prototype.setupNativeMenuActions = function setupNativeMenuActions() {
+        if (!window.electronAPI?.onMenuAction) return;
 
-        if (versionEl) {
-            const badge = document.getElementById('app-version');
-            versionEl.textContent = badge ? badge.textContent : '';
-        }
+        const on = (channel, fn) => window.electronAPI.onMenuAction(channel, fn);
 
-        trigger.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const isOpen = !menu.hidden;
-            menu.hidden = isOpen;
-            trigger.setAttribute('aria-expanded', !isOpen);
-        });
+        // File menu
+        on('menu-sv-save',   () => document.getElementById('sv-save-file-btn')?.click());
+        on('menu-sv-load',   () => document.getElementById('sv-load-file-btn')?.click());
+        on('menu-sv-export', () => document.getElementById('sv-export-btn')?.click());
 
-        document.addEventListener('click', (e) => {
-            if (!dropdown.contains(e.target)) {
-                menu.hidden = true;
-                trigger.setAttribute('aria-expanded', 'false');
-            }
-        });
+        // Edit menu — schematic undo/redo
+        on('menu-sv-undo', () => document.getElementById('sv-undo-btn')?.click());
+        on('menu-sv-redo', () => document.getElementById('sv-redo-btn')?.click());
 
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && !menu.hidden) {
-                menu.hidden = true;
-                trigger.setAttribute('aria-expanded', 'false');
-            }
-        });
+        // View menu
+        on('menu-sv-fit',      () => document.getElementById('sv-fit-btn')?.click());
+        on('menu-sv-zoom-in',  () => document.getElementById('sv-zoom-in-btn')?.click());
+        on('menu-sv-zoom-out', () => document.getElementById('sv-zoom-out-btn')?.click());
+
+        // Help menu — trigger the in-app update button
+        on('menu-check-updates', () => document.getElementById('update-button')?.click());
     };
 
     DWMControl.prototype.saveConfig = function saveConfig() {
