@@ -33,21 +33,28 @@
             </button>
             <div class="titlebar-spacer"></div>
             <div class="titlebar-actions">
-                <div id="update-panel" class="update-panel">
-                    <button id="update-button" class="update-btn" title="Check for updates">
-                        <span class="update-icon"></span>
-                        <span class="update-text">Check Updates</span>
-                    </button>
+                <div class="help-dropdown" id="help-dropdown">
+                    <button class="help-dropdown-trigger" id="help-dropdown-trigger" title="Help &amp; Updates">Help</button>
+                    <div class="help-dropdown-menu" id="help-dropdown-menu" hidden>
+                        <div id="update-panel" class="update-panel">
+                            <button id="update-button" class="update-btn help-menu-btn" title="Check for updates">
+                                <span class="update-icon"></span>
+                                <span class="update-text">Check for Updates</span>
+                            </button>
+                        </div>
+                        <div class="help-menu-divider"></div>
+                        <div class="help-menu-about">
+                            <span class="help-menu-about-name">DWM Control</span>
+                            <span class="help-menu-about-version" id="help-app-version"></span>
+                        </div>
+                    </div>
                 </div>
-                <button id="theme-toggle" class="btn btn-text" title="Toggle Dark Mode" style="display:none">
-                    <span class="btn-icon"></span>
-                </button>
                 <div class="theme-select-wrap">
                     <select id="theme-select" title="Select Theme">
                         <option value="dark">Dark</option>
                         <option value="light">Light</option>
                         <option value="ocean">Ocean</option>
-                        <option value="carbon">Carbon</option>
+                        <option value="carbon" selected>Carbon</option>
                         <option value="amber">Amber</option>
                     </select>
                 </div>
@@ -322,6 +329,7 @@
                             <div class="sv-toolbar-sep"></div>
                             <button id="sv-save-file-btn" class="sv-toolbar-btn">Save</button>
                             <button id="sv-load-file-btn" class="sv-toolbar-btn">Load</button>
+                            <button id="sv-export-btn" class="sv-toolbar-btn">Export</button>
                             <button id="sv-settings-btn" class="sv-toolbar-btn">⚙ Settings</button>
                             <button id="sv-lock-btn" class="sv-toolbar-btn">Lock</button>
                             <span id="sv-save-status" class="sv-save-status">Ready</span>

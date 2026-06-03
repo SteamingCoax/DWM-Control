@@ -1009,3 +1009,30 @@
 [data-theme="amber"] .sv-meter-power-fwd  { fill: #84cc16; }
 [data-theme="amber"] .sv-meter-power-rfl  { fill: #ef4444; }
 [data-theme="amber"] .sv-rl-value         { fill: #84cc16; }
+
+/* === Lock button locked state === */
+.sv-lock-btn--locked {
+    background: #dc2626 !important;
+    color: #fff !important;
+    border-color: #b91c1c !important;
+}
+.sv-lock-btn--locked:hover {
+    background: #b91c1c !important;
+    border-color: #991b1b !important;
+}
+
+/* === Data logging UI === */
+.sv-log-status {
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: var(--sv-bg-tertiary, rgba(255,255,255,0.06));
+    color: var(--sv-text-secondary, #9ca3af);
+    border: 1px solid var(--sv-border, rgba(255,255,255,0.1));
+}
+.sv-props-hint {
+    font-size: 11px;
+    color: var(--sv-text-secondary, #9ca3af);
+    line-height: 1.4;
+    margin-top: 4px;
+}

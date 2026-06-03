@@ -2210,3 +2210,93 @@ label {
   border-color: var(--color-warning);
 }
 
+
+/* === Help Dropdown === */
+.help-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.help-dropdown-trigger {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 0 var(--space-3);
+    height: 30px;
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+}
+.help-dropdown-trigger:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--color-primary);
+}
+
+.help-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 200px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+    z-index: 9999;
+    padding: var(--space-1) 0;
+    animation: helpDropdownIn 0.12s ease;
+}
+
+@keyframes helpDropdownIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.help-menu-btn {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    padding: var(--space-2) var(--space-3);
+    text-align: left;
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    transition: background 0.1s;
+}
+.help-menu-btn:hover {
+    background: var(--bg-tertiary);
+}
+
+.help-menu-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: var(--space-1) 0;
+}
+
+.help-menu-about {
+    padding: var(--space-2) var(--space-3);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.help-menu-about-name {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.help-menu-about-version {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+/* update-panel inside dropdown — remove its default styling */
+.help-dropdown-menu .update-panel {
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+}

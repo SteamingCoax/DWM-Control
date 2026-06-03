@@ -49,6 +49,7 @@ class DWMControl {
         
         // Initialize auto-updater system
         this.setupAutoUpdater();
+        this.setupHelpDropdown();
     }
 
     initializeApp() {
@@ -510,7 +511,7 @@ class DWMControl {
         const themeSelect = document.getElementById('theme-select');
 
         // Set theme from config (defaults to dark)
-        this.setTheme(this.config.theme || 'dark');
+        this.setTheme(this.config.theme || 'carbon');
 
         themeSelect.addEventListener('change', () => {
             const newTheme = themeSelect.value;

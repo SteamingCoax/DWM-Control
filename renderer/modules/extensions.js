@@ -742,6 +742,40 @@
         }
     };
 
+    DWMControl.prototype.setupHelpDropdown = function setupHelpDropdown() {
+        const dropdown  = document.getElementById('help-dropdown');
+        const trigger   = document.getElementById('help-dropdown-trigger');
+        const menu      = document.getElementById('help-dropdown-menu');
+        const versionEl = document.getElementById('help-app-version');
+        if (!dropdown || !trigger || !menu) return;
+
+        if (versionEl) {
+            const badge = document.getElementById('app-version');
+            versionEl.textContent = badge ? badge.textContent : '';
+        }
+
+        trigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = !menu.hidden;
+            menu.hidden = isOpen;
+            trigger.setAttribute('aria-expanded', !isOpen);
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!dropdown.contains(e.target)) {
+                menu.hidden = true;
+                trigger.setAttribute('aria-expanded', 'false');
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !menu.hidden) {
+                menu.hidden = true;
+                trigger.setAttribute('aria-expanded', 'false');
+            }
+        });
+    };
+
     DWMControl.prototype.saveConfig = function saveConfig() {
         try {
             const payload = JSON.stringify(this.config);
