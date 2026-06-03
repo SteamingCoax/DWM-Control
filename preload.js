@@ -47,6 +47,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateDownloadProgress: (callback) => ipcRenderer.on('update-download-progress', callback),
   onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', callback),
   
-  // Remove listeners
-  removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel)
+  // Remove listeners — restricted to known safe channels
+  removeAllListeners: (channel) => {
+    const ALLOWED_CHANNELS = [
+      'serial-data', 'upload-progress', 'update-available', 'update-not-available',
+      'update-error', 'update-download-progress', 'update-downloaded'
+    ];
+    if (ALLOWED_CHANNELS.includes(channel)) {
+      ipcRenderer.removeAllListeners(channel);
+    }
+  }
 });

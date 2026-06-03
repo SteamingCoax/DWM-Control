@@ -275,9 +275,7 @@ app.on('window-all-closed', () => {
 
 // Security: Prevent new window creation
 app.on('web-contents-created', (event, contents) => {
-  contents.on('new-window', (event, navigationUrl) => {
-    event.preventDefault();
-  });
+  contents.setWindowOpenHandler(() => ({ action: 'deny' }));
 });
 
 // WinUSB driver installation for DFU devices (Windows only)
@@ -442,9 +440,18 @@ ipcMain.handle('get-dfu-devices', async () => {
 });
 
 ipcMain.handle('upload-firmware', async (event, { hexFilePath, deviceInfo }) => {
+  // Validate: path must be inside home dir and end with .hex
+  const resolvedHex = path.resolve(hexFilePath || '');
+  const homeDir = os.homedir();
+  if (
+    !resolvedHex.toLowerCase().endsWith('.hex') ||
+    (!resolvedHex.startsWith(homeDir + path.sep) && !resolvedHex.startsWith(__dirname + path.sep))
+  ) {
+    return { success: false, error: 'Invalid firmware file path.', output: '' };
+  }
   return new Promise((resolve, reject) => {
     // Convert hex to bin first
-    convertHexToBin(hexFilePath)
+    convertHexToBin(resolvedHex)
       .then(binFilePath => {
         const dfuUtilPath = getDfuUtilPath();
         const args = [
@@ -671,10 +678,15 @@ ipcMain.handle('select-hex-file', async () => {
   return { success: false };
 });
 
-// Get file statistics
+// Get file statistics — path is restricted to the user's home directory
 ipcMain.handle('get-file-stats', async (event, filePath) => {
   try {
-    const stats = fs.statSync(filePath);
+    const resolvedPath = path.resolve(filePath);
+    const homeDir = os.homedir();
+    if (!resolvedPath.startsWith(homeDir + path.sep) && resolvedPath !== homeDir) {
+      throw new Error('Access denied: path is outside the allowed directory');
+    }
+    const stats = fs.statSync(resolvedPath);
     return { 
       size: stats.size,
       mtime: stats.mtime,
