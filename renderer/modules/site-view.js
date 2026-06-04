@@ -40,6 +40,7 @@
             isLocked:       false,
             logging:        false,
             logData:        [],          // array of { ts, readings: { nodeId: { label, value, unit } } }
+            wasLockedBeforeLogging: false,
         };
         this._svLoadSettings();
         this._svLoadSchematic();
@@ -52,13 +53,14 @@
     // ─── Sidebar palette ─────────────────────────────────────────────────────
 
     DWMControl.prototype._svRenderSidebar = function () {
-        const sidebar = document.getElementById('sv-sidebar');
-        if (!sidebar) return;
+        // Populate only the palette content area, preserving the header with toggle button.
+        const paletteContent = document.getElementById('sv-palette-content');
+        if (!paletteContent) return;
 
         const { getComponentCategories, COMPONENT_TYPES } = window.SiteViewComponents;
         const categories = getComponentCategories();
 
-        let html = '<div class="sv-sidebar-header">Components</div>';
+        let html = '';
 
         for (const cat of categories) {
             if (!cat.items.length) continue;
@@ -89,7 +91,7 @@
             }
         }
 
-        sidebar.innerHTML = html;
+        paletteContent.innerHTML = html;
     };
 
     // ─── Full SVG re-render ───────────────────────────────────────────────────
@@ -1396,7 +1398,11 @@
 <div class="sv-props-section">
 <div class="sv-props-title">Data Logging</div>
 <div class="sv-props-field">
-    <div class="sv-log-status" id="sv-log-status">${this.sv.logging ? `Logging&hellip; (${this.sv.logData.length} rows)` : this.sv.logData.length > 0 ? `Stopped &mdash; ${this.sv.logData.length} row${this.sv.logData.length === 1 ? '' : 's'} recorded` : 'Not logging'}</div>
+    <label class="sv-props-label">Logging Rate</label>
+    <div class="sv-props-info">${this.config?.globalSampleIntervalMs || 80} ms <span class="sv-props-hint-inline">(set in Control tab)</span></div>
+</div>
+<div class="sv-props-field">
+    <div class="sv-log-status" id="sv-log-status">${this.sv.logging ? 'Logging&hellip;' : this.sv.logData.length > 0 ? `Stopped &mdash; ${this.sv.logData.length} row${this.sv.logData.length === 1 ? '' : 's'} recorded` : 'Not logging'}</div>
 </div>
 <div class="sv-props-field sv-props-actions">
     <button class="sv-props-btn${this.sv.logging ? ' sv-props-btn-danger' : ''}" id="sv-ws-log-toggle">${this.sv.logging ? 'Stop Logging' : 'Start Logging'}</button>
@@ -1505,8 +1511,14 @@
     };
 
     DWMControl.prototype._svStartPowerUpdates = function () {
-        if (this.sv.powerTimer) clearInterval(this.sv.powerTimer);
-        this.sv.powerTimer = setInterval(() => this._svUpdatePowerReadouts(), 80);
+        if (this.sv.powerTimer) clearTimeout(this.sv.powerTimer);
+        const tick = () => {
+            this._svUpdatePowerReadouts();
+            const ms = this.config?.globalSampleIntervalMs || 80;
+            this.sv.powerTimer = setTimeout(tick, ms);
+        };
+        const ms = this.config?.globalSampleIntervalMs || 80;
+        this.sv.powerTimer = setTimeout(tick, ms);
     };
 
     DWMControl.prototype._svUpdatePowerReadouts = function () {
@@ -1704,8 +1716,25 @@
 
     DWMControl.prototype._svToggleLogging = function () {
         if (this.sv.logging) {
+            // Stop logging
             this.sv.logging = false;
+            // Restore pre-logging lock state
+            if (!this.sv.wasLockedBeforeLogging) {
+                this.sv.isLocked = false;
+                const lockBtn   = document.getElementById('sv-lock-btn');
+                const deleteBtn = document.getElementById('sv-delete-selected-btn');
+                const clearBtn  = document.getElementById('sv-clear-btn');
+                const saveBtn   = document.getElementById('sv-save-file-btn');
+                const svgEl     = document.getElementById('sv-canvas-svg');
+                if (lockBtn)   { lockBtn.textContent = 'Lock'; lockBtn.classList.remove('sv-lock-btn--locked'); }
+                if (deleteBtn) deleteBtn.disabled = false;
+                if (clearBtn)  clearBtn.disabled  = false;
+                if (saveBtn)   saveBtn.disabled   = false;
+                if (svgEl)     svgEl.classList.remove('sv-canvas-locked');
+            }
         } else {
+            // Start logging — record current lock state before locking
+            this.sv.wasLockedBeforeLogging = this.sv.isLocked;
             this.sv.logData  = [];
             this.sv.logging  = true;
             this._svSetLocked(true);
@@ -1899,7 +1928,7 @@
     // ─── Destroy (clean up timers) ────────────────────────────────────────────
 
     DWMControl.prototype._svDestroy = function () {
-        if (this.sv?.powerTimer) clearInterval(this.sv.powerTimer);
+        if (this.sv?.powerTimer) clearTimeout(this.sv.powerTimer);
         if (this.sv?.saveTimer)  clearTimeout(this.sv.saveTimer);
     };
 

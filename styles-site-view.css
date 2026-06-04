@@ -1037,6 +1037,11 @@
     margin-top: 4px;
 }
 
+.sv-props-hint-inline {
+    font-size: 11px;
+    color: var(--sv-text-secondary, #9ca3af);
+}
+
 /* === Collapsible pane headers & toggle buttons === */
 .sv-sidebar-header,
 .sv-props-header {
@@ -1064,22 +1069,24 @@
     overflow: hidden;
 }
 
+/* Rail-style collapse toggle (matches Control tab meter-settings-rail-btn) */
 .sv-pane-toggle {
-    background: transparent;
-    border: 1px solid transparent;
+    background: var(--bg-card, var(--bg-secondary));
+    border: 1px solid var(--border-color, var(--border-light));
     color: var(--text-secondary);
     cursor: pointer;
-    font-size: 18px;
+    font-size: 13px;
     line-height: 1;
-    padding: 1px 4px;
+    padding: 5px 5px;
     border-radius: 4px;
     flex-shrink: 0;
-    transition: background 0.15s, color 0.15s;
+    transition: color 0.15s, background 0.15s, border-color 0.15s, transform 0.22s ease;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.25);
 }
 .sv-pane-toggle:hover {
-    background: var(--bg-tertiary);
     color: var(--text-primary);
-    border-color: var(--border-light);
+    background: var(--hover-bg, rgba(255, 255, 255, 0.10));
+    border-color: var(--accent-color, var(--color-primary));
 }
 
 /* Collapsed state */
@@ -1100,11 +1107,9 @@
 }
 .sv-sidebar.sv-pane-collapsed .sv-pane-title,
 .sv-sidebar.sv-pane-collapsed .sv-palette-item,
-.sv-sidebar.sv-pane-collapsed .sv-category-header {
+.sv-sidebar.sv-pane-collapsed .sv-category-header,
+.sv-sidebar.sv-pane-collapsed #sv-palette-content {
     display: none;
-}
-.sv-sidebar.sv-pane-collapsed .sv-pane-toggle {
-    writing-mode: initial;
 }
 
 .sv-properties.sv-pane-collapsed {
