@@ -1036,3 +1036,93 @@
     line-height: 1.4;
     margin-top: 4px;
 }
+
+/* === Collapsible pane headers & toggle buttons === */
+.sv-sidebar-header,
+.sv-props-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4px 8px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--border-light);
+    flex-shrink: 0;
+}
+
+.sv-props-header {
+    padding: 0 0 10px;
+    margin-bottom: 0;
+}
+
+.sv-pane-title {
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--text-primary);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.sv-pane-toggle {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    padding: 1px 4px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+}
+.sv-pane-toggle:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--border-light);
+}
+
+/* Collapsed state */
+.sv-sidebar.sv-pane-collapsed {
+    width: 32px !important;
+    min-width: 32px !important;
+    padding: 8px 4px;
+    overflow: hidden;
+}
+.sv-sidebar.sv-pane-collapsed .sv-sidebar-header {
+    flex-direction: column;
+    gap: 8px;
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+    align-items: center;
+    justify-content: flex-start;
+}
+.sv-sidebar.sv-pane-collapsed .sv-pane-title,
+.sv-sidebar.sv-pane-collapsed .sv-palette-item,
+.sv-sidebar.sv-pane-collapsed .sv-category-header {
+    display: none;
+}
+.sv-sidebar.sv-pane-collapsed .sv-pane-toggle {
+    writing-mode: initial;
+}
+
+.sv-properties.sv-pane-collapsed {
+    width: 32px !important;
+    min-width: 32px !important;
+    padding: 8px 4px;
+    overflow: hidden;
+}
+.sv-properties.sv-pane-collapsed .sv-props-header {
+    flex-direction: column-reverse;
+    gap: 8px;
+    border-bottom: none;
+    padding-bottom: 0;
+    margin-bottom: 0;
+    align-items: center;
+    justify-content: flex-start;
+}
+.sv-properties.sv-pane-collapsed .sv-pane-title,
+.sv-properties.sv-pane-collapsed #sv-props-content {
+    display: none;
+}

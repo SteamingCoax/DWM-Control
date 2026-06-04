@@ -271,6 +271,8 @@
     // ─── Lock ─────────────────────────────────────────────────────────────────
 
     DWMControl.prototype._svSetLocked = function (locked) {
+        // Cannot unlock while logging is active
+        if (!locked && this.sv.logging) return;
         this.sv.isLocked = locked;
         const lockBtn    = document.getElementById('sv-lock-btn');
         const deleteBtn  = document.getElementById('sv-delete-selected-btn');
@@ -457,14 +459,23 @@
         if (zoomInBtn)  zoomInBtn.addEventListener('click',  () => _svDoZoom(1.2));
         if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => _svDoZoom(1 / 1.2));
 
-        const settingsBtn = document.getElementById('sv-settings-btn');
-        if (settingsBtn) {
-            settingsBtn.addEventListener('click', () => {
-                // Deselect everything — workspace settings appear in the properties pane
-                this.sv.selectedNodeId = null;
-                this.sv.selectedConnId = null;
-                this._svUpdateSelectionVisuals();
-                this._svRenderProperties();
+        // Collapsible pane toggles
+        const sidebarToggle = document.getElementById('sv-sidebar-toggle');
+        const propsToggle   = document.getElementById('sv-props-toggle');
+        const propsPane     = document.getElementById('sv-properties');
+
+        if (sidebarToggle && sidebar) {
+            sidebarToggle.addEventListener('click', () => {
+                const collapsed = sidebar.classList.toggle('sv-pane-collapsed');
+                sidebarToggle.textContent = collapsed ? '›' : '‹';
+                sidebarToggle.title = collapsed ? 'Expand' : 'Collapse';
+            });
+        }
+        if (propsToggle && propsPane) {
+            propsToggle.addEventListener('click', () => {
+                const collapsed = propsPane.classList.toggle('sv-pane-collapsed');
+                propsToggle.textContent = collapsed ? '‹' : '›';
+                propsToggle.title = collapsed ? 'Expand' : 'Collapse';
             });
         }
     };
@@ -994,6 +1005,14 @@
         <option value="rl"${(node.props.displayMode || 'rl') === 'rl' ? ' selected' : ''}>Return Loss (dB)</option>
         <option value="swr"${node.props.displayMode === 'swr' ? ' selected' : ''}>SWR</option>
     </select>
+</div>
+<div class="sv-props-field">
+    <label class="sv-props-label">Measurement Power Type</label>
+    <select class="sv-props-select" id="sv-prop-rl-power-type">
+        <option value="avg"${(node.props.rlPowerType || 'avg') === 'avg' ? ' selected' : ''}>AVG — Average Power</option>
+        <option value="peak"${node.props.rlPowerType === 'peak' ? ' selected' : ''}>PEP — Peak Envelope</option>
+        <option value="inst"${node.props.rlPowerType === 'inst' ? ' selected' : ''}>INST — Instantaneous</option>
+    </select>
 </div>`;
             }
 
@@ -1289,6 +1308,13 @@
                         this._svMarkDirty();
                     });
                 }
+                const rlPowerTypeSel = document.getElementById('sv-prop-rl-power-type');
+                if (rlPowerTypeSel) {
+                    rlPowerTypeSel.addEventListener('change', () => {
+                        node.props.rlPowerType = rlPowerTypeSel.value;
+                        this._svMarkDirty();
+                    });
+                }
             }
 
             // Delete button
@@ -1525,12 +1551,13 @@
         }
 
         // ── Return Loss / SWR nodes ────────────────────────────────────────────
-        const getRLPowerW = (deviceUid) => {
+        const getRLPowerW = (deviceUid, powerType) => {
             if (!deviceUid || !window.dwm?.meterRegistry) return null;
             for (const rec of window.dwm.meterRegistry.values()) {
                 if ((rec.apiUid || rec.key) === deviceUid) {
                     if (rec.connectionState !== 'connected' || !rec.state?.lastSnapshotRaw) return null;
-                    const w = parseFloat(rec.state.lastSnapshotRaw.avg);
+                    const pt = powerType || 'avg';
+                    const w = parseFloat(rec.state.lastSnapshotRaw[pt] ?? rec.state.lastSnapshotRaw.avg);
                     return Number.isFinite(w) && w > 0 ? w : null;
                 }
             }
@@ -1544,8 +1571,9 @@
             const rlEl = nodeG.querySelector('.sv-rl-value');
             if (!rlEl) continue;
 
-            const pfwd = getRLPowerW(node.props?.fwdDeviceUid);
-            const prfl = getRLPowerW(node.props?.rflDeviceUid);
+            const rlPt = node.props?.rlPowerType || 'avg';
+            const pfwd = getRLPowerW(node.props?.fwdDeviceUid, rlPt);
+            const prfl = getRLPowerW(node.props?.rflDeviceUid, rlPt);
             const mode = node.props?.displayMode || 'rl';
 
             if (pfwd !== null && prfl !== null) {

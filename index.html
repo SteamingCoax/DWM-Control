@@ -302,7 +302,10 @@
                 <div class="sv-container">
                     <!-- Component Palette Sidebar -->
                     <aside class="sv-sidebar" id="sv-sidebar">
-                        <div class="sv-sidebar-header">Components</div>
+                        <div class="sv-sidebar-header">
+                            <span class="sv-pane-title">Components</span>
+                            <button class="sv-pane-toggle" id="sv-sidebar-toggle" title="Collapse">&#8249;</button>
+                        </div>
                         <!-- Populated by _svRenderSidebar() -->
                     </aside>
 
@@ -320,7 +323,6 @@
                             <button id="sv-save-file-btn" class="sv-toolbar-btn">Save</button>
                             <button id="sv-load-file-btn" class="sv-toolbar-btn">Load</button>
                             <button id="sv-export-btn" class="sv-toolbar-btn">Export</button>
-                            <button id="sv-settings-btn" class="sv-toolbar-btn">⚙ Settings</button>
                             <button id="sv-lock-btn" class="sv-toolbar-btn">Lock</button>
                             <span id="sv-save-status" class="sv-save-status">Ready</span>
                         </div>
@@ -338,6 +340,10 @@
 
                     <!-- Properties Panel -->
                     <aside class="sv-properties" id="sv-properties">
+                        <div class="sv-props-header">
+                            <button class="sv-pane-toggle" id="sv-props-toggle" title="Collapse">&#8250;</button>
+                            <span class="sv-pane-title">Settings</span>
+                        </div>
                         <div id="sv-props-content">
                             <p class="sv-props-empty">Select a component to edit its properties.</p>
                         </div>
