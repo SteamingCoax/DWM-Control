@@ -50,6 +50,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Site View file I/O
   svSaveFile: (opts) => ipcRenderer.invoke('sv-save-file', opts),
   svLoadFile: (opts) => ipcRenderer.invoke('sv-load-file', opts),
+  svLoadRecentFile: (filePath) => ipcRenderer.invoke('sv-load-recent-file', filePath),
 
   // Native menu action relay
   onMenuAction: (channel, callback) => {
@@ -57,11 +58,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'menu-sv-save', 'menu-sv-load', 'menu-sv-export',
       'menu-sv-undo', 'menu-sv-redo', 'menu-sv-fit',
       'menu-sv-zoom-in', 'menu-sv-zoom-out', 'menu-check-updates',
+      'menu-sv-load-recent',
     ];
     if (!MENU_CHANNELS.includes(channel)) return;
     const listener = () => callback();
     ipcRenderer.on(channel, listener);
     return () => ipcRenderer.removeListener(channel, listener);
+  },
+
+  // Recent file menu channel (passes filePath as argument)
+  onMenuLoadRecent: (callback) => {
+    const listener = (_event, filePath) => callback(filePath);
+    ipcRenderer.on('menu-sv-load-recent', listener);
+    return () => ipcRenderer.removeListener('menu-sv-load-recent', listener);
   },
 
   // Remove listeners — restricted to known safe channels
@@ -72,6 +81,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'menu-sv-save', 'menu-sv-load', 'menu-sv-export',
       'menu-sv-undo', 'menu-sv-redo', 'menu-sv-fit',
       'menu-sv-zoom-in', 'menu-sv-zoom-out', 'menu-check-updates',
+      'menu-sv-load-recent',
     ];
     if (ALLOWED_CHANNELS.includes(channel)) {
       ipcRenderer.removeAllListeners(channel);

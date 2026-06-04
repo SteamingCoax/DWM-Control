@@ -236,14 +236,58 @@ function createWindow() {
   });
 }
 
+// ─── Recent site-view files ────────────────────────────────────────────────
+
+let RECENT_SV_PATH = null;
+let recentSiteViews = [];
+
+function getRecentSVPath() {
+  if (!RECENT_SV_PATH) RECENT_SV_PATH = path.join(app.getPath('userData'), 'recent-site-views.json');
+  return RECENT_SV_PATH;
+}
+
+function loadRecentSiteViews() {
+  try {
+    const raw = fs.readFileSync(getRecentSVPath(), 'utf8');
+    recentSiteViews = JSON.parse(raw);
+    if (!Array.isArray(recentSiteViews)) recentSiteViews = [];
+  } catch (_) {
+    recentSiteViews = [];
+  }
+}
+
+function saveRecentSiteViews() {
+  try {
+    fs.writeFileSync(getRecentSVPath(), JSON.stringify(recentSiteViews), 'utf8');
+  } catch (_) {}
+}
+
+function addRecentSiteView(filePath) {
+  recentSiteViews = recentSiteViews.filter(p => p !== filePath);
+  recentSiteViews.unshift(filePath);
+  if (recentSiteViews.length > 10) recentSiteViews = recentSiteViews.slice(0, 10);
+  saveRecentSiteViews();
+  buildAppMenu(); // refresh menu
+}
+
 // This method will be called when Electron has finished initialization
 function buildAppMenu() {
-  const isMac = process.platform === 'darwin';
+  const isMac     = process.platform === 'darwin';
+  const isWindows = process.platform === 'win32';
 
   const sendToFocusedWindow = (channel, ...args) => {
     const win = BrowserWindow.getFocusedWindow() || mainWindow;
     if (win) win.webContents.send(channel, ...args);
   };
+
+  // Build "Load Recent" submenu
+  const recentSubmenu = recentSiteViews.length === 0
+    ? [{ label: 'No Recent Files', enabled: false }]
+    : recentSiteViews.map(filePath => ({
+        label: path.basename(filePath),
+        sublabel: filePath,
+        click() { sendToFocusedWindow('menu-sv-load-recent', filePath); },
+      }));
 
   const template = [
     // macOS app menu
@@ -275,6 +319,10 @@ function buildAppMenu() {
           label: 'Load Site View…',
           accelerator: 'CmdOrCtrl+O',
           click() { sendToFocusedWindow('menu-sv-load'); },
+        },
+        {
+          label: 'Load Recent Site View',
+          submenu: recentSubmenu,
         },
         {
           label: 'Export Site Data (CSV)…',
@@ -348,11 +396,11 @@ function buildAppMenu() {
       label: 'Window',
       submenu: [
         { role: 'minimize' },
-        { role: 'zoom' },
+        isMac ? { role: 'zoom' } : { role: 'maximize' },
         ...(isMac ? [
           { type: 'separator' },
           { role: 'front' },
-        ] : [{ role: 'close' }]),
+        ] : []),
       ],
     },
 
@@ -377,6 +425,7 @@ function buildAppMenu() {
 }
 
 app.whenReady().then(() => {
+  loadRecentSiteViews();
   buildAppMenu();
   try {
     createWindow();
@@ -829,6 +878,7 @@ ipcMain.handle('sv-save-file', async (_event, { defaultName, content, filterName
   if (result.canceled || !result.filePath) return { success: false };
   try {
     fs.writeFileSync(result.filePath, content, 'utf8');
+    addRecentSiteView(result.filePath);
     return { success: true, filePath: result.filePath };
   } catch (e) {
     return { success: false, error: e.message };
@@ -843,8 +893,20 @@ ipcMain.handle('sv-load-file', async (_event, { filterName, ext }) => {
   });
   if (result.canceled || !result.filePaths.length) return { success: false };
   try {
-    const content = fs.readFileSync(result.filePaths[0], 'utf8');
-    return { success: true, content };
+    const filePath = result.filePaths[0];
+    const content = fs.readFileSync(filePath, 'utf8');
+    addRecentSiteView(filePath);
+    return { success: true, content, filePath };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle('sv-load-recent-file', async (_event, filePath) => {
+  try {
+    const content = fs.readFileSync(filePath, 'utf8');
+    addRecentSiteView(filePath);
+    return { success: true, content, filePath };
   } catch (e) {
     return { success: false, error: e.message };
   }

@@ -586,6 +586,14 @@
     pointer-events: none;
 }
 
+#sv-select-rect {
+    fill: rgba(74, 158, 255, 0.08);
+    stroke: #4a9eff;
+    stroke-width: 1.5;
+    stroke-dasharray: 6, 3;
+    pointer-events: none;
+}
+
 
 /* ── DWM Meter Power Readout ──────────────────────────────────────────── */
 
@@ -1069,24 +1077,30 @@
     overflow: hidden;
 }
 
-/* Rail-style collapse toggle (matches Control tab meter-settings-rail-btn) */
+/* Rail-style collapse toggle — larger, more prominent */
 .sv-pane-toggle {
     background: var(--bg-card, var(--bg-secondary));
     border: 1px solid var(--border-color, var(--border-light));
     color: var(--text-secondary);
     cursor: pointer;
-    font-size: 13px;
+    font-size: 18px;
     line-height: 1;
-    padding: 5px 5px;
-    border-radius: 4px;
+    padding: 8px 10px;
+    border-radius: 6px;
     flex-shrink: 0;
     transition: color 0.15s, background 0.15s, border-color 0.15s, transform 0.22s ease;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+    min-width: 32px;
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 .sv-pane-toggle:hover {
     color: var(--text-primary);
-    background: var(--hover-bg, rgba(255, 255, 255, 0.10));
+    background: var(--hover-bg, rgba(255, 255, 255, 0.12));
     border-color: var(--accent-color, var(--color-primary));
+    box-shadow: 0 2px 8px rgba(0,0,0,0.45);
 }
 
 /* Collapsed state */

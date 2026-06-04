@@ -437,6 +437,41 @@
             },
         },
 
+        // ── Transmission Line ─────────────────────────────────────────────────
+        'tx-line': {
+            id: 'tx-line',
+            label: 'Transmission Line',
+            category: 'passive',
+            width: 160,
+            height: 60,
+            defaultLabel: 'LINE',
+            ports: [
+                { id: 'in',  side: 'left',  type: 'input',  label: 'In',  yRatio: 0.5 },
+                { id: 'out', side: 'right', type: 'output', label: 'Out', yRatio: 0.5 },
+            ],
+            renderBody(node) {
+                const w = this.width, h = this.height;
+                const midY = h * 0.5;
+                const lenText  = node.props?.lengthFt  != null ? `${node.props.lengthFt} ft`    : '';
+                const typeText = node.props?.cableType  ? node.props.cableType : '';
+                const startX = w * 0.06, endX = w * 0.94;
+                const steps = 8;
+                const step = (endX - startX) / steps;
+                let zigzag = `M${startX},${midY}`;
+                for (let i = 0; i < steps; i++) {
+                    const x1 = startX + i * step + step * 0.5;
+                    const x2 = startX + (i + 1) * step;
+                    zigzag += ` L${x1},${midY - 6} L${x2},${midY}`;
+                }
+                return `
+                    <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
+                    <path class="sv-node-deco" d="${zigzag}" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>
+                    ${typeText ? `<text class="sv-node-type-icon" x="${w*0.5}" y="${midY - 14}" text-anchor="middle" font-size="9">${_esc(typeText)}</text>` : ''}
+                    <text class="sv-node-label" x="${w*0.5}" y="${midY + 18}" text-anchor="middle" font-size="9">${_esc(node.label)}${lenText ? ' \u00b7 ' + lenText : ''}</text>
+                `;
+            },
+        },
+
         // ── Return Loss / SWR ─────────────────────────────────────────────────
         'return-loss': {
             id: 'return-loss',
@@ -483,6 +518,7 @@
         if (type === 'hybrid-3db' || type === 'combiner' || type === 'coupler') props = {};
         if (type === 'antenna')      props = { freqMHz: null };
         if (type === 'return-loss')  props = { fwdDeviceUid: null, fwdDeviceName: null, rflDeviceUid: null, rflDeviceName: null, displayMode: 'rl' };
+        if (type === 'tx-line')      props = { lengthFt: null, cableType: '' };
 
         return {
             id:    'node-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),

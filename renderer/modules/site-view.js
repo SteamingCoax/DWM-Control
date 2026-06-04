@@ -25,10 +25,13 @@
             settings:       { snapEnabled: true, snapSize: 20, gridVisible: true },
             selectedNodeId: null,
             selectedConnId: null,
+            selectedNodeIds: new Set(),  // all currently selected nodes (multi-select)
+            selectRect:     null,        // rubber-band state { startX, startY, currentX, currentY }
             connectingFrom: null,        // { nodeId, portId, portType } while drawing a wire
             panStart:       null,        // { clientX, clientY, vpX, vpY } while panning
             dragNodeId:     null,        // id of node currently being dragged
             dragOffset:     { x: 0, y: 0 },
+            dragOffsets:    null,        // Map of id -> { offsetX, offsetY, origX, origY } for group drag
             dragOrigX:      null,        // position before drag started (for revert)
             dragOrigY:      null,
             dragOverlapId:  null,        // id of node being overlapped during drag
@@ -198,11 +201,12 @@
             el.classList.remove('sv-connection-selected');
         });
 
-        // Apply selected node
-        if (this.sv.selectedNodeId) {
-            const nodeEl = nodesLayer.querySelector(
-                `[data-node-id="${CSS.escape(this.sv.selectedNodeId)}"]`
-            );
+        // Apply selected nodes (single or multi)
+        const toHighlight = new Set();
+        if (this.sv.selectedNodeId) toHighlight.add(this.sv.selectedNodeId);
+        if (this.sv.selectedNodeIds) this.sv.selectedNodeIds.forEach(id => toHighlight.add(id));
+        for (const id of toHighlight) {
+            const nodeEl = nodesLayer.querySelector(`[data-node-id="${CSS.escape(id)}"]`);
             if (nodeEl && nodeEl.classList.contains('sv-node')) {
                 nodeEl.classList.add('sv-selected');
                 const selRect = nodeEl.querySelector('.sv-node-selection');
@@ -349,31 +353,37 @@
 
         // ── Mousedown — route to pan / drag / connect / select ────────────────
         svg.addEventListener('mousedown', (e) => {
+            // Middle mouse → pan
+            if (e.button === 1) {
+                e.preventDefault();
+                this._svStartPan(e);
+                return;
+            }
             if (e.button !== 0) return;
 
-            const target   = e.target;
-            const isPort   = target.classList.contains('sv-port-hit');
-            const nodeEl   = target.closest('[data-node-id]');
-            const connEl   = target.closest('[id^="sv-conn-"]');
+            const target  = e.target;
+            const isPort  = target.classList.contains('sv-port-hit');
+            const nodeEl  = target.closest('[data-node-id]');
+            const connEl  = target.closest('[id^="sv-conn-"]');
 
             if (isPort) {
                 const nodeId   = target.getAttribute('data-node-id');
                 const portId   = target.getAttribute('data-port-id');
                 const portType = target.getAttribute('data-port-type');
                 this._svStartConnecting(nodeId, portId, portType, e);
-
             } else if (nodeEl && nodeEl.id && nodeEl.id.startsWith('sv-node-')) {
                 const nodeId = nodeEl.getAttribute('data-node-id');
                 this._svStartDragNode(nodeId, e);
-
             } else if (connEl) {
                 const connId = connEl.getAttribute('data-conn-id');
                 this._svSelectConnection(connId);
-
             } else {
-                this._svStartPan(e);
+                this._svStartSelectRect(e);
             }
         });
+
+        // Prevent middle-click autoscroll/paste default
+        svg.addEventListener('auxclick', (e) => { if (e.button === 1) e.preventDefault(); });
 
         // ── Global mouse move / up ────────────────────────────────────────────
         document.addEventListener('mousemove', (e) => this._svOnMouseMove(e));
@@ -480,9 +490,75 @@
                 propsToggle.title = collapsed ? 'Expand' : 'Collapse';
             });
         }
+
+        // ── Recent-file menu → load schematic directly ────────────────────────
+        if (window.electronAPI?.onMenuLoadRecent) {
+            window.electronAPI.onMenuLoadRecent((filePath) => {
+                window.electronAPI.svLoadRecentFile(filePath)
+                    .then(result => {
+                        if (!result?.success) return;
+                        let data;
+                        try { data = JSON.parse(result.content); } catch (e) {
+                            alert('Failed to parse schematic file: ' + e.message); return;
+                        }
+                        if (!data || data.version !== 1) {
+                            alert('Invalid schematic file (version mismatch).'); return;
+                        }
+                        if (!window.confirm('Load this schematic? Current workspace will be replaced.')) return;
+                        this.sv.nodes.clear();
+                        this.sv.connections.clear();
+                        this.sv.selectedNodeId = null;
+                        this.sv.selectedConnId = null;
+                        this.sv.selectedNodeIds.clear();
+                        if (Array.isArray(data.nodes)) {
+                            for (const node of data.nodes) {
+                                if (node?.id && node.type) this.sv.nodes.set(node.id, node);
+                            }
+                        }
+                        if (Array.isArray(data.connections)) {
+                            for (const conn of data.connections) {
+                                if (conn?.id) this.sv.connections.set(conn.id, conn);
+                            }
+                        }
+                        if (data.viewport && typeof data.viewport.scale === 'number') {
+                            this.sv.viewport = {
+                                x:     data.viewport.x ?? 0,
+                                y:     data.viewport.y ?? 0,
+                                scale: Math.min(4, Math.max(0.2, data.viewport.scale)),
+                            };
+                        }
+                        this._svRender();
+                        this._svRenderProperties();
+                        this._svSetSaveStatus('saved');
+                        this.sv.isDirty = false;
+                    })
+                    .catch(err => console.error('Recent file load failed:', err));
+            });
+        }
     };
 
     // ─── Pan ──────────────────────────────────────────────────────────────────
+
+    DWMControl.prototype._svStartSelectRect = function(e) {
+        if (this.sv.isLocked) { this._svStartPan(e); return; }
+        const svg   = document.getElementById('sv-canvas-svg');
+        const pt    = svg.createSVGPoint();
+        pt.x = e.clientX;
+        pt.y = e.clientY;
+        const svgPt = pt.matrixTransform(svg.getScreenCTM().inverse());
+        const wx    = (svgPt.x - this.sv.viewport.x) / this.sv.viewport.scale;
+        const wy    = (svgPt.y - this.sv.viewport.y) / this.sv.viewport.scale;
+
+        this.sv.selectRect = { startX: wx, startY: wy, currentX: wx, currentY: wy };
+        if (!e.shiftKey) {
+            this.sv.selectedNodeIds.clear();
+            this.sv.selectedNodeId = null;
+            this.sv.selectedConnId = null;
+        }
+        const rectEl = document.getElementById('sv-select-rect');
+        if (rectEl) rectEl.setAttribute('visibility', 'visible');
+        this._svUpdateSelectionVisuals();
+    };
 
     DWMControl.prototype._svStartPan = function (e) {
         this.sv.panStart = {
@@ -513,6 +589,21 @@
         const wy   = (e.clientY - rect.top  - vp.y) / vp.scale;
 
         this._svPushUndo();
+
+        // If dragged node is part of existing multi-selection, drag all selected
+        const isInMulti = this.sv.selectedNodeIds.has(nodeId) && this.sv.selectedNodeIds.size > 1;
+        if (isInMulti) {
+            const offsets = new Map();
+            for (const id of this.sv.selectedNodeIds) {
+                const n = this.sv.nodes.get(id);
+                if (n) offsets.set(id, { offsetX: wx - n.x, offsetY: wy - n.y, origX: n.x, origY: n.y });
+            }
+            this.sv.dragOffsets = offsets;
+        } else {
+            this.sv.dragOffsets = null;
+            this.sv.selectedNodeIds.clear();
+        }
+
         this.sv.dragNodeId = nodeId;
         this.sv.dragOffset = { x: wx - node.x, y: wy - node.y };
         this.sv.dragOrigX  = node.x;
@@ -552,6 +643,31 @@
         const vp   = this.sv.viewport;
         const rect = svg.getBoundingClientRect();
 
+        if (this.sv.selectRect) {
+            const svg2 = document.getElementById('sv-canvas-svg');
+            const pt2  = svg2.createSVGPoint();
+            pt2.x = e.clientX; pt2.y = e.clientY;
+            const svgPt2 = pt2.matrixTransform(svg2.getScreenCTM().inverse());
+            const wx2 = (svgPt2.x - this.sv.viewport.x) / this.sv.viewport.scale;
+            const wy2 = (svgPt2.y - this.sv.viewport.y) / this.sv.viewport.scale;
+            this.sv.selectRect.currentX = wx2;
+            this.sv.selectRect.currentY = wy2;
+
+            // Update visual rect
+            const rx  = Math.min(this.sv.selectRect.startX, wx2);
+            const ry  = Math.min(this.sv.selectRect.startY, wy2);
+            const rw  = Math.abs(wx2 - this.sv.selectRect.startX);
+            const rh  = Math.abs(wy2 - this.sv.selectRect.startY);
+            const sel = document.getElementById('sv-select-rect');
+            if (sel) {
+                sel.setAttribute('x', rx * this.sv.viewport.scale + this.sv.viewport.x);
+                sel.setAttribute('y', ry * this.sv.viewport.scale + this.sv.viewport.y);
+                sel.setAttribute('width',  rw * this.sv.viewport.scale);
+                sel.setAttribute('height', rh * this.sv.viewport.scale);
+            }
+            return;
+        }
+
         if (this.sv.panStart) {
             const dx = e.clientX - this.sv.panStart.clientX;
             const dy = e.clientY - this.sv.panStart.clientY;
@@ -563,20 +679,34 @@
 
         if (this.sv.dragNodeId) {
             const node = this.sv.nodes.get(this.sv.dragNodeId);
-            if (!node) return;
-            const wx = (e.clientX - rect.left - vp.x) / vp.scale;
-            const wy = (e.clientY - rect.top  - vp.y) / vp.scale;
-            const snapSize = this.sv.settings.snapEnabled ? this.sv.settings.snapSize : 1;
-            node.x = Math.round((wx - this.sv.dragOffset.x) / snapSize) * snapSize;
-            node.y = Math.round((wy - this.sv.dragOffset.y) / snapSize) * snapSize;
+            if (node) {
+                const wx = (e.clientX - rect.left - vp.x) / vp.scale;
+                const wy = (e.clientY - rect.top  - vp.y) / vp.scale;
+                const snapSize = this.sv.settings.snapEnabled ? this.sv.settings.snapSize : 1;
 
-            // Check for overlap with any other node
-            let overlapId = null;
-            for (const other of this.sv.nodes.values()) {
-                if (other.id === node.id) continue;
-                if (this._svNodesOverlap(node, other)) { overlapId = other.id; break; }
+                if (this.sv.dragOffsets) {
+                    // Group drag
+                    for (const [id, off] of this.sv.dragOffsets) {
+                        const n = this.sv.nodes.get(id);
+                        if (n) {
+                            n.x = Math.round((wx - off.offsetX) / snapSize) * snapSize;
+                            n.y = Math.round((wy - off.offsetY) / snapSize) * snapSize;
+                        }
+                    }
+                } else {
+                    node.x = Math.round((wx - this.sv.dragOffset.x) / snapSize) * snapSize;
+                    node.y = Math.round((wy - this.sv.dragOffset.y) / snapSize) * snapSize;
+                }
+
+                // Check for overlap with any other node
+                let overlapId = null;
+                for (const other of this.sv.nodes.values()) {
+                    if (other.id === node.id) continue;
+                    if (this.sv.dragOffsets && this.sv.dragOffsets.has(other.id)) continue;
+                    if (this._svNodesOverlap(node, other)) { overlapId = other.id; break; }
+                }
+                this.sv.dragOverlapId = overlapId;
             }
-            this.sv.dragOverlapId = overlapId;
 
             this._svRender();
             return;
@@ -596,6 +726,34 @@
     // ─── Mouse up ─────────────────────────────────────────────────────────────
 
     DWMControl.prototype._svOnMouseUp = function (e) {
+        if (this.sv.selectRect) {
+            const r     = this.sv.selectRect;
+            const minX  = Math.min(r.startX, r.currentX);
+            const maxX  = Math.max(r.startX, r.currentX);
+            const minY  = Math.min(r.startY, r.currentY);
+            const maxY  = Math.max(r.startY, r.currentY);
+            for (const node of this.sv.nodes.values()) {
+                const td  = window.SiteViewComponents.COMPONENT_TYPES[node.type];
+                const nw  = td ? td.width  : 80;
+                const nh  = td ? td.height : 40;
+                // Test centre point overlap with band
+                if (node.x + nw >= minX && node.x <= maxX && node.y + nh >= minY && node.y <= maxY) {
+                    this.sv.selectedNodeIds.add(node.id);
+                    this.sv.selectedNodeId = node.id; // keep last as "primary"
+                }
+            }
+            this.sv.selectRect = null;
+            const rectEl = document.getElementById('sv-select-rect');
+            if (rectEl) {
+                rectEl.setAttribute('visibility', 'hidden');
+                rectEl.setAttribute('width', '0');
+                rectEl.setAttribute('height', '0');
+            }
+            this._svUpdateSelectionVisuals();
+            this._svRenderProperties();
+            return;
+        }
+
         if (this.sv.panStart) {
             this.sv.panStart = null;
             return;
@@ -607,8 +765,15 @@
                 // Revert to original position
                 node.x = this.sv.dragOrigX;
                 node.y = this.sv.dragOrigY;
+                if (this.sv.dragOffsets) {
+                    for (const [id, off] of this.sv.dragOffsets) {
+                        const n = this.sv.nodes.get(id);
+                        if (n) { n.x = off.origX; n.y = off.origY; }
+                    }
+                }
             }
             this.sv.dragNodeId    = null;
+            this.sv.dragOffsets   = null;
             this.sv.dragOverlapId = null;
             this.sv.dragOrigX     = null;
             this.sv.dragOrigY     = null;
@@ -780,18 +945,33 @@
 
     DWMControl.prototype._svDeleteSelected = function () {
         if (this.sv.isLocked) return;
-        if (this.sv.selectedNodeId) {
+
+        // Multi-select deletion (includes the case where selectedNodeIds has exactly 1 entry)
+        if (this.sv.selectedNodeIds && this.sv.selectedNodeIds.size > 0) {
+            this._svPushUndo();
+            for (const nodeId of this.sv.selectedNodeIds) {
+                this.sv.nodes.delete(nodeId);
+                for (const [connId, conn] of this.sv.connections) {
+                    if (conn.fromNodeId === nodeId || conn.toNodeId === nodeId) {
+                        this.sv.connections.delete(connId);
+                    }
+                }
+            }
+            this.sv.selectedNodeIds.clear();
+            this.sv.selectedNodeId = null;
+            this._svRender();
+            this._svRenderProperties();
+            this._svMarkDirty();
+
+        } else if (this.sv.selectedNodeId) {
             this._svPushUndo();
             const nodeId = this.sv.selectedNodeId;
             this.sv.nodes.delete(nodeId);
-
-            // Remove every connection that references this node
             for (const [connId, conn] of this.sv.connections) {
                 if (conn.fromNodeId === nodeId || conn.toNodeId === nodeId) {
                     this.sv.connections.delete(connId);
                 }
             }
-
             this.sv.selectedNodeId = null;
             this._svRender();
             this._svRenderProperties();
@@ -812,6 +992,11 @@
     DWMControl.prototype._svSelectNode = function (nodeId) {
         this.sv.selectedNodeId = nodeId;
         this.sv.selectedConnId = null;
+        // Keep multi-selection if this node is already in it; otherwise reset to just this one
+        if (!this.sv.selectedNodeIds.has(nodeId)) {
+            this.sv.selectedNodeIds.clear();
+            this.sv.selectedNodeIds.add(nodeId);
+        }
         this._svUpdateSelectionVisuals();
         this._svRenderProperties();
     };
@@ -828,6 +1013,19 @@
     DWMControl.prototype._svRenderProperties = function () {
         const content = document.getElementById('sv-props-content');
         if (!content) return;
+
+        // ── Multi-select header ───────────────────────────────────────────────
+        if (this.sv.selectedNodeIds && this.sv.selectedNodeIds.size > 1) {
+            content.innerHTML = `<div class="sv-props-section">
+<div class="sv-props-title">${this.sv.selectedNodeIds.size} nodes selected</div>
+<div class="sv-props-field sv-props-field--action">
+    <button class="sv-props-delete-btn" id="sv-prop-delete-multi">&#128465; Delete All</button>
+</div>
+</div>`;
+            const delBtn = content.querySelector('#sv-prop-delete-multi');
+            if (delBtn) delBtn.addEventListener('click', () => this._svDeleteSelected());
+            return;
+        }
 
         if (this.sv.selectedNodeId) {
             const node = this.sv.nodes.get(this.sv.selectedNodeId);
@@ -975,6 +1173,27 @@
     <label class="sv-props-label">Frequency (MHz)</label>
     <input class="sv-props-input" type="number" id="sv-prop-tx-freq"
            value="${_esc(String(node.props.freqMHz ?? ''))}" placeholder="e.g. 98.1" min="0" step="0.001">
+</div>`;
+            }
+
+            // ── Transmission Line ─────────────────────────────────────────────
+            if (node.type === 'tx-line') {
+                const cableTypes = ['RG-8', 'RG-8X', 'RG-213', 'LMR-400', 'LMR-600', 'Heliax 1/2"', 'Heliax 7/8"', 'Custom'];
+                const typeOptions = cableTypes.map(ct =>
+                    `<option value="${_esc(ct)}"${(node.props.cableType || '') === ct ? ' selected' : ''}>${_esc(ct)}</option>`
+                ).join('');
+                html += `
+<div class="sv-props-field">
+    <label class="sv-props-label">Cable Type</label>
+    <select class="sv-props-select" id="sv-prop-cable-type">
+        <option value="">-- Select --</option>
+        ${typeOptions}
+    </select>
+</div>
+<div class="sv-props-field">
+    <label class="sv-props-label">Length (ft)</label>
+    <input class="sv-props-input" type="number" id="sv-prop-length-ft"
+           value="${_esc(String(node.props.lengthFt ?? ''))}" placeholder="e.g. 50" min="0" step="1">
 </div>`;
             }
 
@@ -1264,6 +1483,29 @@
                     node.props.gainPowerType = gainPtSel.value;
                     this._svMarkDirty();
                 });
+            }
+
+            // Wire up transmission line props
+            if (node.type === 'tx-line') {
+                const cableTypeSel = document.getElementById('sv-prop-cable-type');
+                const lengthFtInput = document.getElementById('sv-prop-length-ft');
+                if (cableTypeSel) {
+                    cableTypeSel.addEventListener('change', () => {
+                        this._svPushUndo();
+                        node.props.cableType = cableTypeSel.value;
+                        this._svRender();
+                        this._svMarkDirty();
+                    });
+                }
+                if (lengthFtInput) {
+                    lengthFtInput.addEventListener('change', () => {
+                        this._svPushUndo();
+                        const v = lengthFtInput.value.trim();
+                        node.props.lengthFt = v === '' ? null : parseFloat(v);
+                        this._svRender();
+                        this._svMarkDirty();
+                    });
+                }
             }
 
             // Wire up return-loss props
@@ -2070,6 +2312,7 @@
         if (['hybrid-3db', 'combiner', 'coupler'].includes(typeId)) return {};
         if (typeId === 'antenna')      return { freqMHz: null };
         if (typeId === 'return-loss')  return { fwdDeviceUid: null, fwdDeviceName: null, rflDeviceUid: null, rflDeviceName: null, displayMode: 'rl' };
+        if (typeId === 'tx-line')      return { lengthFt: null, cableType: '' };
         return {};
     }
 

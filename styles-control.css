@@ -1680,10 +1680,16 @@
 }
 
 .meter-page-shell.settings-open .meter-settings-panel {
-  width: min(300px, 75vw);
+  width: min(260px, 75vw);
   opacity: 1;
-  padding: 12px;
+  padding: 0;
   border-left-color: var(--border-color);
+}
+
+/* sv-props-section resets inside the settings panel */
+.meter-settings-panel .sv-props-section {
+  padding: 10px 12px;
+  border-bottom: none;
 }
 
 /* Settings toggle rail — narrow strip between board and settings panel */

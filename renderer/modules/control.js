@@ -318,36 +318,37 @@
                         title="${panelVisible ? 'Hide settings' : 'Show settings'}">&#x276F;</button>
                 </div>
                 <aside class="meter-settings-panel" id="meter-settings-panel" aria-label="Global settings">
-                    <div class="meter-settings-panel-header">Global Settings</div>
-                    <div class="meter-settings-group">
-                        <label class="meter-global-toolbar-label" for="global-timing-ms">Refresh Rate (ms)</label>
-                        <input type="number" id="global-timing-ms" class="form-control form-control-sm"
-                            min="10" max="2000" step="10" value="${timingMs}">
-                    </div>
-                    <div class="meter-settings-group" style="display:none">
-                        <label class="meter-global-toolbar-label" for="global-gauge-smoothing">Gauge Smoothing (%)</label>
-                        <input type="range" id="global-gauge-smoothing" min="0" max="95" step="5" value="${smoothingPct}">
-                        <span id="global-gauge-smoothing-value" class="meter-settings-value">${smoothingPct}%</span>
-                    </div>
-                    <div class="meter-settings-group">
-                      <label class="meter-settings-checkbox">
-                        <input type="checkbox" id="global-debug-logging" ${debugLoggingEnabled ? 'checked' : ''}>
-                        Enable serial debug logging
-                      </label>
-                    </div>
-                    <div class="meter-settings-group">
-                        <label class="meter-global-toolbar-label" for="global-board-layout">Board Layout</label>
-                        <select id="global-board-layout" class="form-select form-select-sm">
-                            <option value="column"${boardLayout === 'column' ? ' selected' : ''}>Single Column</option>
-                            <option value="auto-fit"${boardLayout === 'auto-fit' ? ' selected' : ''}>Auto-Fit Grid</option>
-                            <option value="grid-2"${boardLayout === 'grid-2' ? ' selected' : ''}>2 Columns</option>
-                            <option value="grid-3"${boardLayout === 'grid-3' ? ' selected' : ''}>3 Columns</option>
-                            <option value="grid-4"${boardLayout === 'grid-4' ? ' selected' : ''}>4 Columns</option>
-                        </select>
-                    </div>
-                    <div class="meter-settings-group">
-                        <div class="meter-settings-group-label">Derived Measurements</div>
-                        <button class="btn btn-secondary btn-small" id="add-swr-card-btn" style="width:100%">+ Add SWR / Return Loss Card</button>
+                    <div class="sv-props-section">
+                        <div class="sv-props-title">Global Settings</div>
+                        <div class="sv-props-field">
+                            <label class="sv-props-label" for="global-timing-ms">Refresh Rate (ms)</label>
+                            <input type="number" id="global-timing-ms" class="sv-props-input"
+                                min="10" max="2000" step="10" value="${timingMs}">
+                        </div>
+                        <div class="sv-props-field" style="display:none">
+                            <label class="sv-props-label" for="global-gauge-smoothing">Gauge Smoothing (%)</label>
+                            <input type="range" id="global-gauge-smoothing" min="0" max="95" step="5" value="${smoothingPct}">
+                            <span id="global-gauge-smoothing-value" class="sv-props-label">${smoothingPct}%</span>
+                        </div>
+                        <div class="sv-props-field">
+                            <label class="sv-props-label">
+                                <input type="checkbox" id="global-debug-logging" ${debugLoggingEnabled ? 'checked' : ''}>
+                                Serial debug logging
+                            </label>
+                        </div>
+                        <div class="sv-props-field">
+                            <label class="sv-props-label" for="global-board-layout">Board Layout</label>
+                            <select id="global-board-layout" class="sv-props-select">
+                                <option value="column"${boardLayout === 'column' ? ' selected' : ''}>Single Column</option>
+                                <option value="auto-fit"${boardLayout === 'auto-fit' ? ' selected' : ''}>Auto-Fit Grid</option>
+                                <option value="grid-2"${boardLayout === 'grid-2' ? ' selected' : ''}>2 Columns</option>
+                                <option value="grid-3"${boardLayout === 'grid-3' ? ' selected' : ''}>3 Columns</option>
+                                <option value="grid-4"${boardLayout === 'grid-4' ? ' selected' : ''}>4 Columns</option>
+                            </select>
+                        </div>
+                        <div class="sv-props-field sv-props-field--action">
+                            <button class="sv-props-btn" id="add-swr-card-btn">+ Add SWR / Return Loss Card</button>
+                        </div>
                     </div>
                 </aside>
             </div>
