@@ -176,10 +176,10 @@
             height: 90,
             defaultLabel: '3dB HYB',
             ports: [
-                { id: 'in1',  side: 'left',  type: 'input',  label: 'In 1',  yRatio: 0.33 },
-                { id: 'in2',  side: 'left',  type: 'input',  label: 'In 2',  yRatio: 0.67 },
-                { id: 'out1', side: 'right', type: 'output', label: 'Out 1', yRatio: 0.33 },
-                { id: 'out2', side: 'right', type: 'output', label: 'Out 2', yRatio: 0.67 },
+                { id: 'p1', side: 'left',  type: 'bidirectional', label: 'P1', yRatio: 0.33 },
+                { id: 'p2', side: 'left',  type: 'bidirectional', label: 'P2', yRatio: 0.67 },
+                { id: 'p3', side: 'right', type: 'bidirectional', label: 'P3', yRatio: 0.33 },
+                { id: 'p4', side: 'right', type: 'bidirectional', label: 'P4', yRatio: 0.67 },
             ],
             renderBody(node) {
                 const w = this.width, h = this.height; // w=120, h=90

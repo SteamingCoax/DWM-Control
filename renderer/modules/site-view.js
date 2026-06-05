@@ -151,6 +151,8 @@
         if (!layer) return;
         layer.innerHTML = '';
 
+        const { COMPONENT_TYPES } = window.SiteViewComponents;
+
         for (const conn of this.sv.connections.values()) {
             const fromNode = this.sv.nodes.get(conn.fromNodeId);
             const toNode   = this.sv.nodes.get(conn.toNodeId);
@@ -159,12 +161,24 @@
             const d = this._svConnectionPath(fromNode, conn.fromPortId, toNode, conn.toPortId);
             if (!d) continue;
 
+            // Determine arrow visibility based on port types
+            const fromTypeDef = COMPONENT_TYPES[fromNode.type];
+            const toTypeDef   = COMPONENT_TYPES[toNode.type];
+            const fromPort    = fromTypeDef?.ports.find(p => p.id === conn.fromPortId);
+            const toPort      = toTypeDef?.ports.find(p => p.id === conn.toPortId);
+            const fromT = fromPort?.type;
+            const toT   = toPort?.type;
+            // Show arrow only when signal direction is unambiguous:
+            //   output → input, output → bidirectional, bidirectional → input
+            const showArrow = (fromT === 'output' && (toT === 'input' || toT === 'bidirectional')) ||
+                              (fromT === 'bidirectional' && toT === 'input');
+
             const path = document.createElementNS(SVG_NS, 'path');
             path.setAttribute('id', `sv-conn-${conn.id}`);
             path.setAttribute('class', 'sv-connection');
             path.setAttribute('d', d);
             path.setAttribute('fill', 'none');
-            path.setAttribute('marker-end', 'url(#sv-arrow)');
+            if (showArrow) path.setAttribute('marker-end', 'url(#sv-arrow)');
             path.setAttribute('data-conn-id', conn.id);
             layer.appendChild(path);
         }
@@ -824,27 +838,25 @@
 
             if (!toNodeId) return;
 
-            // Validate direction: one side must be output (or bidirectional) and the other input
-            const fromOut = from.portType === 'output'       || from.portType === 'bidirectional';
-            const fromIn  = from.portType === 'input'        || from.portType === 'bidirectional';
-            const toIn    = toPortType    === 'input'        || toPortType    === 'bidirectional';
-            const toOut   = toPortType    === 'output'       || toPortType    === 'bidirectional';
-
-            if (!(fromOut && toIn) && !(fromIn && toOut)) return;
-
-            // Normalise so the "from" side is always the output port
+            // Normalise: when one end is clearly output and the other clearly input,
+            // store from=output, to=input (so arrow direction is consistent).
+            // For all other combinations (same type, bidirectional, etc.) keep original order.
+            const fromT = from.portType;
             let fnId = from.nodeId, fpId = from.portId;
             let tnId = toNodeId,    tpId = toPortId;
-            if (fromIn && toOut) {
+            if (fromT === 'input' && toPortType === 'output') {
+                // Swap so the "from" side is the output
                 [fnId, fpId, tnId, tpId] = [tnId, tpId, fnId, fpId];
             }
 
-            // Replace any existing connection on the same port — one connection per port
+            // Replace any existing connection on the same port (one connection per port)
+            // Check both "from" and "to" ends since bidirectional ports can appear on either side.
             for (const [existingId, existing] of this.sv.connections) {
-                if ((existing.fromNodeId === fnId && existing.fromPortId === fpId) ||
-                    (existing.toNodeId   === tnId && existing.toPortId   === tpId)) {
-                    this.sv.connections.delete(existingId);
-                }
+                const usesFromPort = (existing.fromNodeId === fnId && existing.fromPortId === fpId) ||
+                                     (existing.toNodeId   === fnId && existing.toPortId   === fpId);
+                const usesToPort   = (existing.fromNodeId === tnId && existing.fromPortId === tpId) ||
+                                     (existing.toNodeId   === tnId && existing.toPortId   === tpId);
+                if (usesFromPort || usesToPort) this.sv.connections.delete(existingId);
             }
 
             const connId = 'conn-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
