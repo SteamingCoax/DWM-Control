@@ -272,25 +272,15 @@ function addRecentSiteView(filePath) {
 
 // This method will be called when Electron has finished initialization
 function buildAppMenu() {
-  const isMac     = process.platform === 'darwin';
-  const isWindows = process.platform === 'win32';
+  const isMac = process.platform === 'darwin';
 
   const sendToFocusedWindow = (channel, ...args) => {
     const win = BrowserWindow.getFocusedWindow() || mainWindow;
     if (win) win.webContents.send(channel, ...args);
   };
 
-  // Build "Load Recent" submenu
-  const recentSubmenu = recentSiteViews.length === 0
-    ? [{ label: 'No Recent Files', enabled: false }]
-    : recentSiteViews.map(filePath => ({
-        label: path.basename(filePath),
-        sublabel: filePath,
-        click() { sendToFocusedWindow('menu-sv-load-recent', filePath); },
-      }));
-
   const template = [
-    // macOS app menu
+    // ── macOS application menu ────────────────────────────────────────────
     ...(isMac ? [{
       label: app.name,
       submenu: [
@@ -306,35 +296,40 @@ function buildAppMenu() {
       ],
     }] : []),
 
-    // File
+    // ── File ──────────────────────────────────────────────────────────────
     {
       label: 'File',
       submenu: [
         {
-          label: 'Save Site View',
+          label: 'New Workspace',
+          accelerator: 'CmdOrCtrl+N',
+          click() { sendToFocusedWindow('menu-sv-new-ws'); },
+        },
+        {
+          label: 'Open Workspaces…',
+          accelerator: 'CmdOrCtrl+Shift+O',
+          click() { sendToFocusedWindow('menu-sv-workspaces'); },
+        },
+        {
+          label: 'Save Workspace',
           accelerator: 'CmdOrCtrl+S',
           click() { sendToFocusedWindow('menu-sv-save'); },
         },
+        { type: 'separator' },
         {
-          label: 'Load Site View…',
-          accelerator: 'CmdOrCtrl+O',
-          click() { sendToFocusedWindow('menu-sv-load'); },
+          label: 'Import Workspace from File…',
+          click() { sendToFocusedWindow('menu-sv-import-ws'); },
         },
         {
-          label: 'Load Recent Site View',
-          submenu: recentSubmenu,
-        },
-        {
-          label: 'Export Site Data (CSV)…',
-          accelerator: 'CmdOrCtrl+Shift+E',
-          click() { sendToFocusedWindow('menu-sv-export'); },
+          label: 'Export Workspace to File…',
+          click() { sendToFocusedWindow('menu-sv-export-ws'); },
         },
         { type: 'separator' },
         isMac ? { role: 'close' } : { role: 'quit' },
       ],
     },
 
-    // Edit
+    // ── Edit ──────────────────────────────────────────────────────────────
     {
       label: 'Edit',
       submenu: [
@@ -347,30 +342,33 @@ function buildAppMenu() {
         { role: 'selectAll' },
         { type: 'separator' },
         {
-          label: 'Undo Schematic Action',
-          accelerator: 'CmdOrCtrl+Z',
-          click() { sendToFocusedWindow('menu-sv-undo'); },
+          label: 'Delete Selected',
+          click() { sendToFocusedWindow('menu-sv-delete'); },
         },
         {
-          label: 'Redo Schematic Action',
-          accelerator: 'CmdOrCtrl+Shift+Z',
-          click() { sendToFocusedWindow('menu-sv-redo'); },
+          label: 'Clear All',
+          click() { sendToFocusedWindow('menu-sv-clear'); },
+        },
+        { type: 'separator' },
+        {
+          label: 'Lock Workspace',
+          click() { sendToFocusedWindow('menu-sv-lock'); },
         },
       ],
     },
 
-    // View
+    // ── View ──────────────────────────────────────────────────────────────
     {
       label: 'View',
       submenu: [
         {
-          label: 'Fit Site View',
+          label: 'Fit to Screen',
           accelerator: 'CmdOrCtrl+Shift+F',
           click() { sendToFocusedWindow('menu-sv-fit'); },
         },
         {
           label: 'Zoom In',
-          accelerator: 'CmdOrCtrl+Plus',
+          accelerator: 'CmdOrCtrl+=',
           click() { sendToFocusedWindow('menu-sv-zoom-in'); },
         },
         {
@@ -379,19 +377,30 @@ function buildAppMenu() {
           click() { sendToFocusedWindow('menu-sv-zoom-out'); },
         },
         { type: 'separator' },
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { role: 'toggleDevTools' },
-        { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { type: 'separator' },
         { role: 'togglefullscreen' },
+        { type: 'separator' },
+        { role: 'toggleDevTools' },
       ],
     },
 
-    // Window
+    // ── Logging ───────────────────────────────────────────────────────────
+    {
+      label: 'Logging',
+      submenu: [
+        {
+          label: 'Toggle Data Logging',
+          accelerator: 'CmdOrCtrl+Shift+L',
+          click() { sendToFocusedWindow('menu-sv-log-toggle'); },
+        },
+        { type: 'separator' },
+        {
+          label: 'Change Log Save Folder…',
+          click() { sendToFocusedWindow('menu-sv-log-folder'); },
+        },
+      ],
+    },
+
+    // ── Window ────────────────────────────────────────────────────────────
     {
       label: 'Window',
       submenu: [
@@ -404,7 +413,7 @@ function buildAppMenu() {
       ],
     },
 
-    // Help
+    // ── Help ──────────────────────────────────────────────────────────────
     {
       role: 'help',
       submenu: [

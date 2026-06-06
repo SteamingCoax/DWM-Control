@@ -73,10 +73,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Native menu action relay
   onMenuAction: (channel, callback) => {
     const MENU_CHANNELS = [
-      'menu-sv-save', 'menu-sv-load', 'menu-sv-export',
+      'menu-sv-save', 'menu-sv-new-ws', 'menu-sv-workspaces',
+      'menu-sv-import-ws', 'menu-sv-export-ws',
       'menu-sv-undo', 'menu-sv-redo', 'menu-sv-fit',
-      'menu-sv-zoom-in', 'menu-sv-zoom-out', 'menu-check-updates',
-      'menu-sv-load-recent',
+      'menu-sv-zoom-in', 'menu-sv-zoom-out',
+      'menu-sv-delete', 'menu-sv-clear', 'menu-sv-lock',
+      'menu-sv-log-toggle', 'menu-sv-log-folder',
+      'menu-check-updates',
     ];
     if (!MENU_CHANNELS.includes(channel)) return;
     const listener = () => callback();
@@ -84,22 +87,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener(channel, listener);
   },
 
-  // Recent file menu channel (passes filePath as argument)
-  onMenuLoadRecent: (callback) => {
-    const listener = (_event, filePath) => callback(filePath);
-    ipcRenderer.on('menu-sv-load-recent', listener);
-    return () => ipcRenderer.removeListener('menu-sv-load-recent', listener);
-  },
-
   // Remove listeners — restricted to known safe channels
   removeAllListeners: (channel) => {
     const ALLOWED_CHANNELS = [
       'serial-data', 'upload-progress', 'update-available', 'update-not-available',
       'update-error', 'update-download-progress', 'update-downloaded',
-      'menu-sv-save', 'menu-sv-load', 'menu-sv-export',
+      'menu-sv-save', 'menu-sv-new-ws', 'menu-sv-workspaces',
+      'menu-sv-import-ws', 'menu-sv-export-ws',
       'menu-sv-undo', 'menu-sv-redo', 'menu-sv-fit',
-      'menu-sv-zoom-in', 'menu-sv-zoom-out', 'menu-check-updates',
-      'menu-sv-load-recent',
+      'menu-sv-zoom-in', 'menu-sv-zoom-out',
+      'menu-sv-delete', 'menu-sv-clear', 'menu-sv-lock',
+      'menu-sv-log-toggle', 'menu-sv-log-folder',
+      'menu-check-updates',
     ];
     if (ALLOWED_CHANNELS.includes(channel)) {
       ipcRenderer.removeAllListeners(channel);

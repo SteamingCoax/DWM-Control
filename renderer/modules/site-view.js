@@ -435,6 +435,8 @@
         document.addEventListener('keydown', (e) => {
             const panel = document.getElementById('siteview-panel');
             if (!panel || !panel.classList.contains('active')) return;
+            const mod = e.ctrlKey || e.metaKey;
+            const inInput = e.target.matches('input, textarea, select');
             if (e.key === 'Escape') {
                 const overlay = document.getElementById('sv-ws-modal-overlay');
                 if (overlay && overlay.style.display !== 'none') {
@@ -442,21 +444,35 @@
                     this._svCloseWorkspaceBrowser();
                 }
             }
-            if ((e.key === 'Delete' || e.key === 'Backspace') &&
-                !e.target.matches('input, textarea, select')) {
+            if ((e.key === 'Delete' || e.key === 'Backspace') && !inInput) {
                 if (!this.sv.isLocked) this._svDeleteSelected();
             }
-            if (e.ctrlKey && !e.shiftKey && e.key === 'z' &&
-                !e.target.matches('input, textarea, select')) {
+            if (mod && !e.shiftKey && e.key === 'z' && !inInput) {
                 e.preventDefault();
                 this._svUndo();
             }
-            if ((e.ctrlKey && e.key === 'y') ||
-                (e.ctrlKey && e.shiftKey && e.key === 'z')) {
-                if (!e.target.matches('input, textarea, select')) {
-                    e.preventDefault();
-                    this._svRedo();
-                }
+            if ((mod && e.key === 'y') || (mod && e.shiftKey && e.key === 'z')) {
+                if (!inInput) { e.preventDefault(); this._svRedo(); }
+            }
+            if (mod && !e.shiftKey && e.key === 's' && !inInput) {
+                e.preventDefault();
+                this._svSaveToFile();
+            }
+            if (mod && e.shiftKey && e.key === 'f' && !inInput) {
+                e.preventDefault();
+                this._svFitView();
+            }
+            if (mod && !e.shiftKey && (e.key === '=' || e.key === '+') && !inInput) {
+                e.preventDefault();
+                if (this._svDoZoom) this._svDoZoom(1.2);
+            }
+            if (mod && !e.shiftKey && e.key === '-' && !inInput) {
+                e.preventDefault();
+                if (this._svDoZoom) this._svDoZoom(1 / 1.2);
+            }
+            if (mod && e.shiftKey && e.key === 'l' && !inInput) {
+                e.preventDefault();
+                this._svToggleLogging();
             }
         });
 
@@ -521,7 +537,7 @@
         if (wsImportBtn)        wsImportBtn.addEventListener('click',        () => this._svWsImportFile());
         if (wsFolderChangeBtn)  wsFolderChangeBtn.addEventListener('click',  () => this._svWsSetFolder());
 
-        const _svDoZoom = (factor) => {
+        this._svDoZoom = (factor) => {
             const container = document.getElementById('sv-canvas-container');
             const rect = container ? container.getBoundingClientRect() : { left: 0, top: 0, width: 800, height: 600 };
             const cx = rect.width  / 2;
@@ -533,8 +549,8 @@
             this.sv.viewport.scale = next;
             this._svApplyViewport();
         };
-        if (zoomInBtn)  zoomInBtn.addEventListener('click',  () => _svDoZoom(1.2));
-        if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => _svDoZoom(1 / 1.2));
+        if (zoomInBtn)  zoomInBtn.addEventListener('click',  () => this._svDoZoom(1.2));
+        if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => this._svDoZoom(1 / 1.2));
 
         // Collapsible pane toggles
         const sidebarToggle = document.getElementById('sv-sidebar-toggle');
@@ -556,49 +572,43 @@
             });
         }
 
-        // ── Recent-file menu → load schematic directly ────────────────────────
-        if (window.electronAPI?.onMenuLoadRecent) {
-            window.electronAPI.onMenuLoadRecent((filePath) => {
-                window.electronAPI.svLoadRecentFile(filePath)
-                    .then(result => {
-                        if (!result?.success) return;
-                        let data;
-                        try { data = JSON.parse(result.content); } catch (e) {
-                            alert('Failed to parse schematic file: ' + e.message); return;
-                        }
-                        if (!data || data.version !== 1) {
-                            alert('Invalid schematic file (version mismatch).'); return;
-                        }
-                        if (!window.confirm('Load this schematic? Current workspace will be replaced.')) return;
-                        this.sv.nodes.clear();
-                        this.sv.connections.clear();
-                        this.sv.selectedNodeId = null;
-                        this.sv.selectedConnId = null;
-                        this.sv.selectedNodeIds.clear();
-                        if (Array.isArray(data.nodes)) {
-                            for (const node of data.nodes) {
-                                if (node?.id && node.type) this.sv.nodes.set(node.id, node);
-                            }
-                        }
-                        if (Array.isArray(data.connections)) {
-                            for (const conn of data.connections) {
-                                if (conn?.id) this.sv.connections.set(conn.id, conn);
-                            }
-                        }
-                        if (data.viewport && typeof data.viewport.scale === 'number') {
-                            this.sv.viewport = {
-                                x:     data.viewport.x ?? 0,
-                                y:     data.viewport.y ?? 0,
-                                scale: Math.min(4, Math.max(0.2, data.viewport.scale)),
-                            };
-                        }
-                        this._svRender();
-                        this._svRenderProperties();
-                        this._svSetSaveStatus('saved');
-                        this.sv.isDirty = false;
-                    })
-                    .catch(err => console.error('Recent file load failed:', err));
-            });
+        // ── Native menu action relay ───────────────────────────────────────────
+        if (window.electronAPI?.onMenuAction) {
+            const menuHandlers = {
+                'menu-sv-save':        () => this._svSaveToFile(),
+                'menu-sv-new-ws':      () => {
+                    this._svOpenWorkspaceBrowser();
+                    // Trigger the inline new-workspace form after the modal opens
+                    setTimeout(() => {
+                        const wsNewBtn = document.getElementById('sv-ws-new-btn');
+                        if (wsNewBtn) wsNewBtn.click();
+                    }, 100);
+                },
+                'menu-sv-workspaces':  () => this._svOpenWorkspaceBrowser(),
+                'menu-sv-import-ws':   () => this._svWsImportFile(),
+                'menu-sv-export-ws':   () => {
+                    if (this.sv.currentWsId) {
+                        this._svWsExportFile(this.sv.currentWsId, this.sv.currentWsName);
+                    } else {
+                        this._svSaveToFile().then?.(() =>
+                            this._svWsExportFile(this.sv.currentWsId, this.sv.currentWsName));
+                    }
+                },
+                'menu-sv-undo':        () => this._svUndo(),
+                'menu-sv-redo':        () => this._svRedo(),
+                'menu-sv-fit':         () => this._svFitView(),
+                'menu-sv-zoom-in':     () => this._svDoZoom(1.2),
+                'menu-sv-zoom-out':    () => this._svDoZoom(1 / 1.2),
+                'menu-sv-delete':      () => { if (!this.sv.isLocked) this._svDeleteSelected(); },
+                'menu-sv-clear':       () => this._svClear(),
+                'menu-sv-lock':        () => { if (!this.sv.isLogging) this._svSetLocked(!this.sv.isLocked); },
+                'menu-sv-log-toggle':  () => this._svToggleLogging(),
+                'menu-sv-log-folder':  () => this._svLogSetDir(),
+                'menu-check-updates':  () => window.electronAPI?.checkForUpdates?.(),
+            };
+            for (const [channel, handler] of Object.entries(menuHandlers)) {
+                window.electronAPI.onMenuAction(channel, handler);
+            }
         }
     };
 
