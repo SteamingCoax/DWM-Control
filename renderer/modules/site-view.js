@@ -674,10 +674,10 @@
             const rh  = Math.abs(wy2 - this.sv.selectRect.startY);
             const sel = document.getElementById('sv-select-rect');
             if (sel) {
-                sel.setAttribute('x', rx * this.sv.viewport.scale + this.sv.viewport.x);
-                sel.setAttribute('y', ry * this.sv.viewport.scale + this.sv.viewport.y);
-                sel.setAttribute('width',  rw * this.sv.viewport.scale);
-                sel.setAttribute('height', rh * this.sv.viewport.scale);
+                sel.setAttribute('x', rx);
+                sel.setAttribute('y', ry);
+                sel.setAttribute('width', rw);
+                sel.setAttribute('height', rh);
             }
             return;
         }
@@ -838,14 +838,15 @@
 
             if (!toNodeId) return;
 
-            // Normalise: when one end is clearly output and the other clearly input,
-            // store from=output, to=input (so arrow direction is consistent).
-            // For all other combinations (same type, bidirectional, etc.) keep original order.
+            // Normalise: ensure "from" is always the output/source side so arrow direction is consistent.
+            // Swap when the dragged-from port is an input or bidirectional that should be a destination.
             const fromT = from.portType;
             let fnId = from.nodeId, fpId = from.portId;
             let tnId = toNodeId,    tpId = toPortId;
-            if (fromT === 'input' && toPortType === 'output') {
-                // Swap so the "from" side is the output
+            if ((fromT === 'input'        && toPortType === 'output')       ||
+                (fromT === 'bidirectional' && toPortType === 'output')       ||
+                (fromT === 'input'        && toPortType === 'bidirectional')) {
+                // Swap so the output/source side is always "from"
                 [fnId, fpId, tnId, tpId] = [tnId, tpId, fnId, fpId];
             }
 

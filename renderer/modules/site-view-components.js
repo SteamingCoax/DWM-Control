@@ -105,11 +105,13 @@
                 const midY = h * 0.5;
                 const triPts = `${w*0.12},${h*0.12} ${w*0.12},${h*0.88} ${w*0.72},${midY}`;
                 const confGain = node.props?.gainDb != null ? `${node.props.gainDb >= 0 ? '+' : ''}${node.props.gainDb} dB` : '';
+                // Center text at the midpoint of the triangle's horizontal span: (0.12+0.72)/2 = 0.42
+                const tx = w * 0.42;
                 return `
                     <polygon class="sv-node-deco" points="${triPts}" opacity="0.55"/>
-                    <text class="sv-node-type-icon" x="${w*0.35}" y="${midY - 4}" text-anchor="middle" font-size="11">▶</text>
-                    <text class="sv-node-label" x="${w*0.35}" y="${midY + 9}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
-                    ${confGain ? `<text class="sv-node-label" x="${w*0.35}" y="${midY + 20}" text-anchor="middle" font-size="8">${_esc(confGain)}</text>` : ''}
+                    <text class="sv-node-type-icon" x="${tx}" y="${midY - 4}" text-anchor="middle" font-size="11">▶</text>
+                    <text class="sv-node-label" x="${tx}" y="${midY + 9}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
+                    ${confGain ? `<text class="sv-node-label" x="${tx}" y="${midY + 20}" text-anchor="middle" font-size="8">${_esc(confGain)}</text>` : ''}
                 `;
             },
         },
