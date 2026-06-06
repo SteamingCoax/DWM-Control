@@ -303,27 +303,60 @@
             label: 'Coax Switch',
             category: 'switching',
             width: 120,
-            height: 90,
+            height: 90,         // 2-port base height; overridden by getHeight(node)
             defaultLabel: 'SW',
-            ports: [
-                { id: 'in',   side: 'left',  type: 'input',  label: 'In',    yRatio: 0.5 },
-                { id: 'out1', side: 'right', type: 'output', label: 'Out 1', yRatio: 0.33 },
-                { id: 'out2', side: 'right', type: 'output', label: 'Out 2', yRatio: 0.67 },
+            ports: [            // static fallback for 2-port — dynamic via getPorts(node)
+                { id: 'in',   side: 'left',  type: 'input',  label: 'COM',    yRatio: 0.5  },
+                { id: 'out1', side: 'right', type: 'output', label: 'Port 1', yRatio: 0.33 },
+                { id: 'out2', side: 'right', type: 'output', label: 'Port 2', yRatio: 0.67 },
             ],
+            getHeight(node) {
+                const n = Math.min(8, Math.max(2, node.props?.numPorts ?? 2));
+                return Math.max(90, n * 28 + 20);
+            },
+            getPorts(node) {
+                const n = Math.min(8, Math.max(2, node.props?.numPorts ?? 2));
+                const ports = [
+                    { id: 'in', side: 'left', type: 'input', label: 'COM', yRatio: 0.5 },
+                ];
+                for (let i = 1; i <= n; i++) {
+                    ports.push({
+                        id: `out${i}`, side: 'right', type: 'output',
+                        label: `P${i}`, yRatio: i / (n + 1),
+                    });
+                }
+                return ports;
+            },
             renderBody(node) {
-                const w = this.width, h = this.height; // w=120, h=90
-                const px = w*0.44, py = h*0.5;
-                const ax = w*0.76, ay = h*0.33;
-                const bx = w*0.76, by = h*0.67;
-                const active = node.props?.activePort ?? 1;
-                return `
-                    <line class="sv-node-deco" x1="${px}" y1="${py}" x2="${active===1 ? ax : bx}" y2="${active===1 ? ay : by}" stroke-width="2"   stroke-linecap="round" opacity="0.85"/>
-                    <line class="sv-node-deco" x1="${px}" y1="${py}" x2="${active===1 ? bx : ax}" y2="${active===1 ? by : ay}" stroke-width="1.5" stroke-dasharray="4,3" stroke-linecap="round" opacity="0.4"/>
-                    <path class="sv-node-deco" d="M${ax},${ay+4} A${h*0.22},${h*0.22} 0 0,1 ${bx},${by-4}" fill="none" stroke-width="1" stroke-dasharray="3,3" opacity="0.35"/>
-                    <circle class="sv-node-deco" cx="${px}" cy="${py}" r="4.5" opacity="0.85"/>
-                    <text class="sv-node-type-icon" x="${w*0.2}" y="${h*0.44}" text-anchor="middle" font-size="14">SW</text>
-                    <text class="sv-node-label"     x="${w*0.2}" y="${h*0.64}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
-                `;
+                const n       = Math.min(8, Math.max(2, node.props?.numPorts ?? 2));
+                const w       = this.width;
+                const h       = typeof this.getHeight === 'function' ? this.getHeight(node) : this.height;
+                const active  = node.props?.activePort ?? 1;
+                const px      = w * 0.30;
+                const py      = h * 0.5;
+                let out = `<rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>`;
+                for (let i = 1; i <= n; i++) {
+                    const ty = h * (i / (n + 1));
+                    const tx = w * 0.88;
+                    const isActive = (active === i);
+                    out += `<line class="sv-node-deco"
+                        x1="${px}" y1="${py}" x2="${tx}" y2="${ty}"
+                        stroke-width="${isActive ? 2 : 1.5}"
+                        stroke-dasharray="${isActive ? 'none' : '4,3'}"
+                        stroke-linecap="round"
+                        opacity="${isActive ? 0.85 : 0.35}"/>`;
+                }
+                // Arc spanning all selector ports
+                const arcY1 = h * (1 / (n + 1));
+                const arcY2 = h * (n / (n + 1));
+                const arcX  = w * 0.88;
+                const arcR  = (arcY2 - arcY1) * 0.55;
+                out += `<path class="sv-node-deco" d="M${arcX},${arcY1} A${arcR},${arcR} 0 0,1 ${arcX},${arcY2}" fill="none" stroke-width="1" stroke-dasharray="3,3" opacity="0.30"/>`;
+                out += `<circle class="sv-node-deco" cx="${px}" cy="${py}" r="4.5" opacity="0.85"/>`;
+                out += `<text class="sv-node-type-icon" x="${w*0.14}" y="${h*0.42}" text-anchor="middle" font-size="13">SW</text>`;
+                out += `<text class="sv-node-label"     x="${w*0.14}" y="${h*0.60}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>`;
+                out += `<text class="sv-node-label"     x="${w*0.14}" y="${h*0.76}" text-anchor="middle" font-size="9">1:${n}</text>`;
+                return out;
             },
         },
 
@@ -505,6 +538,18 @@
 
     };
 
+    // Returns a typeDef merged with any node-specific dynamic ports/height
+    function _getTypeDef(node) {
+        const base = COMPONENT_TYPES[node.type];
+        if (!base) return null;
+        if (typeof base.getPorts !== 'function' && typeof base.getHeight !== 'function') return base;
+        return {
+            ...base,
+            ports:  typeof base.getPorts  === 'function' ? base.getPorts(node)  : base.ports,
+            height: typeof base.getHeight === 'function' ? base.getHeight(node) : base.height,
+        };
+    }
+
     function createNode(type, x, y) {
         const typeDef = COMPONENT_TYPES[type];
         if (!typeDef) throw new Error(`SiteViewComponents: unknown component type "${type}"`);
@@ -516,7 +561,7 @@
         if (type === 'transmitter')  props = { powerW: null, freqMHz: null };
         if (type === 'filter')       props = { filterType: 'lowpass', gainPowerType: 'avg', freqMHz: null, bandwidthMHz: null };
         if (type === '4port-switch') props = { mode: 'through' };
-        if (type === 'coax-switch')  props = { activePort: 1 };
+        if (type === 'coax-switch')  props = { activePort: 1, numPorts: 2 };
         if (type === 'hybrid-3db' || type === 'combiner' || type === 'coupler') props = {};
         if (type === 'antenna')      props = { freqMHz: null };
         if (type === 'return-loss')  props = { fwdDeviceUid: null, fwdDeviceName: null, rflDeviceUid: null, rflDeviceName: null, displayMode: 'rl' };
@@ -534,7 +579,7 @@
     }
 
     function getPortAbsolutePos(node, portId) {
-        const typeDef = COMPONENT_TYPES[node.type];
+        const typeDef = _getTypeDef(node);
         if (!typeDef) return null;
         const port = typeDef.ports.find(p => p.id === portId);
         if (!port) return null;
@@ -560,7 +605,7 @@
     }
 
     function renderNodeSVG(node, gainCtx) {
-        const typeDef = COMPONENT_TYPES[node.type];
+        const typeDef = _getTypeDef(node);
         if (!typeDef) return `<!-- sv-unknown-type: ${_esc(node.type)} -->`;
 
         const isGainType = GAIN_TYPES.has(node.type);
@@ -652,6 +697,18 @@
         return CATEGORIES.map(c => map[c.id]).filter(c => c.items.length > 0);
     }
 
+    // Returns the resolved port list for a node (dynamic if type supports it)
+    function getNodePorts(node) {
+        const td = _getTypeDef(node);
+        return td ? td.ports : [];
+    }
+
+    // Returns the resolved height for a node (dynamic if type supports it)
+    function getNodeHeight(node) {
+        const td = _getTypeDef(node);
+        return td ? td.height : 0;
+    }
+
     window.SiteViewComponents = {
         COMPONENT_TYPES,
         CATEGORIES,
@@ -660,6 +717,8 @@
         getPortScreenPos,
         renderNodeSVG,
         getComponentCategories,
+        getNodePorts,
+        getNodeHeight,
     };
 
 })();

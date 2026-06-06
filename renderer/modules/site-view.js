@@ -168,10 +168,8 @@
             if (!d) continue;
 
             // Determine arrow visibility based on port types
-            const fromTypeDef = COMPONENT_TYPES[fromNode.type];
-            const toTypeDef   = COMPONENT_TYPES[toNode.type];
-            const fromPort    = fromTypeDef?.ports.find(p => p.id === conn.fromPortId);
-            const toPort      = toTypeDef?.ports.find(p => p.id === conn.toPortId);
+            const fromPort = window.SiteViewComponents.getNodePorts(fromNode).find(p => p.id === conn.fromPortId);
+            const toPort   = window.SiteViewComponents.getNodePorts(toNode).find(p => p.id === conn.toPortId);
             const fromT = fromPort?.type;
             const toT   = toPort?.type;
             // Show arrow only when signal direction is unambiguous:
@@ -810,7 +808,7 @@
             for (const node of this.sv.nodes.values()) {
                 const td  = window.SiteViewComponents.COMPONENT_TYPES[node.type];
                 const nw  = td ? td.width  : 80;
-                const nh  = td ? td.height : 40;
+                const nh  = window.SiteViewComponents.getNodeHeight(node) || 40;
                 // Test centre point overlap with band
                 if (node.x + nw >= minX && node.x <= maxX && node.y + nh >= minY && node.y <= maxY) {
                     this.sv.selectedNodeIds.add(node.id);
@@ -882,9 +880,7 @@
 
             for (const node of this.sv.nodes.values()) {
                 if (node.id === from.nodeId) continue;
-                const typeDef = COMPONENT_TYPES[node.type];
-                if (!typeDef) continue;
-                for (const port of typeDef.ports) {
+                for (const port of window.SiteViewComponents.getNodePorts(node)) {
                     const pos  = getPortAbsolutePos(node, port.id);
                     if (!pos) continue;
                     const dist = Math.hypot(pos.x - wx, pos.y - wy);
@@ -1169,13 +1165,24 @@
 
             // ── Coax Switch ───────────────────────────────────────────────────
             if (node.type === 'coax-switch') {
+                const numPorts  = node.props.numPorts  ?? 2;
+                const activePrt = node.props.activePort ?? 1;
+                let numPortsOpts = '';
+                for (let i = 2; i <= 8; i++) {
+                    numPortsOpts += `<option value="${i}"${numPorts === i ? ' selected' : ''}>${i}</option>`;
+                }
+                let activePortOpts = '';
+                for (let i = 1; i <= numPorts; i++) {
+                    activePortOpts += `<option value="${i}"${activePrt === i ? ' selected' : ''}>Port ${i}</option>`;
+                }
                 html += `
 <div class="sv-props-field">
+    <label class="sv-props-label">Selector Ports</label>
+    <select class="sv-props-select" id="sv-prop-num-ports">${numPortsOpts}</select>
+</div>
+<div class="sv-props-field">
     <label class="sv-props-label">Active Port</label>
-    <select class="sv-props-select" id="sv-prop-active-port">
-        <option value="1"${node.props.activePort === 1 ? ' selected' : ''}>Port 1</option>
-        <option value="2"${node.props.activePort === 2 ? ' selected' : ''}>Port 2</option>
-    </select>
+    <select class="sv-props-select" id="sv-prop-active-port">${activePortOpts}</select>
 </div>`;
             }
 
@@ -1439,13 +1446,37 @@
                 }
             }
 
-            // Wire up coax-switch active port
+            // Wire up coax-switch num ports + active port
             if (node.type === 'coax-switch') {
-                const portSel = document.getElementById('sv-prop-active-port');
+                const numPortsSel = document.getElementById('sv-prop-num-ports');
+                const portSel     = document.getElementById('sv-prop-active-port');
+                if (numPortsSel) {
+                    numPortsSel.addEventListener('change', () => {
+                        this._svPushUndo();
+                        const newN = parseInt(numPortsSel.value, 10);
+                        node.props.numPorts  = newN;
+                        // Clamp activePort to valid range
+                        if ((node.props.activePort ?? 1) > newN) node.props.activePort = newN;
+                        // Remove connections to ports that no longer exist
+                        for (let i = newN + 1; i <= 8; i++) {
+                            const portId = `out${i}`;
+                            for (const [cid, conn] of this.sv.connections) {
+                                if ((conn.fromNode === node.id && conn.fromPort === portId) ||
+                                    (conn.toNode   === node.id && conn.toPort   === portId)) {
+                                    this.sv.connections.delete(cid);
+                                }
+                            }
+                        }
+                        this._svRender();
+                        this._svRenderProperties(node.id);
+                        this._svMarkDirty();
+                    });
+                }
                 if (portSel) {
                     portSel.addEventListener('change', () => {
                         this._svPushUndo();
                         node.props.activePort = parseInt(portSel.value, 10);
+                        this._svRender();
                         this._svMarkDirty();
                     });
                 }
@@ -2316,12 +2347,12 @@
         const { COMPONENT_TYPES } = window.SiteViewComponents;
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         for (const node of this.sv.nodes.values()) {
-            const td = COMPONENT_TYPES[node.type];
-            if (!td) continue;
+        const td = COMPONENT_TYPES[node.type];
+        if (!td) continue;
             minX = Math.min(minX, node.x);
             minY = Math.min(minY, node.y);
             maxX = Math.max(maxX, node.x + td.width);
-            maxY = Math.max(maxY, node.y + td.height);
+            maxY = Math.max(maxY, node.y + window.SiteViewComponents.getNodeHeight(node));
         }
         if (!isFinite(minX)) return null;
 
@@ -2634,7 +2665,7 @@
     DWMControl.prototype._svNodeBounds = function (node) {
         const typeDef = window.SiteViewComponents.COMPONENT_TYPES[node.type];
         if (!typeDef) return null;
-        return { x: node.x, y: node.y, w: typeDef.width, h: typeDef.height };
+        return { x: node.x, y: node.y, w: typeDef.width, h: window.SiteViewComponents.getNodeHeight(node) };
     };
 
     DWMControl.prototype._svNodesOverlap = function (a, b) {
@@ -2714,7 +2745,7 @@
         if (typeId === 'transmitter')  return { powerW: null, freqMHz: null };
         if (typeId === 'filter')       return { filterType: 'lowpass', ...gpt, freqMHz: null, bandwidthMHz: null };
         if (typeId === '4port-switch') return { mode: 'through' };
-        if (typeId === 'coax-switch')  return { activePort: 1 };
+        if (typeId === 'coax-switch')  return { activePort: 1, numPorts: 2 };
         if (['hybrid-3db', 'combiner', 'coupler'].includes(typeId)) return {};
         if (typeId === 'antenna')      return { freqMHz: null };
         if (typeId === 'return-loss')  return { fwdDeviceUid: null, fwdDeviceName: null, rflDeviceUid: null, rflDeviceName: null, displayMode: 'rl' };
