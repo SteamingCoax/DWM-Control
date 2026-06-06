@@ -44,8 +44,11 @@
             redoStack:      [],
             isLocked:       false,
             logging:        false,
-            logData:        [],          // array of { ts, readings: { nodeId: { label, value, unit } } }
+            logData:        [],          // kept but no longer used for storage; cleared on start
+            logFilePath:    null,        // path of the currently open log file
+            logColumns:     [],          // ordered list of column nodeIds for the current session
             wasLockedBeforeLogging: false,
+            logsDir:        null,        // populated async from main process prefs
         };
         this._svLoadSettings();
         this._svLoadSchematic();
@@ -476,8 +479,6 @@
         if (undoBtn)       undoBtn.addEventListener('click',       () => this._svUndo());
         if (redoBtn)       redoBtn.addEventListener('click',       () => this._svRedo());
         if (lockBtn)       lockBtn.addEventListener('click',       () => this._svSetLocked(!this.sv.isLocked));
-        const exportBtn = document.getElementById('sv-export-btn');
-        if (exportBtn)     exportBtn.addEventListener('click',     () => this._svExportCSV());
         this._svUpdateUndoRedoBtns();
 
         // Workspace browser modal
@@ -1706,13 +1707,20 @@
     <label class="sv-props-label">Logging Rate</label>
     <div class="sv-props-info">${this.config?.globalSampleIntervalMs || 80} ms <span class="sv-props-hint-inline">(set in Control tab)</span></div>
 </div>
+<div class="sv-props-field sv-log-dir-field">
+    <label class="sv-props-label">Save Folder</label>
+    <div class="sv-log-dir-row">
+        <span class="sv-log-dir-path" id="sv-log-dir-path" title="${_esc(this.sv.logsDir || '')}">Loading…</span>
+        <button class="sv-props-btn sv-props-btn-sm" id="sv-log-dir-btn">Change…</button>
+    </div>
+</div>
 <div class="sv-props-field">
-    <div class="sv-log-status" id="sv-log-status">${this.sv.logging ? 'Logging&hellip;' : this.sv.logData.length > 0 ? `Stopped &mdash; ${this.sv.logData.length} row${this.sv.logData.length === 1 ? '' : 's'} recorded` : 'Not logging'}</div>
+    <div class="sv-log-status" id="sv-log-status">${this.sv.logging ? 'Logging&hellip;' : this.sv.logFilePath ? `Last saved: ${_esc(this.sv.logFilePath.split('/').pop() || this.sv.logFilePath.split('\\').pop() || '')}` : 'Not logging'}</div>
 </div>
 <div class="sv-props-field sv-props-actions">
     <button class="sv-props-btn${this.sv.logging ? ' sv-props-btn-danger' : ''}" id="sv-ws-log-toggle">${this.sv.logging ? 'Stop Logging' : 'Start Logging'}</button>
 </div>
-<div class="sv-props-hint">Logging locks the workspace and records all meter readings each update cycle.</div>
+<div class="sv-props-hint">Each row is written to disk immediately — safe against app crashes. Logging locks the workspace.</div>
 </div>`;
 
             // Wire workspace settings
@@ -1763,6 +1771,23 @@
             const logToggleBtn = document.getElementById('sv-ws-log-toggle');
             if (logToggleBtn) {
                 logToggleBtn.addEventListener('click', () => this._svToggleLogging());
+            }
+
+            // Log directory change
+            const logDirBtn = document.getElementById('sv-log-dir-btn');
+            if (logDirBtn) {
+                logDirBtn.addEventListener('click', () => this._svLogSetDir());
+            }
+
+            // Populate log dir path label (async)
+            if (window.electronAPI?.svLogGetDir) {
+                window.electronAPI.svLogGetDir().then(r => {
+                    if (r?.logsDir) {
+                        this.sv.logsDir = r.logsDir;
+                        const el = document.getElementById('sv-log-dir-path');
+                        if (el) { el.textContent = r.logsDir; el.title = r.logsDir; }
+                    }
+                }).catch(() => {});
             }
         }
     };
@@ -1957,11 +1982,18 @@
         }
 
         // ── Data logging capture ───────────────────────────────────────────────
-        if (this.sv.logging) {
-            const row = { ts: Date.now(), readings: {} };
-            for (const node of this.sv.nodes.values()) {
+        if (this.sv.logging && window.electronAPI?.svLogRow) {
+            const q = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
+            const ts = new Date().toISOString();
+            const vals = [];
+
+            // Ensure column order matches header (built at start)
+            for (const nodeId of this.sv.logColumns) {
+                const node = this.sv.nodes.get(nodeId);
+                if (!node) { vals.push(''); continue; }
+
                 if (node.type === 'dwm-meter') {
-                    let val = null, unit = '', text = '-- --';
+                    let text = '';
                     const deviceUid = node.props.deviceUid;
                     if (deviceUid && window.dwm?.meterRegistry) {
                         for (const rec of window.dwm.meterRegistry.values()) {
@@ -1971,49 +2003,37 @@
                                 const pt = node.props.powerType || 'avg';
                                 const w  = parseFloat(rec.state.lastSnapshotRaw[pt] ?? rec.state.lastSnapshotRaw.avg);
                                 if (Number.isFinite(w) && w >= 0 && typeof window.dwm.scalePower === 'function') {
-                                    val  = w;
                                     const scaled = window.dwm.scalePower(w);
-                                    unit = scaled.unit;
-                                    text = scaled.scaled.toFixed(2) + ' ' + scaled.unit;
+                                    text = scaled.scaled.toFixed(4) + ' ' + scaled.unit;
                                 }
                                 break;
                             }
                         }
                     }
-                    row.readings[node.id] = {
-                        label:       node.label || node.id,
-                        measureType: node.props.measureType || 'forward',
-                        powerType:   node.props.powerType || 'avg',
-                        value:       val,
-                        unit:        unit,
-                        text:        text,
-                    };
+                    vals.push(text);
                 } else if (node.type === 'return-loss') {
                     const pfwd = getRLPowerW(node.props?.fwdDeviceUid);
                     const prfl = getRLPowerW(node.props?.rflDeviceUid);
-                    let displayText = '-- --';
+                    let displayText = '';
                     const mode = node.props?.displayMode || 'rl';
                     if (pfwd !== null && prfl !== null) {
                         const ratio = Math.min(prfl / pfwd, 0.9999);
                         if (mode === 'swr') {
                             const gamma = Math.sqrt(ratio);
                             const swr   = (1 + gamma) / (1 - gamma);
-                            displayText = swr.toFixed(2) + ':1';
+                            displayText = swr.toFixed(4) + ':1';
                         } else {
-                            displayText = (-10 * Math.log10(ratio)).toFixed(1) + ' dB';
+                            displayText = (-10 * Math.log10(ratio)).toFixed(2) + ' dB';
                         }
                     }
-                    row.readings[node.id] = {
-                        label:       node.label || node.id,
-                        measureType: mode === 'swr' ? 'SWR' : 'Return Loss',
-                        powerType:   'avg',
-                        value:       null,
-                        unit:        mode === 'swr' ? ':1' : 'dB',
-                        text:        displayText,
-                    };
+                    vals.push(displayText);
+                } else {
+                    vals.push('');
                 }
             }
-            this.sv.logData.push(row);
+
+            const csvRow = [q(ts), ...vals.map(q)].join(',');
+            window.electronAPI.svLogRow({ row: csvRow }).catch(() => {});
         }
     };
 
@@ -2021,8 +2041,19 @@
 
     DWMControl.prototype._svToggleLogging = function () {
         if (this.sv.logging) {
-            // Stop logging
+            // ── Stop logging ──────────────────────────────────────────────────
             this.sv.logging = false;
+            this.sv.logColumns = [];
+
+            // Close the stream in main process
+            if (window.electronAPI?.svLogClose) {
+                window.electronAPI.svLogClose().then(result => {
+                    if (result?.success && result.filePath) {
+                        this.sv.logFilePath = result.filePath;
+                    }
+                }).catch(err => console.error('Log close error:', err));
+            }
+
             // Restore pre-logging lock state
             if (!this.sv.wasLockedBeforeLogging) {
                 this.sv.isLocked = false;
@@ -2038,11 +2069,47 @@
                 if (svgEl)     svgEl.classList.remove('sv-canvas-locked');
             }
         } else {
-            // Start logging — record current lock state before locking
+            // ── Start logging ─────────────────────────────────────────────────
             this.sv.wasLockedBeforeLogging = this.sv.isLocked;
-            this.sv.logData  = [];
-            this.sv.logging  = true;
+            this.sv.logData    = [];
+            this.sv.logColumns = [];
+            this.sv.logFilePath = null;
+            this.sv.logging    = true;
             this._svSetLocked(true);
+
+            // Build header row from current meter nodes
+            const colIds   = [];
+            const colNames = [];
+            for (const node of this.sv.nodes.values()) {
+                if (node.type === 'dwm-meter' || node.type === 'return-loss') {
+                    colIds.push(node.id);
+                    const label = node.label || node.id;
+                    const suffix = node.type === 'dwm-meter'
+                        ? ` (${node.props?.measureType || 'fwd'} ${(node.props?.powerType || 'avg').toUpperCase()})`
+                        : ` (${node.props?.displayMode === 'swr' ? 'SWR' : 'Return Loss'})`;
+                    colNames.push(label + suffix);
+                }
+            }
+            this.sv.logColumns = colIds;
+
+            const header = ['Timestamp', ...colNames].map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
+            const ts     = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const wsName = (this.sv.currentWsName || 'log').replace(/[^a-zA-Z0-9_-]/g, '_');
+            const filename = `${wsName}-${ts}`;
+
+            if (window.electronAPI?.svLogOpen) {
+                window.electronAPI.svLogOpen({ header, filename }).then(result => {
+                    if (result?.success) {
+                        this.sv.logFilePath = result.filePath;
+                    } else {
+                        console.error('Failed to open log file:', result?.error);
+                        this.sv.logging = false;
+                    }
+                }).catch(err => {
+                    console.error('Log open error:', err);
+                    this.sv.logging = false;
+                });
+            }
         }
         // Re-render properties pane to update button/status
         const wasSelected = this.sv.selectedNodeId;
@@ -2053,99 +2120,17 @@
         this.sv.selectedNodeId = wasSelected;
     };
 
-    DWMControl.prototype._svExportCSV = function () {
-        const rows = [];
-        const esc  = (v) => (v == null ? '' : String(v).replace(/"/g, '""'));
-        const q    = (v) => `"${esc(v)}"`;
-
-        // ── Section 1: Component summary ──────────────────────────────────────
-        rows.push('--- Components ---');
-        rows.push([
-            'Type', 'Label', 'ID',
-            'Device UID', 'Device Name',
-            'Measure Type', 'Power Type',
-            'Attenuation (dB)', 'Gain (dB)',
-            'Filter Type', 'Freq (MHz)', 'BW (MHz)',
-            'TX Power (W)', 'TX Frequency (MHz)', 'TX Name',
-            'Switch Mode', 'Active Port',
-            'Display Mode', 'Flipped',
-        ].map(q).join(','));
-
-        for (const node of this.sv.nodes.values()) {
-            const p = node.props || {};
-            rows.push([
-                node.type,
-                node.label || '',
-                node.id,
-                p.deviceUid      || '',
-                p.deviceName     || '',
-                p.measureType    || '',
-                p.powerType      || '',
-                p.attenuationDb  ?? '',
-                p.gainDb         ?? '',
-                p.filterType     || '',
-                p.centerFreq     ?? '',
-                p.bandwidth      ?? '',
-                p.txPower        ?? '',
-                p.txFreq         ?? '',
-                p.txName         || '',
-                p.switchMode     || '',
-                p.activePort     || '',
-                p.displayMode    || '',
-                node.flipped     ? 'yes' : 'no',
-            ].map(q).join(','));
-        }
-
-        rows.push('');
-
-        // ── Section 2: Connections ────────────────────────────────────────────
-        rows.push('--- Connections ---');
-        rows.push(['From Component', 'From Port', 'To Component', 'To Port'].map(q).join(','));
-        for (const conn of this.sv.connections.values()) {
-            const fromNode = this.sv.nodes.get(conn.fromNodeId);
-            const toNode   = this.sv.nodes.get(conn.toNodeId);
-            rows.push([
-                fromNode?.label || conn.fromNodeId,
-                conn.fromPortId,
-                toNode?.label   || conn.toNodeId,
-                conn.toPortId,
-            ].map(q).join(','));
-        }
-
-        rows.push('');
-
-        // ── Section 3: Measurement log (if any) ───────────────────────────────
-        rows.push('--- Measurement Log ---');
-        if (this.sv.logData.length === 0) {
-            rows.push(q('No measurement data. Start logging to record live readings.'));
-        } else {
-            // Build column list from all nodeIds that ever appeared
-            const meterIds   = [];
-            const meterLabels = {};
-            for (const row of this.sv.logData) {
-                for (const [nid, r] of Object.entries(row.readings)) {
-                    if (!meterLabels[nid]) {
-                        meterIds.push(nid);
-                        meterLabels[nid] = `${r.label} (${r.measureType} ${r.powerType.toUpperCase()})`;
-                    }
-                }
+    DWMControl.prototype._svLogSetDir = function () {
+        if (!window.electronAPI?.svLogSetDir) return;
+        window.electronAPI.svLogSetDir().then(result => {
+            if (result?.canceled) return;
+            if (result?.success && result.logsDir) {
+                this.sv.logsDir = result.logsDir;
+                // Update the displayed path if properties pane is showing workspace settings
+                const el = document.getElementById('sv-log-dir-path');
+                if (el) { el.textContent = result.logsDir; el.title = result.logsDir; }
             }
-            rows.push(['Timestamp', ...meterIds.map(id => meterLabels[id])].map(q).join(','));
-            for (const row of this.sv.logData) {
-                const ts = new Date(row.ts).toISOString();
-                const vals = meterIds.map(id => row.readings[id]?.text ?? '');
-                rows.push([ts, ...vals].map(q).join(','));
-            }
-        }
-
-        const csvContent = rows.join('\r\n');
-        const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        window.electronAPI.svSaveFile({
-            defaultName: `site-data-${ts}.csv`,
-            content:     csvContent,
-            filterName:  'CSV Files',
-            ext:         'csv',
-        }).catch(err => console.error('Export failed:', err));
+        }).catch(err => console.error('Set log dir failed:', err));
     };
 
     // ─── Persistence ──────────────────────────────────────────────────────────

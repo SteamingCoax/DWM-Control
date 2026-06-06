@@ -63,6 +63,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   svWsExportFile:  (opts)   => ipcRenderer.invoke('sv-ws-export-file', opts),
   svWsImportFile:  ()       => ipcRenderer.invoke('sv-ws-import-file'),
 
+  // Streaming data logger
+  svLogGetDir: ()       => ipcRenderer.invoke('sv-log-get-dir'),
+  svLogSetDir: ()       => ipcRenderer.invoke('sv-log-set-dir'),
+  svLogOpen:   (opts)   => ipcRenderer.invoke('sv-log-open', opts),
+  svLogRow:    (opts)   => ipcRenderer.invoke('sv-log-row', opts),
+  svLogClose:  ()       => ipcRenderer.invoke('sv-log-close'),
+
   // Native menu action relay
   onMenuAction: (channel, callback) => {
     const MENU_CHANNELS = [

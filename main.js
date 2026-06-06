@@ -1077,6 +1077,103 @@ ipcMain.handle('sv-ws-import-file', async () => {
   }
 });
 
+// ─── Streaming Data Logger ────────────────────────────────────────────────
+// Writes each row immediately to disk — crash-safe, zero memory accumulation.
+
+let activeLogStream  = null;  // fs.WriteStream
+let activeLogPath    = null;  // full path to the current log file
+
+function getLogsDir() {
+  if (!WS_PREFS) loadWsPrefs();
+  const dir = WS_PREFS.logsDir || path.join(
+    WS_PREFS.workspacesDir || path.join(app.getPath('userData'), 'workspaces'),
+    'logs'
+  );
+  if (!fs.existsSync(dir)) {
+    try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
+  }
+  return dir;
+}
+
+ipcMain.handle('sv-log-get-dir', async () => {
+  return { logsDir: getLogsDir() };
+});
+
+ipcMain.handle('sv-log-set-dir', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Choose Log Save Folder',
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (result.canceled || !result.filePaths.length) return { canceled: true };
+  const newDir = result.filePaths[0];
+  if (!WS_PREFS) loadWsPrefs();
+  WS_PREFS.logsDir = newDir;
+  saveWsPrefs();
+  if (!fs.existsSync(newDir)) {
+    try { fs.mkdirSync(newDir, { recursive: true }); } catch (_) {}
+  }
+  return { success: true, logsDir: newDir };
+});
+
+// Open log file and write CSV header
+ipcMain.handle('sv-log-open', async (_event, { header, filename }) => {
+  // Close any existing stream first
+  if (activeLogStream) {
+    try { activeLogStream.end(); } catch (_) {}
+    activeLogStream = null;
+    activeLogPath   = null;
+  }
+  const dir = getLogsDir();
+  const ts  = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const fname = (filename || `log-${ts}`) + '.csv';
+  const filePath = path.join(dir, fname);
+  try {
+    activeLogStream = fs.createWriteStream(filePath, { flags: 'a', encoding: 'utf8' });
+    activeLogStream.on('error', (err) => {
+      console.error('Log stream error:', err);
+      activeLogStream = null;
+      activeLogPath   = null;
+    });
+    activeLogStream.write(header + '\r\n');
+    activeLogPath = filePath;
+    return { success: true, filePath };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+// Append one CSV row — called every logging tick
+ipcMain.handle('sv-log-row', async (_event, { row }) => {
+  if (!activeLogStream || activeLogStream.destroyed) return { success: false, error: 'No open log stream' };
+  try {
+    activeLogStream.write(row + '\r\n');
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+// Close the log stream
+ipcMain.handle('sv-log-close', async () => {
+  if (!activeLogStream) return { success: false, error: 'No open log stream' };
+  const filePath = activeLogPath;
+  return new Promise((resolve) => {
+    activeLogStream.end(() => {
+      activeLogStream = null;
+      activeLogPath   = null;
+      resolve({ success: true, filePath });
+    });
+  });
+});
+
+// Also close the stream on app quit so nothing is lost
+app.on('before-quit', () => {
+  if (activeLogStream && !activeLogStream.destroyed) {
+    try { activeLogStream.end(); } catch (_) {}
+    activeLogStream = null;
+  }
+});
+
 // Get file statistics — path is restricted to the user's home directory
 ipcMain.handle('get-file-stats', async (event, filePath) => {
   try {
