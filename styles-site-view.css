@@ -1491,3 +1491,73 @@
 .sv-ws-btn-danger:hover {
     background: #dc2626;
 }
+
+/* ─── Workspace modal footer ─────────────────────────────────────────────── */
+
+.sv-ws-modal-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 24px;
+    border-top: 1px solid var(--border-light);
+    background: var(--bg-tertiary, rgba(0,0,0,0.15));
+    flex-shrink: 0;
+    border-radius: 0 0 12px 12px;
+}
+
+.sv-ws-folder-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.sv-ws-folder-path {
+    flex: 1;
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: monospace;
+}
+
+.sv-ws-folder-change-btn {
+    background: transparent;
+    border: 1px solid var(--border-light);
+    color: var(--text-secondary);
+    border-radius: 5px;
+    padding: 4px 10px;
+    font-size: 11px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.12s, color 0.12s;
+}
+.sv-ws-folder-change-btn:hover {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+/* Secondary button (Import) in modal header */
+.sv-ws-btn-secondary {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    padding: 7px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.sv-ws-btn-secondary:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+/* Export card button */
+.sv-ws-card-btn--export {
+    color: var(--text-muted);
+}
+.sv-ws-card-btn--export:hover {
+    color: var(--text-primary);
+}

@@ -488,6 +488,8 @@
         const wsNameInput      = document.getElementById('sv-ws-name-input');
         const wsNameConfirmBtn = document.getElementById('sv-ws-name-confirm-btn');
         const wsNameCancelBtn  = document.getElementById('sv-ws-name-cancel-btn');
+        const wsImportBtn      = document.getElementById('sv-ws-import-btn');
+        const wsFolderChangeBtn = document.getElementById('sv-ws-folder-change-btn');
 
         if (wsCloseBtn) wsCloseBtn.addEventListener('click', () => this._svCloseWorkspaceBrowser());
         if (wsOverlay)  wsOverlay.addEventListener('click', (e) => {
@@ -514,7 +516,9 @@
             if (e.key === 'Enter') this._svWsNameFormSubmit();
             if (e.key === 'Escape') this._svWsNameFormHide();
         });
-        if (wsNameCancelBtn) wsNameCancelBtn.addEventListener('click', () => this._svWsNameFormHide());
+        if (wsNameCancelBtn)    wsNameCancelBtn.addEventListener('click',    () => this._svWsNameFormHide());
+        if (wsImportBtn)        wsImportBtn.addEventListener('click',        () => this._svWsImportFile());
+        if (wsFolderChangeBtn)  wsFolderChangeBtn.addEventListener('click',  () => this._svWsSetFolder());
 
         const _svDoZoom = (factor) => {
             const container = document.getElementById('sv-canvas-container');
@@ -2369,6 +2373,12 @@
         if (!window.electronAPI?.svWsList) return;
         window.electronAPI.svWsList().then(result => {
             const workspaces = result?.workspaces || [];
+            // Update folder display in footer
+            const folderEl = document.getElementById('sv-ws-folder-path');
+            if (folderEl && result?.workspacesDir) {
+                folderEl.textContent = result.workspacesDir;
+                folderEl.title       = result.workspacesDir;
+            }
             this._svRenderWorkspaceBrowserCards(workspaces);
         }).catch(err => console.error('Failed to list workspaces:', err));
     };
@@ -2395,8 +2405,9 @@
             const isCurrent = ws.id === this.sv.currentWsId;
             const modDate   = ws.modifiedAt ? _svRelativeDate(ws.modifiedAt) : 'Never saved';
             const compStr   = ws.componentCount === 1 ? '1 component' : `${ws.componentCount || 0} components`;
+            // Use inline SVG to avoid CSP data: URI restriction on img-src
             const thumbHtml = ws.thumbnail
-                ? `<img class="sv-ws-card-thumb-img" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(ws.thumbnail)}" alt="Preview" loading="lazy">`
+                ? ws.thumbnail
                 : `<div class="sv-ws-card-thumb-placeholder"><span>No Preview</span></div>`;
 
             return `<div class="sv-ws-card${isCurrent ? ' sv-ws-card--current' : ''}" data-ws-id="${_esc(ws.id)}">
@@ -2411,6 +2422,7 @@
                     <button class="sv-ws-card-btn sv-ws-card-btn--open"   data-action="open"      data-ws-id="${_esc(ws.id)}">${isCurrent ? 'Reload' : 'Open'}</button>
                     <button class="sv-ws-card-btn sv-ws-card-btn--rename" data-action="rename"    data-ws-id="${_esc(ws.id)}" data-ws-name="${_esc(ws.name)}">Rename</button>
                     <button class="sv-ws-card-btn sv-ws-card-btn--dupe"   data-action="duplicate" data-ws-id="${_esc(ws.id)}">Duplicate</button>
+                    <button class="sv-ws-card-btn sv-ws-card-btn--export" data-action="export"    data-ws-id="${_esc(ws.id)}" data-ws-name="${_esc(ws.name)}">Export…</button>
                     <button class="sv-ws-card-btn sv-ws-card-btn--del"    data-action="delete"    data-ws-id="${_esc(ws.id)}">Delete</button>
                 </div>
             </div>
@@ -2426,6 +2438,7 @@
                 if (action === 'open')      this._svWsOpen(wsId);
                 if (action === 'rename')    this._svWsRename(wsId, wsName);
                 if (action === 'duplicate') this._svWsDuplicate(wsId);
+                if (action === 'export')    this._svWsExportFile(wsId, wsName);
                 if (action === 'delete')    this._svWsDelete(wsId);
             });
         });
@@ -2515,6 +2528,35 @@
 
     DWMControl.prototype._svWsNew = function () {
         // Handled via inline form — this is now a no-op stub kept for compat
+    };
+
+    DWMControl.prototype._svWsExportFile = function (wsId, wsName) {
+        window.electronAPI.svWsExportFile({ id: wsId, name: wsName || 'workspace' })
+            .then(result => {
+                if (result?.success) this._svSetSaveStatus('Exported');
+            })
+            .catch(err => console.error('Export failed:', err));
+    };
+
+    DWMControl.prototype._svWsImportFile = function () {
+        window.electronAPI.svWsImportFile()
+            .then(result => {
+                if (result?.canceled) return;
+                if (!result?.success) { console.error('Import failed:', result?.error); return; }
+                this._svRefreshWorkspaceBrowser();
+            })
+            .catch(err => console.error('Import failed:', err));
+    };
+
+    DWMControl.prototype._svWsSetFolder = function () {
+        window.electronAPI.svWsSetFolder()
+            .then(result => {
+                if (result?.canceled) return;
+                if (!result?.success) return;
+                // Refresh — new folder may have different workspaces
+                this._svRefreshWorkspaceBrowser();
+            })
+            .catch(err => console.error('Set folder failed:', err));
     };
 
     // ─── Inline name form helpers ─────────────────────────────────────────────

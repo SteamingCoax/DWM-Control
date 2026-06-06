@@ -914,9 +914,28 @@ ipcMain.handle('sv-load-recent-file', async (_event, filePath) => {
 
 // ─── Workspace Browser ────────────────────────────────────────────────────
 
+let WS_PREFS = null;
+
+function getWsPrefsPath() {
+  return path.join(app.getPath('userData'), 'ws-prefs.json');
+}
+
+function loadWsPrefs() {
+  try { WS_PREFS = JSON.parse(fs.readFileSync(getWsPrefsPath(), 'utf8')); }
+  catch (_) { WS_PREFS = {}; }
+}
+
+function saveWsPrefs() {
+  try { fs.writeFileSync(getWsPrefsPath(), JSON.stringify(WS_PREFS, null, 2), 'utf8'); }
+  catch (_) {}
+}
+
 function getWorkspacesDir() {
-  const dir = path.join(app.getPath('userData'), 'workspaces');
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!WS_PREFS) loadWsPrefs();
+  const dir = WS_PREFS.workspacesDir || path.join(app.getPath('userData'), 'workspaces');
+  if (!fs.existsSync(dir)) {
+    try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
+  }
   return dir;
 }
 
@@ -939,7 +958,7 @@ ipcMain.handle('sv-ws-list', async () => {
     } catch (_) {}
   }
   workspaces.sort((a, b) => (b.modifiedAt || '').localeCompare(a.modifiedAt || ''));
-  return { workspaces };
+  return { workspaces, workspacesDir: dir };
 });
 
 ipcMain.handle('sv-ws-save', async (_event, { id, name, schematic, thumbnail, componentCount }) => {
@@ -998,6 +1017,64 @@ ipcMain.handle('sv-ws-duplicate', async (_event, { id }) => {
     fs.writeFileSync(path.join(dir, newId + '.svws'), JSON.stringify(data), 'utf8');
     return { success: true, id: newId };
   } catch (e) { return { success: false, error: e.message }; }
+});
+
+// Change workspace folder
+ipcMain.handle('sv-ws-set-folder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Choose Workspace Folder',
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (result.canceled || !result.filePaths.length) return { canceled: true };
+  const newDir = result.filePaths[0];
+  if (!WS_PREFS) loadWsPrefs();
+  WS_PREFS.workspacesDir = newDir;
+  saveWsPrefs();
+  if (!fs.existsSync(newDir)) {
+    try { fs.mkdirSync(newDir, { recursive: true }); } catch (_) {}
+  }
+  return { success: true, workspacesDir: newDir };
+});
+
+// Export a specific workspace to an arbitrary file path
+ipcMain.handle('sv-ws-export-file', async (_event, { id, name }) => {
+  const srcPath = path.join(getWorkspacesDir(), id + '.svws');
+  try {
+    const data = JSON.parse(fs.readFileSync(srcPath, 'utf8'));
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Export Workspace',
+      defaultPath: path.join(os.homedir(), (name || 'workspace') + '.svws'),
+      filters: [{ name: 'Site View Workspace', extensions: ['svws'] }],
+    });
+    if (result.canceled || !result.filePath) return { canceled: true };
+    fs.writeFileSync(result.filePath, JSON.stringify(data), 'utf8');
+    return { success: true, filePath: result.filePath };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+// Import a workspace from an arbitrary file path into the workspace folder
+ipcMain.handle('sv-ws-import-file', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Import Workspace',
+    filters: [{ name: 'Site View Workspace', extensions: ['svws'] }],
+    properties: ['openFile'],
+  });
+  if (result.canceled || !result.filePaths.length) return { canceled: true };
+  try {
+    const raw  = fs.readFileSync(result.filePaths[0], 'utf8');
+    const data = JSON.parse(raw);
+    if (!data || data.version !== 1) return { success: false, error: 'Invalid workspace file' };
+    const dir   = getWorkspacesDir();
+    const newId = 'ws-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+    data.createdAt  = data.createdAt  || new Date().toISOString();
+    data.modifiedAt = new Date().toISOString();
+    fs.writeFileSync(path.join(dir, newId + '.svws'), JSON.stringify(data), 'utf8');
+    return { success: true, id: newId, name: data.name || 'Imported' };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
 });
 
 // Get file statistics — path is restricted to the user's home directory

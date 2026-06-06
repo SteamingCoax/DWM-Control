@@ -53,12 +53,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   svLoadRecentFile: (filePath) => ipcRenderer.invoke('sv-load-recent-file', filePath),
 
   // Workspace browser
-  svWsList:      ()       => ipcRenderer.invoke('sv-ws-list'),
-  svWsSave:      (opts)   => ipcRenderer.invoke('sv-ws-save', opts),
-  svWsLoad:      (opts)   => ipcRenderer.invoke('sv-ws-load', opts),
-  svWsDelete:    (opts)   => ipcRenderer.invoke('sv-ws-delete', opts),
-  svWsRename:    (opts)   => ipcRenderer.invoke('sv-ws-rename', opts),
-  svWsDuplicate: (opts)   => ipcRenderer.invoke('sv-ws-duplicate', opts),
+  svWsList:        ()       => ipcRenderer.invoke('sv-ws-list'),
+  svWsSave:        (opts)   => ipcRenderer.invoke('sv-ws-save', opts),
+  svWsLoad:        (opts)   => ipcRenderer.invoke('sv-ws-load', opts),
+  svWsDelete:      (opts)   => ipcRenderer.invoke('sv-ws-delete', opts),
+  svWsRename:      (opts)   => ipcRenderer.invoke('sv-ws-rename', opts),
+  svWsDuplicate:   (opts)   => ipcRenderer.invoke('sv-ws-duplicate', opts),
+  svWsSetFolder:   ()       => ipcRenderer.invoke('sv-ws-set-folder'),
+  svWsExportFile:  (opts)   => ipcRenderer.invoke('sv-ws-export-file', opts),
+  svWsImportFile:  ()       => ipcRenderer.invoke('sv-ws-import-file'),
 
   // Native menu action relay
   onMenuAction: (channel, callback) => {
