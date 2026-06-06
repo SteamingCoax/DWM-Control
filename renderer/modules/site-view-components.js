@@ -125,8 +125,8 @@
             height: 60,
             defaultLabel: 'ATT',
             ports: [
-                { id: 'in',  side: 'left',  type: 'input',  label: 'In',  yRatio: 0.5 },
-                { id: 'out', side: 'right', type: 'output', label: 'Out', yRatio: 0.5 },
+                { id: 'in',  side: 'left',  type: 'bidirectional', label: 'In',  yRatio: 0.5 },
+                { id: 'out', side: 'right', type: 'bidirectional', label: 'Out', yRatio: 0.5 },
             ],
             renderBody(node) {
                 const w = this.width, h = this.height; // w=140, h=60
@@ -197,12 +197,11 @@
             },
         },
 
-        // ── Combiner / Splitter ───────────────────────────────────────────────
-        // Ports: in1 at (0, h*0.33), in2 at (0, h*0.67), out at (w, h*0.5)
-        // Shape is a trapezoid with its left vertices at the actual port positions
+        // ── Combiner ──────────────────────────────────────────────────────────
+        // Shape: trapezoid, wide on left (two ports), narrow on right (one port)
         'combiner': {
             id: 'combiner',
-            label: 'Combiner/Splitter',
+            label: 'Combiner',
             category: 'passive',
             width: 120,
             height: 90,
@@ -210,10 +209,10 @@
             ports: [
                 { id: 'in1', side: 'left',  type: 'input',  label: 'In 1', yRatio: 0.33 },
                 { id: 'in2', side: 'left',  type: 'input',  label: 'In 2', yRatio: 0.67 },
-                { id: 'out', side: 'right', type: 'output', label: 'Out',  yRatio: 0.5 },
+                { id: 'out', side: 'right', type: 'output', label: 'Out',  yRatio: 0.5  },
             ],
             renderBody(node) {
-                const w = this.width, h = this.height; // w=120, h=90
+                const w = this.width, h = this.height;
                 const pts = `0,${h*0.22} 0,${h*0.78} ${w*0.82},${h*0.62} ${w*0.82},${h*0.38}`;
                 return `
                     <polygon class="sv-node-body" points="${pts}"/>
@@ -222,8 +221,39 @@
                     <line class="sv-node-deco" x1="0" y1="${h*0.67}" x2="${w*0.55}" y2="${h*0.54}" stroke-width="1.5" opacity="0.5"/>
                     <line class="sv-node-deco" x1="${w*0.55}" y1="${h*0.46}" x2="${w*0.55}" y2="${h*0.54}" stroke-width="1.5" opacity="0.5"/>
                     <line class="sv-node-deco" x1="${w*0.55}" y1="${h*0.5}" x2="${w*0.82}" y2="${h*0.5}" stroke-width="1.5" opacity="0.5"/>
-                    <text class="sv-node-type-icon" x="${w*0.38}" y="${h*0.46}" text-anchor="middle" font-size="9">COMB</text>
-                    <text class="sv-node-label"     x="${w*0.38}" y="${h*0.60}" text-anchor="middle" font-size="8">${_esc(node.label)}</text>
+                    <text class="sv-node-type-icon" x="${w*0.35}" y="${h*0.46}" text-anchor="middle" font-size="9">COMB</text>
+                    <text class="sv-node-label"     x="${w*0.35}" y="${h*0.60}" text-anchor="middle" font-size="8">${_esc(node.label)}</text>
+                `;
+            },
+        },
+
+        // ── Splitter ──────────────────────────────────────────────────────────
+        // Shape: trapezoid, narrow on left (one port), wide on right (two ports)
+        'splitter': {
+            id: 'splitter',
+            label: 'Splitter',
+            category: 'passive',
+            width: 120,
+            height: 90,
+            defaultLabel: 'SPLT',
+            ports: [
+                { id: 'in',   side: 'left',  type: 'input',  label: 'In',    yRatio: 0.5  },
+                { id: 'out1', side: 'right', type: 'output', label: 'Out 1', yRatio: 0.33 },
+                { id: 'out2', side: 'right', type: 'output', label: 'Out 2', yRatio: 0.67 },
+            ],
+            renderBody(node) {
+                const w = this.width, h = this.height;
+                // Mirror of combiner: narrow on left, wide on right
+                const pts = `${w*0.18},${h*0.38} ${w*0.18},${h*0.62} ${w},${h*0.78} ${w},${h*0.22}`;
+                return `
+                    <polygon class="sv-node-body" points="${pts}"/>
+                    <line class="sv-node-deco" x1="0" y1="${h*0.5}" x2="${w*0.18}" y2="${h*0.5}" stroke-width="2" opacity="0.6"/>
+                    <line class="sv-node-deco" x1="${w*0.45}" y1="${h*0.46}" x2="${w}" y2="${h*0.33}" stroke-width="1.5" opacity="0.5"/>
+                    <line class="sv-node-deco" x1="${w*0.45}" y1="${h*0.54}" x2="${w}" y2="${h*0.67}" stroke-width="1.5" opacity="0.5"/>
+                    <line class="sv-node-deco" x1="${w*0.45}" y1="${h*0.46}" x2="${w*0.45}" y2="${h*0.54}" stroke-width="1.5" opacity="0.5"/>
+                    <line class="sv-node-deco" x1="${w*0.18}" y1="${h*0.5}" x2="${w*0.45}" y2="${h*0.5}" stroke-width="1.5" opacity="0.5"/>
+                    <text class="sv-node-type-icon" x="${w*0.65}" y="${h*0.46}" text-anchor="middle" font-size="9">SPLT</text>
+                    <text class="sv-node-label"     x="${w*0.65}" y="${h*0.60}" text-anchor="middle" font-size="8">${_esc(node.label)}</text>
                 `;
             },
         },
@@ -237,8 +267,7 @@
             height: 100,
             defaultLabel: 'ANT',
             ports: [
-                // yRatio 0.5 so the feed aligns horizontally with components in the chain
-                { id: 'feed', side: 'left', type: 'input', label: 'Feed', yRatio: 0.5 },
+                { id: 'feed', side: 'left', type: 'bidirectional', label: 'Feed', yRatio: 0.5 },
             ],
             renderBody(node) {
                 const w = this.width, h = this.height;
@@ -306,9 +335,9 @@
             height: 90,         // 2-port base height; overridden by getHeight(node)
             defaultLabel: 'SW',
             ports: [            // static fallback for 2-port — dynamic via getPorts(node)
-                { id: 'in',   side: 'left',  type: 'input',  label: 'COM',    yRatio: 0.5  },
-                { id: 'out1', side: 'right', type: 'output', label: 'Port 1', yRatio: 0.33 },
-                { id: 'out2', side: 'right', type: 'output', label: 'Port 2', yRatio: 0.67 },
+                { id: 'in',   side: 'left',  type: 'bidirectional', label: 'COM',    yRatio: 0.5  },
+                { id: 'out1', side: 'right', type: 'bidirectional', label: 'Port 1', yRatio: 0.33 },
+                { id: 'out2', side: 'right', type: 'bidirectional', label: 'Port 2', yRatio: 0.67 },
             ],
             getHeight(node) {
                 const n = Math.min(8, Math.max(2, node.props?.numPorts ?? 2));
@@ -321,7 +350,7 @@
                 ];
                 for (let i = 1; i <= n; i++) {
                     ports.push({
-                        id: `out${i}`, side: 'right', type: 'output',
+                        id: `out${i}`, side: 'right', type: 'bidirectional',
                         label: `P${i}`, yRatio: i / (n + 1),
                     });
                 }
@@ -346,12 +375,6 @@
                         stroke-linecap="round"
                         opacity="${isActive ? 0.85 : 0.35}"/>`;
                 }
-                // Arc spanning all selector ports
-                const arcY1 = h * (1 / (n + 1));
-                const arcY2 = h * (n / (n + 1));
-                const arcX  = w * 0.88;
-                const arcR  = (arcY2 - arcY1) * 0.55;
-                out += `<path class="sv-node-deco" d="M${arcX},${arcY1} A${arcR},${arcR} 0 0,1 ${arcX},${arcY2}" fill="none" stroke-width="1" stroke-dasharray="3,3" opacity="0.30"/>`;
                 out += `<circle class="sv-node-deco" cx="${px}" cy="${py}" r="4.5" opacity="0.85"/>`;
                 out += `<text class="sv-node-type-icon" x="${w*0.14}" y="${h*0.42}" text-anchor="middle" font-size="13">SW</text>`;
                 out += `<text class="sv-node-label"     x="${w*0.14}" y="${h*0.60}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>`;
@@ -369,10 +392,10 @@
             height: 90,
             defaultLabel: '4P-SW',
             ports: [
-                { id: 'in1',  side: 'left',  type: 'input',  label: 'In 1',  yRatio: 0.33 },
-                { id: 'in2',  side: 'left',  type: 'input',  label: 'In 2',  yRatio: 0.67 },
-                { id: 'out1', side: 'right', type: 'output', label: 'Out 1', yRatio: 0.33 },
-                { id: 'out2', side: 'right', type: 'output', label: 'Out 2', yRatio: 0.67 },
+                { id: 'in1',  side: 'left',  type: 'bidirectional', label: 'P1', yRatio: 0.33 },
+                { id: 'in2',  side: 'left',  type: 'bidirectional', label: 'P2', yRatio: 0.67 },
+                { id: 'out1', side: 'right', type: 'bidirectional', label: 'P3', yRatio: 0.33 },
+                { id: 'out2', side: 'right', type: 'bidirectional', label: 'P4', yRatio: 0.67 },
             ],
             renderBody(node) {
                 const w = this.width, h = this.height; // w=120, h=90
@@ -411,8 +434,8 @@
             height: 80,
             defaultLabel: 'FILT',
             ports: [
-                { id: 'in',  side: 'left',  type: 'input',  label: 'In',  yRatio: 0.5 },
-                { id: 'out', side: 'right', type: 'output', label: 'Out', yRatio: 0.5 },
+                { id: 'in',  side: 'left',  type: 'bidirectional', label: 'In',  yRatio: 0.5 },
+                { id: 'out', side: 'right', type: 'bidirectional', label: 'Out', yRatio: 0.5 },
             ],
             renderBody(node) {
                 const w = this.width, h = this.height; // w=140, h=80
@@ -452,9 +475,9 @@
             height: 90,
             defaultLabel: 'CPLR',
             ports: [
-                { id: 'in',      side: 'left',   type: 'input',  label: 'In',      yRatio: 0.5 },
-                { id: 'out',     side: 'right',  type: 'output', label: 'Out',     yRatio: 0.5 },
-                { id: 'coupled', side: 'bottom', type: 'output', label: 'Coupled', xRatio: 0.5 },
+                { id: 'in',      side: 'left',   type: 'bidirectional', label: 'In',      yRatio: 0.5 },
+                { id: 'out',     side: 'right',  type: 'bidirectional', label: 'Out',     yRatio: 0.5 },
+                { id: 'coupled', side: 'bottom', type: 'bidirectional', label: 'Coupled', xRatio: 0.5 },
             ],
             renderBody(node) {
                 const w = this.width, h = this.height; // w=130, h=90
@@ -481,14 +504,13 @@
             height: 60,
             defaultLabel: 'LINE',
             ports: [
-                { id: 'in',  side: 'left',  type: 'input',  label: 'In',  yRatio: 0.5 },
-                { id: 'out', side: 'right', type: 'output', label: 'Out', yRatio: 0.5 },
+                { id: 'in',  side: 'left',  type: 'bidirectional', label: 'In',  yRatio: 0.5 },
+                { id: 'out', side: 'right', type: 'bidirectional', label: 'Out', yRatio: 0.5 },
             ],
             renderBody(node) {
                 const w = this.width, h = this.height;
                 const midY = h * 0.5;
-                const lenText  = node.props?.lengthFt  != null ? `${node.props.lengthFt} ft`    : '';
-                const typeText = node.props?.cableType  ? node.props.cableType : '';
+                const lenText  = node.props?.lengthFt != null ? `${node.props.lengthFt} ft` : '';
                 const startX = w * 0.06, endX = w * 0.94;
                 const steps = 8;
                 const step = (endX - startX) / steps;
@@ -501,7 +523,6 @@
                 return `
                     <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="4"/>
                     <path class="sv-node-deco" d="${zigzag}" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>
-                    ${typeText ? `<text class="sv-node-type-icon" x="${w*0.5}" y="${midY - 14}" text-anchor="middle" font-size="9">${_esc(typeText)}</text>` : ''}
                     <text class="sv-node-label" x="${w*0.5}" y="${midY + 18}" text-anchor="middle" font-size="9">${_esc(node.label)}${lenText ? ' \u00b7 ' + lenText : ''}</text>
                 `;
             },
@@ -562,10 +583,10 @@
         if (type === 'filter')       props = { filterType: 'lowpass', gainPowerType: 'avg', freqMHz: null, bandwidthMHz: null };
         if (type === '4port-switch') props = { mode: 'through' };
         if (type === 'coax-switch')  props = { activePort: 1, numPorts: 2 };
-        if (type === 'hybrid-3db' || type === 'combiner' || type === 'coupler') props = {};
+        if (type === 'hybrid-3db' || type === 'combiner' || type === 'splitter' || type === 'coupler') props = {};
         if (type === 'antenna')      props = { freqMHz: null };
         if (type === 'return-loss')  props = { fwdDeviceUid: null, fwdDeviceName: null, rflDeviceUid: null, rflDeviceName: null, displayMode: 'rl' };
-        if (type === 'tx-line')      props = { lengthFt: null, cableType: '' };
+        if (type === 'tx-line')      props = { lengthFt: null };
 
         return {
             id:    'node-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),

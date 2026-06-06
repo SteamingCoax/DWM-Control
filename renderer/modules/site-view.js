@@ -1259,18 +1259,7 @@
 
             // ── Transmission Line ─────────────────────────────────────────────
             if (node.type === 'tx-line') {
-                const cableTypes = ['RG-8', 'RG-8X', 'RG-213', 'LMR-400', 'LMR-600', 'Heliax 1/2"', 'Heliax 7/8"', 'Custom'];
-                const typeOptions = cableTypes.map(ct =>
-                    `<option value="${_esc(ct)}"${(node.props.cableType || '') === ct ? ' selected' : ''}>${_esc(ct)}</option>`
-                ).join('');
                 html += `
-<div class="sv-props-field">
-    <label class="sv-props-label">Cable Type</label>
-    <select class="sv-props-select" id="sv-prop-cable-type">
-        <option value="">-- Select --</option>
-        ${typeOptions}
-    </select>
-</div>
 <div class="sv-props-field">
     <label class="sv-props-label">Length (ft)</label>
     <input class="sv-props-input" type="number" id="sv-prop-length-ft"
@@ -1592,16 +1581,7 @@
 
             // Wire up transmission line props
             if (node.type === 'tx-line') {
-                const cableTypeSel = document.getElementById('sv-prop-cable-type');
                 const lengthFtInput = document.getElementById('sv-prop-length-ft');
-                if (cableTypeSel) {
-                    cableTypeSel.addEventListener('change', () => {
-                        this._svPushUndo();
-                        node.props.cableType = cableTypeSel.value;
-                        this._svRender();
-                        this._svMarkDirty();
-                    });
-                }
                 if (lengthFtInput) {
                     lengthFtInput.addEventListener('change', () => {
                         this._svPushUndo();
@@ -2746,10 +2726,10 @@
         if (typeId === 'filter')       return { filterType: 'lowpass', ...gpt, freqMHz: null, bandwidthMHz: null };
         if (typeId === '4port-switch') return { mode: 'through' };
         if (typeId === 'coax-switch')  return { activePort: 1, numPorts: 2 };
-        if (['hybrid-3db', 'combiner', 'coupler'].includes(typeId)) return {};
+        if (['hybrid-3db', 'combiner', 'splitter', 'coupler'].includes(typeId)) return {};
         if (typeId === 'antenna')      return { freqMHz: null };
         if (typeId === 'return-loss')  return { fwdDeviceUid: null, fwdDeviceName: null, rflDeviceUid: null, rflDeviceName: null, displayMode: 'rl' };
-        if (typeId === 'tx-line')      return { lengthFt: null, cableType: '' };
+        if (typeId === 'tx-line')      return { lengthFt: null };
         return {};
     }
 
