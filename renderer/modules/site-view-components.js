@@ -198,7 +198,7 @@
         },
 
         // ── Combiner ──────────────────────────────────────────────────────────
-        // Shape: trapezoid, wide on left (two ports), narrow on right (one port)
+        // Shape: trapezoid, wide on left (N ports), narrow on right (one port)
         'combiner': {
             id: 'combiner',
             label: 'Combiner',
@@ -211,24 +211,49 @@
                 { id: 'in2', side: 'left',  type: 'input',  label: 'In 2', yRatio: 0.67 },
                 { id: 'out', side: 'right', type: 'output', label: 'Out',  yRatio: 0.5  },
             ],
+            getHeight(node) {
+                const n = Math.min(8, Math.max(2, node.props?.numPorts ?? 2));
+                return Math.max(90, n * 26 + 16);
+            },
+            getPorts(node) {
+                const n = Math.min(8, Math.max(2, node.props?.numPorts ?? 2));
+                const ports = [];
+                for (let i = 1; i <= n; i++) {
+                    ports.push({ id: `in${i}`, side: 'left', type: 'input', label: `In ${i}`, yRatio: i / (n + 1) });
+                }
+                ports.push({ id: 'out', side: 'right', type: 'output', label: 'Out', yRatio: 0.5 });
+                return ports;
+            },
             renderBody(node) {
-                const w = this.width, h = this.height;
-                const pts = `0,${h*0.22} 0,${h*0.78} ${w*0.82},${h*0.62} ${w*0.82},${h*0.38}`;
-                return `
-                    <polygon class="sv-node-body" points="${pts}"/>
-                    <line class="sv-node-deco" x1="${w*0.82}" y1="${h*0.5}" x2="${w}" y2="${h*0.5}" stroke-width="2" opacity="0.6"/>
-                    <line class="sv-node-deco" x1="0" y1="${h*0.33}" x2="${w*0.55}" y2="${h*0.46}" stroke-width="1.5" opacity="0.5"/>
-                    <line class="sv-node-deco" x1="0" y1="${h*0.67}" x2="${w*0.55}" y2="${h*0.54}" stroke-width="1.5" opacity="0.5"/>
-                    <line class="sv-node-deco" x1="${w*0.55}" y1="${h*0.46}" x2="${w*0.55}" y2="${h*0.54}" stroke-width="1.5" opacity="0.5"/>
-                    <line class="sv-node-deco" x1="${w*0.55}" y1="${h*0.5}" x2="${w*0.82}" y2="${h*0.5}" stroke-width="1.5" opacity="0.5"/>
-                    <text class="sv-node-type-icon" x="${w*0.35}" y="${h*0.46}" text-anchor="middle" font-size="9">COMB</text>
-                    <text class="sv-node-label"     x="${w*0.35}" y="${h*0.60}" text-anchor="middle" font-size="8">${_esc(node.label)}</text>
-                `;
+                const n  = Math.min(8, Math.max(2, node.props?.numPorts ?? 2));
+                const w  = this.width;
+                const h  = typeof this.getHeight === 'function' ? this.getHeight(node) : this.height;
+                const ty1 = h * (1 / (n + 1));
+                const ty2 = h * (n / (n + 1));
+                const outY = h * 0.5;
+                const neckX = w * 0.72;
+                const tipX  = w;
+                // Trapezoid: wide on left, single-point (output side) on right
+                const pts = `0,${ty1 - 4} 0,${ty2 + 4} ${neckX},${outY + 12} ${neckX},${outY - 12}`;
+                let out = `<polygon class="sv-node-body" points="${pts}"/>`;
+                out += `<line class="sv-node-deco" x1="${neckX}" y1="${outY}" x2="${tipX}" y2="${outY}" stroke-width="2" opacity="0.6"/>`;
+                const jx = w * 0.55, jy = outY;
+                for (let i = 1; i <= n; i++) {
+                    const py = h * (i / (n + 1));
+                    out += `<line class="sv-node-deco" x1="0" y1="${py}" x2="${jx}" y2="${jy}" stroke-width="1.5" opacity="0.5"/>`;
+                }
+                if (n > 2) {
+                    out += `<line class="sv-node-deco" x1="${jx}" y1="${jy}" x2="${neckX}" y2="${outY}" stroke-width="1.5" opacity="0.5"/>`;
+                }
+                out += `<text class="sv-node-type-icon" x="${w*0.30}" y="${h*0.46}" text-anchor="middle" font-size="9">COMB</text>`;
+                out += `<text class="sv-node-label"     x="${w*0.30}" y="${h*0.60}" text-anchor="middle" font-size="8">${_esc(node.label)}</text>`;
+                out += `<text class="sv-node-label"     x="${w*0.30}" y="${h*0.73}" text-anchor="middle" font-size="8">${n}:1</text>`;
+                return out;
             },
         },
 
         // ── Splitter ──────────────────────────────────────────────────────────
-        // Shape: trapezoid, narrow on left (one port), wide on right (two ports)
+        // Shape: trapezoid, narrow on left (one port), wide on right (N ports)
         'splitter': {
             id: 'splitter',
             label: 'Splitter',
@@ -241,20 +266,41 @@
                 { id: 'out1', side: 'right', type: 'output', label: 'Out 1', yRatio: 0.33 },
                 { id: 'out2', side: 'right', type: 'output', label: 'Out 2', yRatio: 0.67 },
             ],
+            getHeight(node) {
+                const n = Math.min(8, Math.max(2, node.props?.numPorts ?? 2));
+                return Math.max(90, n * 26 + 16);
+            },
+            getPorts(node) {
+                const n = Math.min(8, Math.max(2, node.props?.numPorts ?? 2));
+                const ports = [{ id: 'in', side: 'left', type: 'input', label: 'In', yRatio: 0.5 }];
+                for (let i = 1; i <= n; i++) {
+                    ports.push({ id: `out${i}`, side: 'right', type: 'output', label: `Out ${i}`, yRatio: i / (n + 1) });
+                }
+                return ports;
+            },
             renderBody(node) {
-                const w = this.width, h = this.height;
-                // Mirror of combiner: narrow on left, wide on right
-                const pts = `${w*0.18},${h*0.38} ${w*0.18},${h*0.62} ${w},${h*0.78} ${w},${h*0.22}`;
-                return `
-                    <polygon class="sv-node-body" points="${pts}"/>
-                    <line class="sv-node-deco" x1="0" y1="${h*0.5}" x2="${w*0.18}" y2="${h*0.5}" stroke-width="2" opacity="0.6"/>
-                    <line class="sv-node-deco" x1="${w*0.45}" y1="${h*0.46}" x2="${w}" y2="${h*0.33}" stroke-width="1.5" opacity="0.5"/>
-                    <line class="sv-node-deco" x1="${w*0.45}" y1="${h*0.54}" x2="${w}" y2="${h*0.67}" stroke-width="1.5" opacity="0.5"/>
-                    <line class="sv-node-deco" x1="${w*0.45}" y1="${h*0.46}" x2="${w*0.45}" y2="${h*0.54}" stroke-width="1.5" opacity="0.5"/>
-                    <line class="sv-node-deco" x1="${w*0.18}" y1="${h*0.5}" x2="${w*0.45}" y2="${h*0.5}" stroke-width="1.5" opacity="0.5"/>
-                    <text class="sv-node-type-icon" x="${w*0.65}" y="${h*0.46}" text-anchor="middle" font-size="9">SPLT</text>
-                    <text class="sv-node-label"     x="${w*0.65}" y="${h*0.60}" text-anchor="middle" font-size="8">${_esc(node.label)}</text>
-                `;
+                const n  = Math.min(8, Math.max(2, node.props?.numPorts ?? 2));
+                const w  = this.width;
+                const h  = typeof this.getHeight === 'function' ? this.getHeight(node) : this.height;
+                const inY = h * 0.5;
+                const oy1 = h * (1 / (n + 1));
+                const oy2 = h * (n / (n + 1));
+                const neckX = w * 0.28;
+                const pts = `0,${inY - 12} 0,${inY + 12} ${neckX},${oy2 + 4} ${neckX},${oy1 - 4}`;
+                let out = `<polygon class="sv-node-body" points="${pts}"/>`;
+                out += `<line class="sv-node-deco" x1="0" y1="${inY}" x2="${neckX}" y2="${inY}" stroke-width="2" opacity="0.6"/>`;
+                const jx = w * 0.45, jy = inY;
+                for (let i = 1; i <= n; i++) {
+                    const py = h * (i / (n + 1));
+                    out += `<line class="sv-node-deco" x1="${jx}" y1="${jy}" x2="${w}" y2="${py}" stroke-width="1.5" opacity="0.5"/>`;
+                }
+                if (n > 2) {
+                    out += `<line class="sv-node-deco" x1="${neckX}" y1="${inY}" x2="${jx}" y2="${jy}" stroke-width="1.5" opacity="0.5"/>`;
+                }
+                out += `<text class="sv-node-type-icon" x="${w*0.70}" y="${h*0.46}" text-anchor="middle" font-size="9">SPLT</text>`;
+                out += `<text class="sv-node-label"     x="${w*0.70}" y="${h*0.60}" text-anchor="middle" font-size="8">${_esc(node.label)}</text>`;
+                out += `<text class="sv-node-label"     x="${w*0.70}" y="${h*0.73}" text-anchor="middle" font-size="8">1:${n}</text>`;
+                return out;
             },
         },
 
@@ -583,7 +629,9 @@
         if (type === 'filter')       props = { filterType: 'lowpass', gainPowerType: 'avg', freqMHz: null, bandwidthMHz: null };
         if (type === '4port-switch') props = { mode: 'through' };
         if (type === 'coax-switch')  props = { activePort: 1, numPorts: 2 };
-        if (type === 'hybrid-3db' || type === 'combiner' || type === 'splitter' || type === 'coupler') props = {};
+        if (type === 'hybrid-3db' || type === 'coupler') props = {};
+        if (type === 'combiner') props = { numPorts: 2 };
+        if (type === 'splitter') props = { numPorts: 2 };
         if (type === 'antenna')      props = { freqMHz: null };
         if (type === 'return-loss')  props = { fwdDeviceUid: null, fwdDeviceName: null, rflDeviceUid: null, rflDeviceName: null, displayMode: 'rl' };
         if (type === 'tx-line')      props = { lengthFt: null };

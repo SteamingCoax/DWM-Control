@@ -1186,6 +1186,21 @@
 </div>`;
             }
 
+            // ── Combiner / Splitter port count ────────────────────────────────
+            if (node.type === 'combiner' || node.type === 'splitter') {
+                const np = node.props.numPorts ?? 2;
+                let npOpts = '';
+                for (let i = 2; i <= 8; i++) {
+                    npOpts += `<option value="${i}"${np === i ? ' selected' : ''}>${i}</option>`;
+                }
+                const portLabel = node.type === 'combiner' ? 'Input Ports' : 'Output Ports';
+                html += `
+<div class="sv-props-field">
+    <label class="sv-props-label">${portLabel}</label>
+    <select class="sv-props-select" id="sv-prop-num-ports">${npOpts}</select>
+</div>`;
+            }
+
             // ── 4-Port Switch ─────────────────────────────────────────────────
             if (node.type === '4port-switch') {
                 html += `
@@ -1471,9 +1486,35 @@
                 }
             }
 
+            // Wire up combiner/splitter port count
+            if (node.type === 'combiner' || node.type === 'splitter') {
+                const npSel = document.getElementById('sv-prop-num-ports');
+                if (npSel) {
+                    npSel.addEventListener('change', () => {
+                        this._svPushUndo();
+                        const newN = parseInt(npSel.value, 10);
+                        const oldN = node.props.numPorts ?? 2;
+                        node.props.numPorts = newN;
+                        // Remove connections to ports that no longer exist
+                        const maxPortId = node.type === 'combiner' ? `in${oldN}` : `out${oldN}`;
+                        for (let i = newN + 1; i <= oldN; i++) {
+                            const portId = node.type === 'combiner' ? `in${i}` : `out${i}`;
+                            for (const [cid, conn] of this.sv.connections) {
+                                if ((conn.fromNode === node.id && conn.fromPort === portId) ||
+                                    (conn.toNode   === node.id && conn.toPort   === portId)) {
+                                    this.sv.connections.delete(cid);
+                                }
+                            }
+                        }
+                        this._svRender();
+                        this._svRenderProperties(node.id);
+                        this._svMarkDirty();
+                    });
+                }
+            }
+
             // Wire up 4-port switch mode
-            if (node.type === '4port-switch') {
-                const modeSel = document.getElementById('sv-prop-sw-mode');
+            if (node.type === '4port-switch') {                const modeSel = document.getElementById('sv-prop-sw-mode');
                 if (modeSel) {
                     modeSel.addEventListener('change', () => {
                         this._svPushUndo();
@@ -2004,8 +2045,9 @@
 
         // ── Data logging capture ───────────────────────────────────────────────
         if (this.sv.logging && window.electronAPI?.svLogRow) {
-            const q = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;
-            const ts = new Date().toISOString();
+            const now = new Date();
+            const ts  = now.toISOString();
+            const epochMs = now.getTime();
             const vals = [];
 
             // Ensure column order matches header (built at start)
@@ -2014,7 +2056,7 @@
                 if (!node) { vals.push(''); continue; }
 
                 if (node.type === 'dwm-meter') {
-                    let text = '';
+                    let numeric = '';
                     const deviceUid = node.props.deviceUid;
                     if (deviceUid && window.dwm?.meterRegistry) {
                         for (const rec of window.dwm.meterRegistry.values()) {
@@ -2023,38 +2065,34 @@
                                 rec.state?.lastSnapshotRaw) {
                                 const pt = node.props.powerType || 'avg';
                                 const w  = parseFloat(rec.state.lastSnapshotRaw[pt] ?? rec.state.lastSnapshotRaw.avg);
-                                if (Number.isFinite(w) && w >= 0 && typeof window.dwm.scalePower === 'function') {
-                                    const scaled = window.dwm.scalePower(w);
-                                    text = scaled.scaled.toFixed(4) + ' ' + scaled.unit;
-                                }
+                                if (Number.isFinite(w) && w >= 0) numeric = w.toFixed(6);
                                 break;
                             }
                         }
                     }
-                    vals.push(text);
+                    vals.push(numeric);
                 } else if (node.type === 'return-loss') {
                     const pfwd = getRLPowerW(node.props?.fwdDeviceUid);
                     const prfl = getRLPowerW(node.props?.rflDeviceUid);
-                    let displayText = '';
+                    let numeric = '';
                     const mode = node.props?.displayMode || 'rl';
                     if (pfwd !== null && prfl !== null) {
                         const ratio = Math.min(prfl / pfwd, 0.9999);
                         if (mode === 'swr') {
                             const gamma = Math.sqrt(ratio);
-                            const swr   = (1 + gamma) / (1 - gamma);
-                            displayText = swr.toFixed(4) + ':1';
+                            numeric = ((1 + gamma) / (1 - gamma)).toFixed(6);
                         } else {
-                            displayText = (-10 * Math.log10(ratio)).toFixed(2) + ' dB';
+                            numeric = (-10 * Math.log10(ratio)).toFixed(6);
                         }
                     }
-                    vals.push(displayText);
+                    vals.push(numeric);
                 } else {
                     vals.push('');
                 }
             }
 
-            const csvRow = [q(ts), ...vals.map(q)].join(',');
-            window.electronAPI.svLogRow({ row: csvRow }).catch(() => {});
+            const row = [ts, epochMs, ...vals].join(',');
+            window.electronAPI.svLogRow({ row }).catch(() => {});
         }
     };
 
@@ -2098,28 +2136,72 @@
             this.sv.logging    = true;
             this._svSetLocked(true);
 
-            // Build header row from current meter nodes
+            // Build column metadata from current meter nodes
             const colIds   = [];
-            const colNames = [];
+            const colMeta  = [];   // { shortName, label, type, unit, measureType, powerType, displayMode }
             for (const node of this.sv.nodes.values()) {
                 if (node.type === 'dwm-meter' || node.type === 'return-loss') {
                     colIds.push(node.id);
-                    const label = node.label || node.id;
-                    const suffix = node.type === 'dwm-meter'
-                        ? ` (${node.props?.measureType || 'fwd'} ${(node.props?.powerType || 'avg').toUpperCase()})`
-                        : ` (${node.props?.displayMode === 'swr' ? 'SWR' : 'Return Loss'})`;
-                    colNames.push(label + suffix);
+                    if (node.type === 'dwm-meter') {
+                        const mt = node.props?.measureType || 'forward';
+                        const pt = (node.props?.powerType || 'avg').toUpperCase();
+                        colMeta.push({
+                            shortName:   (node.label || node.id).replace(/,/g, ';'),
+                            label:       node.label || node.id,
+                            type:        'Power',
+                            unit:        'W',
+                            measureType: mt.charAt(0).toUpperCase() + mt.slice(1),
+                            powerType:   pt,
+                            device:      node.props?.deviceName || node.props?.deviceUid || '',
+                        });
+                    } else {
+                        const mode = node.props?.displayMode === 'swr' ? 'SWR' : 'Return Loss';
+                        colMeta.push({
+                            shortName:   (node.label || node.id).replace(/,/g, ';'),
+                            label:       node.label || node.id,
+                            type:        mode,
+                            unit:        mode === 'SWR' ? 'ratio' : 'dB',
+                            measureType: '',
+                            powerType:   '',
+                            device:      '',
+                        });
+                    }
                 }
             }
             this.sv.logColumns = colIds;
 
-            const header = ['Timestamp', ...colNames].map(v => `"${String(v).replace(/"/g,'""')}"`).join(',');
-            const ts     = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-            const wsName = (this.sv.currentWsName || 'log').replace(/[^a-zA-Z0-9_-]/g, '_');
-            const filename = `${wsName}-${ts}`;
+            const sampleRateMs = this.config?.globalSampleIntervalMs || 100;
+            const startIso     = new Date().toISOString();
+            const wsName       = this.sv.currentWsName || 'Untitled';
+            const ts           = startIso.replace(/[:.]/g, '-').slice(0, 19);
+            const filename     = (wsName).replace(/[^a-zA-Z0-9_-]/g, '_') + '-' + ts;
+
+            // Build the file header block (# comments = metadata, not parsed as data)
+            const metaLines = [
+                `# DWM-Control Power Log`,
+                `# Workspace: ${wsName}`,
+                `# Start Time: ${startIso}`,
+                `# Sample Rate: ${sampleRateMs} ms`,
+                `# Channels: ${colMeta.length}`,
+            ];
+            for (let i = 0; i < colMeta.length; i++) {
+                const m = colMeta[i];
+                metaLines.push(`# CH${i + 1}: ${m.shortName} | Type: ${m.type} | Measurement: ${m.measureType} | Mode: ${m.powerType} | Unit: ${m.unit}${m.device ? ' | Device: ' + m.device : ''}`);
+            }
+            metaLines.push(`#`);
+
+            // Column header row — short, clean names importable by any tool
+            const dataColNames = ['Timestamp_ISO', 'Timestamp_ms', ...colMeta.map((m, i) => `CH${i + 1}_${m.shortName}`)];
+            const unitRow      = ['[ISO 8601]',    '[ms]',         ...colMeta.map(m => `[${m.unit}]`)];
+
+            const headerBlock = [
+                metaLines.join('\r\n'),
+                dataColNames.join(','),
+                unitRow.join(','),
+            ].join('\r\n');
 
             if (window.electronAPI?.svLogOpen) {
-                window.electronAPI.svLogOpen({ header, filename }).then(result => {
+                window.electronAPI.svLogOpen({ header: headerBlock, filename }).then(result => {
                     if (result?.success) {
                         this.sv.logFilePath = result.filePath;
                     } else {
@@ -2726,7 +2808,8 @@
         if (typeId === 'filter')       return { filterType: 'lowpass', ...gpt, freqMHz: null, bandwidthMHz: null };
         if (typeId === '4port-switch') return { mode: 'through' };
         if (typeId === 'coax-switch')  return { activePort: 1, numPorts: 2 };
-        if (['hybrid-3db', 'combiner', 'splitter', 'coupler'].includes(typeId)) return {};
+        if (['hybrid-3db', 'coupler'].includes(typeId)) return {};
+        if (typeId === 'combiner' || typeId === 'splitter') return { numPorts: 2 };
         if (typeId === 'antenna')      return { freqMHz: null };
         if (typeId === 'return-loss')  return { fwdDeviceUid: null, fwdDeviceName: null, rflDeviceUid: null, rflDeviceName: null, displayMode: 'rl' };
         if (typeId === 'tx-line')      return { lengthFt: null };

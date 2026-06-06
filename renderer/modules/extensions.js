@@ -698,7 +698,7 @@
             lastDevice: null,
             lastPort: null,
             lastBaud: 115200,
-            globalSampleIntervalMs: 250,
+            globalSampleIntervalMs: 100,
             globalDebugLoggingEnabled: false,
             meterCardOrder: [],
             boardCardOrder: [],

@@ -1124,7 +1124,7 @@ ipcMain.handle('sv-log-set-dir', async () => {
   return { success: true, logsDir: newDir };
 });
 
-// Open log file and write CSV header
+// Open log file and write multi-section CSV header
 ipcMain.handle('sv-log-open', async (_event, { header, filename }) => {
   // Close any existing stream first
   if (activeLogStream) {
@@ -1143,7 +1143,8 @@ ipcMain.handle('sv-log-open', async (_event, { header, filename }) => {
       activeLogStream = null;
       activeLogPath   = null;
     });
-    activeLogStream.write(header + '\r\n');
+    // UTF-8 BOM for Excel compatibility, then the header block (already CRLF-terminated by renderer)
+    activeLogStream.write('\uFEFF' + header + '\r\n');
     activeLogPath = filePath;
     return { success: true, filePath };
   } catch (e) {
