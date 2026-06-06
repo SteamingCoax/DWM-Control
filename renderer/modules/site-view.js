@@ -1465,8 +1465,8 @@
                         for (let i = newN + 1; i <= 8; i++) {
                             const portId = `out${i}`;
                             for (const [cid, conn] of this.sv.connections) {
-                                if ((conn.fromNode === node.id && conn.fromPort === portId) ||
-                                    (conn.toNode   === node.id && conn.toPort   === portId)) {
+                                if ((conn.fromNodeId === node.id && conn.fromPortId === portId) ||
+                                    (conn.toNodeId   === node.id && conn.toPortId   === portId)) {
                                     this.sv.connections.delete(cid);
                                 }
                             }
@@ -1496,12 +1496,11 @@
                         const oldN = node.props.numPorts ?? 2;
                         node.props.numPorts = newN;
                         // Remove connections to ports that no longer exist
-                        const maxPortId = node.type === 'combiner' ? `in${oldN}` : `out${oldN}`;
                         for (let i = newN + 1; i <= oldN; i++) {
                             const portId = node.type === 'combiner' ? `in${i}` : `out${i}`;
                             for (const [cid, conn] of this.sv.connections) {
-                                if ((conn.fromNode === node.id && conn.fromPort === portId) ||
-                                    (conn.toNode   === node.id && conn.toPort   === portId)) {
+                                if ((conn.fromNodeId === node.id && conn.fromPortId === portId) ||
+                                    (conn.toNodeId   === node.id && conn.toPortId   === portId)) {
                                     this.sv.connections.delete(cid);
                                 }
                             }
@@ -2176,6 +2175,73 @@
             const ts           = startIso.replace(/[:.]/g, '-').slice(0, 19);
             const filename     = (wsName).replace(/[^a-zA-Z0-9_-]/g, '_') + '-' + ts;
 
+            // ── Build schematic layout for comment block ───────────────────────
+            const TYPE_LABEL = {
+                'transmitter': 'Transmitter', 'amplifier': 'Amplifier',
+                'attenuator': 'Attenuator',   'dwm-meter': 'Meter',
+                'hybrid-3db': '3dB Hybrid',   'combiner': 'Combiner',
+                'splitter': 'Splitter',        'antenna': 'Antenna',
+                'load-terminator': 'Load',     'coax-switch': 'Coax Switch',
+                '4port-switch': '4-Port SW',   'filter': 'Filter',
+                'coupler': 'Coupler',          'tx-line': 'TX Line',
+                'return-loss': 'Return Loss',
+            };
+            const nodeProps = (node) => {
+                const p = node.props || {};
+                switch (node.type) {
+                    case 'transmitter': return [p.powerW != null ? `${p.powerW} W` : '', p.freqMHz != null ? `${p.freqMHz} MHz` : ''].filter(Boolean).join(', ');
+                    case 'amplifier':   return p.gainDb != null ? `Gain: ${p.gainDb >= 0 ? '+' : ''}${p.gainDb} dB` : '';
+                    case 'attenuator':  return `${p.attenuationDb ?? 3} dB`;
+                    case 'dwm-meter':   return `${p.measureType || 'Forward'} ${(p.powerType || 'avg').toUpperCase()}${p.deviceName ? ' — ' + p.deviceName : ''}`;
+                    case 'return-loss': return `Mode: ${p.displayMode === 'swr' ? 'SWR' : 'Return Loss'}`;
+                    case 'coax-switch': return `1:${p.numPorts ?? 2}, Active: P${p.activePort ?? 1}`;
+                    case 'combiner':    return `${p.numPorts ?? 2}:1`;
+                    case 'splitter':    return `1:${p.numPorts ?? 2}`;
+                    case 'filter':      return [p.filterType || 'lowpass', p.freqMHz != null ? `${p.freqMHz} MHz` : ''].filter(Boolean).join(', ');
+                    case 'tx-line':     return p.lengthFt != null ? `${p.lengthFt} ft` : '';
+                    case 'antenna':     return p.freqMHz != null ? `${p.freqMHz} MHz` : '';
+                    default: return '';
+                }
+            };
+
+            // Component list
+            const schematicLines = ['#', '# --- Schematic Layout ---'];
+            const allNodes = [...this.sv.nodes.values()];
+            schematicLines.push(`# Components (${allNodes.length}):`);
+            for (const n of allNodes) {
+                const typeStr  = TYPE_LABEL[n.type] || n.type;
+                const propsStr = nodeProps(n);
+                const pad      = (s, l) => s + ' '.repeat(Math.max(0, l - s.length));
+                schematicLines.push(`#   ${pad(n.label || n.id, 14)}  ${pad(typeStr, 14)}  ${propsStr}`);
+            }
+
+            // Connection list — resolve port labels for readability
+            const allConns = [...this.sv.connections.values()];
+            schematicLines.push(`#`);
+            schematicLines.push(`# Connections (${allConns.length}):`);
+
+            // Sort connections by from-node label then from-port
+            const getPortLabel = (node, portId) => {
+                if (!node) return portId;
+                const port = window.SiteViewComponents.getNodePorts(node).find(p => p.id === portId);
+                return port ? port.label : portId;
+            };
+            const sortedConns = [...allConns].sort((a, b) => {
+                const la = (this.sv.nodes.get(a.fromNodeId)?.label || '') + a.fromPortId;
+                const lb = (this.sv.nodes.get(b.fromNodeId)?.label || '') + b.fromPortId;
+                return la.localeCompare(lb);
+            });
+            for (const conn of sortedConns) {
+                const fn = this.sv.nodes.get(conn.fromNodeId);
+                const tn = this.sv.nodes.get(conn.toNodeId);
+                const fl = fn ? (fn.label || fn.id) : conn.fromNodeId;
+                const tl = tn ? (tn.label || tn.id) : conn.toNodeId;
+                const fp = getPortLabel(fn, conn.fromPortId);
+                const tp = getPortLabel(tn, conn.toPortId);
+                schematicLines.push(`#   ${fl} [${fp}]  -->  ${tl} [${tp}]`);
+            }
+            schematicLines.push('#');
+
             // Build the file header block (# comments = metadata, not parsed as data)
             const metaLines = [
                 `# DWM-Control Power Log`,
@@ -2188,7 +2254,6 @@
                 const m = colMeta[i];
                 metaLines.push(`# CH${i + 1}: ${m.shortName} | Type: ${m.type} | Measurement: ${m.measureType} | Mode: ${m.powerType} | Unit: ${m.unit}${m.device ? ' | Device: ' + m.device : ''}`);
             }
-            metaLines.push(`#`);
 
             // Column header row — short, clean names importable by any tool
             const dataColNames = ['Timestamp_ISO', 'Timestamp_ms', ...colMeta.map((m, i) => `CH${i + 1}_${m.shortName}`)];
@@ -2196,6 +2261,7 @@
 
             const headerBlock = [
                 metaLines.join('\r\n'),
+                schematicLines.join('\r\n'),
                 dataColNames.join(','),
                 unitRow.join(','),
             ].join('\r\n');
