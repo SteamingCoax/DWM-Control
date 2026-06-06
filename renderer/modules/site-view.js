@@ -1395,6 +1395,10 @@
                                     }
                                 }
                             }
+                            // Auto-set label to device name
+                            node.label = node.props.deviceName;
+                            const labelInput = document.getElementById('sv-prop-label');
+                            if (labelInput) labelInput.value = node.label;
                         }
                         this._svRender();
                         this._svMarkDirty();
@@ -2310,6 +2314,8 @@
             nodes:       [...this.sv.nodes.values()],
             connections: [...this.sv.connections.values()],
             viewport:    { ...this.sv.viewport },
+            currentWsId:   this.sv.currentWsId   || null,
+            currentWsName: this.sv.currentWsName  || null,
         };
         try {
             localStorage.setItem('dwm-siteview-schematic', JSON.stringify(data));
@@ -2357,6 +2363,9 @@
                     scale: Math.min(4, Math.max(0.2, data.viewport.scale)),
                 };
             }
+
+            if (data.currentWsId)   this.sv.currentWsId   = data.currentWsId;
+            if (data.currentWsName) this.sv.currentWsName = data.currentWsName;
         } catch (e) {
             console.warn('Site view load failed:', e);
         }
