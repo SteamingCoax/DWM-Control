@@ -52,6 +52,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   svLoadFile: (opts) => ipcRenderer.invoke('sv-load-file', opts),
   svLoadRecentFile: (filePath) => ipcRenderer.invoke('sv-load-recent-file', filePath),
 
+  // Workspace browser
+  svWsList:      ()       => ipcRenderer.invoke('sv-ws-list'),
+  svWsSave:      (opts)   => ipcRenderer.invoke('sv-ws-save', opts),
+  svWsLoad:      (opts)   => ipcRenderer.invoke('sv-ws-load', opts),
+  svWsDelete:    (opts)   => ipcRenderer.invoke('sv-ws-delete', opts),
+  svWsRename:    (opts)   => ipcRenderer.invoke('sv-ws-rename', opts),
+  svWsDuplicate: (opts)   => ipcRenderer.invoke('sv-ws-duplicate', opts),
+
   // Native menu action relay
   onMenuAction: (channel, callback) => {
     const MENU_CHANNELS = [

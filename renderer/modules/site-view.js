@@ -38,6 +38,8 @@
             saveTimer:      null,
             powerTimer:     null,
             isDirty:        false,
+            currentWsId:   null,
+            currentWsName: 'Untitled',
             undoStack:      [],
             redoStack:      [],
             isLocked:       false,
@@ -51,6 +53,7 @@
         this._svRender();
         this._svSetupEvents();
         this._svStartPowerUpdates();
+        this._svUpdateWsNameDisplay();
     };
 
     // ─── Sidebar palette ─────────────────────────────────────────────────────
@@ -429,6 +432,13 @@
         document.addEventListener('keydown', (e) => {
             const panel = document.getElementById('siteview-panel');
             if (!panel || !panel.classList.contains('active')) return;
+            if (e.key === 'Escape') {
+                const overlay = document.getElementById('sv-ws-modal-overlay');
+                if (overlay && overlay.style.display !== 'none') {
+                    e.stopPropagation();
+                    this._svCloseWorkspaceBrowser();
+                }
+            }
             if ((e.key === 'Delete' || e.key === 'Backspace') &&
                 !e.target.matches('input, textarea, select')) {
                 if (!this.sv.isLocked) this._svDeleteSelected();
@@ -448,27 +458,37 @@
         });
 
         // ── Toolbar buttons ───────────────────────────────────────────────────
-        const clearBtn    = document.getElementById('sv-clear-btn');
-        const fitBtn      = document.getElementById('sv-fit-btn');
-        const zoomInBtn   = document.getElementById('sv-zoom-in-btn');
-        const zoomOutBtn  = document.getElementById('sv-zoom-out-btn');
-        const deleteBtn   = document.getElementById('sv-delete-selected-btn');
-        const saveFileBtn = document.getElementById('sv-save-file-btn');
-        const loadFileBtn = document.getElementById('sv-load-file-btn');
-        const undoBtn     = document.getElementById('sv-undo-btn');
-        const redoBtn     = document.getElementById('sv-redo-btn');
-        const lockBtn     = document.getElementById('sv-lock-btn');
-        if (clearBtn)    clearBtn.addEventListener('click',    () => this._svClear());
-        if (fitBtn)      fitBtn.addEventListener('click',      () => this._svFitView());
-        if (deleteBtn)   deleteBtn.addEventListener('click',   () => this._svDeleteSelected());
-        if (saveFileBtn) saveFileBtn.addEventListener('click', () => this._svSaveToFile());
-        if (loadFileBtn) loadFileBtn.addEventListener('click', () => this._svLoadFromFile());
-        if (undoBtn)     undoBtn.addEventListener('click',     () => this._svUndo());
-        if (redoBtn)     redoBtn.addEventListener('click',     () => this._svRedo());
-        if (lockBtn)     lockBtn.addEventListener('click',     () => this._svSetLocked(!this.sv.isLocked));
+        const clearBtn      = document.getElementById('sv-clear-btn');
+        const fitBtn        = document.getElementById('sv-fit-btn');
+        const zoomInBtn     = document.getElementById('sv-zoom-in-btn');
+        const zoomOutBtn    = document.getElementById('sv-zoom-out-btn');
+        const deleteBtn     = document.getElementById('sv-delete-selected-btn');
+        const saveFileBtn   = document.getElementById('sv-save-file-btn');
+        const workspacesBtn = document.getElementById('sv-workspaces-btn');
+        const undoBtn       = document.getElementById('sv-undo-btn');
+        const redoBtn       = document.getElementById('sv-redo-btn');
+        const lockBtn       = document.getElementById('sv-lock-btn');
+        if (clearBtn)      clearBtn.addEventListener('click',      () => this._svClear());
+        if (fitBtn)        fitBtn.addEventListener('click',        () => this._svFitView());
+        if (deleteBtn)     deleteBtn.addEventListener('click',     () => this._svDeleteSelected());
+        if (saveFileBtn)   saveFileBtn.addEventListener('click',   () => this._svSaveToFile());
+        if (workspacesBtn) workspacesBtn.addEventListener('click', () => this._svOpenWorkspaceBrowser());
+        if (undoBtn)       undoBtn.addEventListener('click',       () => this._svUndo());
+        if (redoBtn)       redoBtn.addEventListener('click',       () => this._svRedo());
+        if (lockBtn)       lockBtn.addEventListener('click',       () => this._svSetLocked(!this.sv.isLocked));
         const exportBtn = document.getElementById('sv-export-btn');
-        if (exportBtn)   exportBtn.addEventListener('click',   () => this._svExportCSV());
+        if (exportBtn)     exportBtn.addEventListener('click',     () => this._svExportCSV());
         this._svUpdateUndoRedoBtns();
+
+        // Workspace browser modal
+        const wsCloseBtn = document.getElementById('sv-ws-close-btn');
+        const wsNewBtn   = document.getElementById('sv-ws-new-btn');
+        const wsOverlay  = document.getElementById('sv-ws-modal-overlay');
+        if (wsCloseBtn) wsCloseBtn.addEventListener('click', () => this._svCloseWorkspaceBrowser());
+        if (wsNewBtn)   wsNewBtn.addEventListener('click',   () => this._svWsNew());
+        if (wsOverlay)  wsOverlay.addEventListener('click', (e) => {
+            if (e.target === wsOverlay) this._svCloseWorkspaceBrowser();
+        });
 
         const _svDoZoom = (factor) => {
             const container = document.getElementById('sv-canvas-container');
@@ -2117,6 +2137,7 @@
 
     DWMControl.prototype._svMarkDirty = function () {
         this.sv.isDirty = true;
+        this._svUpdateWsNameDisplay();
         this._svSetSaveStatus('saving');
         if (this.sv.saveTimer) clearTimeout(this.sv.saveTimer);
         this.sv.saveTimer = setTimeout(() => {
@@ -2190,21 +2211,26 @@
     // ─── Save / Load to file ──────────────────────────────────────────────────
 
     DWMControl.prototype._svSaveToFile = function () {
-        const data = {
+        const schematic = {
             version:     1,
             nodes:       [...this.sv.nodes.values()],
             connections: [...this.sv.connections.values()],
             viewport:    { ...this.sv.viewport },
         };
-        const content = JSON.stringify(data, null, 2);
-        window.electronAPI.svSaveFile({
-            defaultName: 'site-schematic.json',
-            content,
-            filterName: 'Site Schematic',
-            ext: 'json',
-        }).then(result => {
-            if (result?.success) this._svSetSaveStatus('saved');
-        }).catch(err => console.error('Save failed:', err));
+        const thumbnail      = this._svGenerateThumbnail();
+        const componentCount = this.sv.nodes.size;
+        const name           = this.sv.currentWsName || 'Untitled';
+        const id             = this.sv.currentWsId   || null;
+
+        window.electronAPI.svWsSave({ id, name, schematic, thumbnail, componentCount })
+            .then(result => {
+                if (!result?.success) return;
+                this.sv.currentWsId = result.id;
+                this.sv.isDirty = false;
+                this._svUpdateWsNameDisplay();
+                this._svSetSaveStatus('saved');
+            })
+            .catch(err => console.error('Workspace save failed:', err));
     };
 
     DWMControl.prototype._svLoadFromFile = function () {
@@ -2245,6 +2271,244 @@
                 this._svMarkDirty();
             })
             .catch(err => console.error('Load failed:', err));
+    };
+
+    // ─── Workspace name display ───────────────────────────────────────────────
+
+    DWMControl.prototype._svUpdateWsNameDisplay = function () {
+        const el = document.getElementById('sv-current-ws-name');
+        if (!el) return;
+        const name = this.sv.currentWsName || 'Untitled';
+        el.textContent = this.sv.isDirty ? name + ' *' : name;
+        el.title = name;
+    };
+
+    // ─── Thumbnail generation ─────────────────────────────────────────────────
+
+    DWMControl.prototype._svGenerateThumbnail = function () {
+        if (this.sv.nodes.size === 0) return null;
+
+        const { COMPONENT_TYPES } = window.SiteViewComponents;
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const node of this.sv.nodes.values()) {
+            const td = COMPONENT_TYPES[node.type];
+            if (!td) continue;
+            minX = Math.min(minX, node.x);
+            minY = Math.min(minY, node.y);
+            maxX = Math.max(maxX, node.x + td.width);
+            maxY = Math.max(maxY, node.y + td.height);
+        }
+        if (!isFinite(minX)) return null;
+
+        const pad = 20;
+        minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+        const bw = maxX - minX, bh = maxY - minY;
+        const TW = 240, TH = 140;
+        const sc = Math.min(TW / bw, TH / bh);
+        const tx = (TW - bw * sc) / 2 - minX * sc;
+        const ty = (TH - bh * sc) / 2 - minY * sc;
+
+        const nodesEl = document.getElementById('sv-nodes-layer');
+        const connsEl = document.getElementById('sv-connections-layer');
+        if (!nodesEl) return null;
+
+        const nodesHtml = (nodesEl.innerHTML || '')
+            .replace(/stroke-dasharray="[^"]*"/g, '')
+            .replace(/class="sv-node-selection"[^/]*/g, 'visibility="hidden"')
+            .replace(/class="sv-port-hit[^"]*"[^/]*/g, '');
+        const connsHtml = connsEl ? connsEl.innerHTML || '' : '';
+
+        return `<svg xmlns="http://www.w3.org/2000/svg" width="${TW}" height="${TH}">` +
+            `<rect width="${TW}" height="${TH}" fill="#1e2a3a" rx="6"/>` +
+            `<g transform="translate(${tx.toFixed(2)},${ty.toFixed(2)}) scale(${sc.toFixed(4)})">` +
+            `<g>${connsHtml}</g><g>${nodesHtml}</g>` +
+            `</g></svg>`;
+    };
+
+    // ─── Workspace Browser ────────────────────────────────────────────────────
+
+    DWMControl.prototype._svOpenWorkspaceBrowser = function () {
+        const overlay = document.getElementById('sv-ws-modal-overlay');
+        if (!overlay) return;
+        overlay.style.display = 'flex';
+        this._svRefreshWorkspaceBrowser();
+    };
+
+    DWMControl.prototype._svCloseWorkspaceBrowser = function () {
+        const overlay = document.getElementById('sv-ws-modal-overlay');
+        if (overlay) overlay.style.display = 'none';
+    };
+
+    DWMControl.prototype._svRefreshWorkspaceBrowser = function () {
+        if (!window.electronAPI?.svWsList) return;
+        window.electronAPI.svWsList().then(result => {
+            const workspaces = result?.workspaces || [];
+            this._svRenderWorkspaceBrowserCards(workspaces);
+        }).catch(err => console.error('Failed to list workspaces:', err));
+    };
+
+    DWMControl.prototype._svRenderWorkspaceBrowserCards = function (workspaces) {
+        const grid     = document.getElementById('sv-ws-grid');
+        const empty    = document.getElementById('sv-ws-empty');
+        const subtitle = document.getElementById('sv-ws-modal-subtitle');
+        if (!grid) return;
+
+        if (subtitle) subtitle.textContent = workspaces.length > 0
+            ? `${workspaces.length} workspace${workspaces.length !== 1 ? 's' : ''}`
+            : '';
+
+        if (workspaces.length === 0) {
+            grid.style.display = 'none';
+            if (empty) empty.style.display = 'flex';
+            return;
+        }
+        grid.style.display = 'grid';
+        if (empty) empty.style.display = 'none';
+
+        grid.innerHTML = workspaces.map(ws => {
+            const isCurrent = ws.id === this.sv.currentWsId;
+            const modDate   = ws.modifiedAt ? _svRelativeDate(ws.modifiedAt) : 'Never saved';
+            const compStr   = ws.componentCount === 1 ? '1 component' : `${ws.componentCount || 0} components`;
+            const thumbHtml = ws.thumbnail
+                ? `<img class="sv-ws-card-thumb-img" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(ws.thumbnail)}" alt="Preview" loading="lazy">`
+                : `<div class="sv-ws-card-thumb-placeholder"><span>No Preview</span></div>`;
+
+            return `<div class="sv-ws-card${isCurrent ? ' sv-ws-card--current' : ''}" data-ws-id="${_esc(ws.id)}">
+            <div class="sv-ws-card-thumb">${thumbHtml}</div>
+            <div class="sv-ws-card-body">
+                <div class="sv-ws-card-name-row">
+                    <span class="sv-ws-card-name" data-ws-name="${_esc(ws.name)}">${_esc(ws.name)}</span>
+                    ${isCurrent ? '<span class="sv-ws-card-badge">Open</span>' : ''}
+                </div>
+                <div class="sv-ws-card-meta">${_esc(compStr)} &middot; ${_esc(modDate)}</div>
+                <div class="sv-ws-card-actions">
+                    <button class="sv-ws-card-btn sv-ws-card-btn--open"   data-action="open"      data-ws-id="${_esc(ws.id)}">${isCurrent ? 'Reload' : 'Open'}</button>
+                    <button class="sv-ws-card-btn sv-ws-card-btn--rename" data-action="rename"    data-ws-id="${_esc(ws.id)}" data-ws-name="${_esc(ws.name)}">Rename</button>
+                    <button class="sv-ws-card-btn sv-ws-card-btn--dupe"   data-action="duplicate" data-ws-id="${_esc(ws.id)}">Duplicate</button>
+                    <button class="sv-ws-card-btn sv-ws-card-btn--del"    data-action="delete"    data-ws-id="${_esc(ws.id)}">Delete</button>
+                </div>
+            </div>
+        </div>`;
+        }).join('');
+
+        grid.querySelectorAll('[data-action]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const action = btn.getAttribute('data-action');
+                const wsId   = btn.getAttribute('data-ws-id');
+                const wsName = btn.getAttribute('data-ws-name');
+                if (action === 'open')      this._svWsOpen(wsId);
+                if (action === 'rename')    this._svWsRename(wsId, wsName);
+                if (action === 'duplicate') this._svWsDuplicate(wsId);
+                if (action === 'delete')    this._svWsDelete(wsId);
+            });
+        });
+    };
+
+    DWMControl.prototype._svWsOpen = function (wsId) {
+        if (this.sv.isDirty) {
+            if (!window.confirm('You have unsaved changes. Open workspace anyway?')) return;
+        }
+        window.electronAPI.svWsLoad({ id: wsId }).then(result => {
+            if (!result?.success) { console.error('Load workspace failed:', result?.error); return; }
+            const data = result.schematic;
+            if (!data || data.version !== 1) { console.error('Invalid workspace data'); return; }
+            this.sv.nodes.clear();
+            this.sv.connections.clear();
+            this.sv.selectedNodeId  = null;
+            this.sv.selectedConnId  = null;
+            this.sv.selectedNodeIds.clear();
+            if (Array.isArray(data.nodes)) {
+                for (const node of data.nodes) {
+                    if (node?.id && node.type) this.sv.nodes.set(node.id, node);
+                }
+            }
+            if (Array.isArray(data.connections)) {
+                for (const conn of data.connections) {
+                    if (conn?.id) this.sv.connections.set(conn.id, conn);
+                }
+            }
+            if (data.viewport && typeof data.viewport.scale === 'number') {
+                this.sv.viewport = {
+                    x:     data.viewport.x ?? 0,
+                    y:     data.viewport.y ?? 0,
+                    scale: Math.min(4, Math.max(0.2, data.viewport.scale)),
+                };
+            }
+            this.sv.currentWsId   = wsId;
+            this.sv.currentWsName = result.name || 'Untitled';
+            this.sv.isDirty       = false;
+            this._svRender();
+            this._svRenderProperties();
+            this._svUpdateWsNameDisplay();
+            this._svSetSaveStatus('Loaded');
+            this._svCloseWorkspaceBrowser();
+        }).catch(err => console.error('Open workspace error:', err));
+    };
+
+    DWMControl.prototype._svWsRename = function (wsId, currentName) {
+        const newName = window.prompt('Rename workspace:', currentName || 'Untitled');
+        if (!newName || newName.trim() === '') return;
+        window.electronAPI.svWsRename({ id: wsId, name: newName.trim() }).then(result => {
+            if (!result?.success) return;
+            if (wsId === this.sv.currentWsId) {
+                this.sv.currentWsName = newName.trim();
+                this._svUpdateWsNameDisplay();
+            }
+            this._svRefreshWorkspaceBrowser();
+        }).catch(err => console.error('Rename failed:', err));
+    };
+
+    DWMControl.prototype._svWsDuplicate = function (wsId) {
+        window.electronAPI.svWsDuplicate({ id: wsId }).then(result => {
+            if (!result?.success) return;
+            this._svRefreshWorkspaceBrowser();
+        }).catch(err => console.error('Duplicate failed:', err));
+    };
+
+    DWMControl.prototype._svWsDelete = function (wsId) {
+        if (!window.confirm('Delete this workspace? This cannot be undone.')) return;
+        window.electronAPI.svWsDelete({ id: wsId }).then(result => {
+            if (!result?.success) return;
+            if (wsId === this.sv.currentWsId) {
+                this.sv.currentWsId   = null;
+                this.sv.currentWsName = 'Untitled';
+                this._svUpdateWsNameDisplay();
+            }
+            this._svRefreshWorkspaceBrowser();
+        }).catch(err => console.error('Delete failed:', err));
+    };
+
+    DWMControl.prototype._svWsNew = function () {
+        const name = window.prompt('New workspace name:', 'Untitled');
+        if (name === null) return;
+        if (this.sv.isDirty) {
+            if (!window.confirm('Save current workspace before creating a new one?')) {
+                this._svWsNewBlank(name.trim() || 'Untitled');
+                return;
+            }
+            this._svSaveToFile();
+        }
+        this._svWsNewBlank(name.trim() || 'Untitled');
+    };
+
+    DWMControl.prototype._svWsNewBlank = function (name) {
+        this.sv.nodes.clear();
+        this.sv.connections.clear();
+        this.sv.undoStack   = [];
+        this.sv.redoStack   = [];
+        this.sv.selectedNodeId  = null;
+        this.sv.selectedConnId  = null;
+        this.sv.selectedNodeIds.clear();
+        this.sv.viewport    = { x: 0, y: 0, scale: 1.0 };
+        this.sv.currentWsId   = null;
+        this.sv.currentWsName = name;
+        this.sv.isDirty       = false;
+        this._svRender();
+        this._svRenderProperties();
+        this._svUpdateWsNameDisplay();
+        this._svUpdateUndoRedoBtns();
+        this._svCloseWorkspaceBrowser();
     };
 
     // ─── Bezier connection path ───────────────────────────────────────────────
@@ -2311,6 +2575,17 @@
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
+    }
+
+    function _svRelativeDate(isoStr) {
+        const d   = new Date(isoStr);
+        const now = Date.now();
+        const s   = Math.round((now - d.getTime()) / 1000);
+        if (s < 60)        return 'just now';
+        if (s < 3600)      return `${Math.floor(s / 60)}m ago`;
+        if (s < 86400)     return `${Math.floor(s / 3600)}h ago`;
+        if (s < 86400 * 7) return `${Math.floor(s / 86400)}d ago`;
+        return d.toLocaleDateString();
     }
 
     function _defaultProps(typeId) {

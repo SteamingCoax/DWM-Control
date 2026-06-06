@@ -321,11 +321,12 @@
                             <button id="sv-delete-selected-btn" class="sv-toolbar-btn sv-toolbar-btn-danger">Delete</button>
                             <button id="sv-clear-btn" class="sv-toolbar-btn sv-toolbar-btn-danger">Clear All</button>
                             <div class="sv-toolbar-sep"></div>
+                            <button id="sv-workspaces-btn" class="sv-toolbar-btn sv-toolbar-btn-primary">Workspaces</button>
+                            <span id="sv-current-ws-name" class="sv-current-ws-name" title="Current workspace">Untitled</span>
                             <button id="sv-save-file-btn" class="sv-toolbar-btn">Save</button>
-                            <button id="sv-load-file-btn" class="sv-toolbar-btn">Load</button>
                             <button id="sv-export-btn" class="sv-toolbar-btn">Export</button>
                             <button id="sv-lock-btn" class="sv-toolbar-btn">Lock</button>
-                            <span id="sv-save-status" class="sv-save-status">Ready</span>
+                            <span id="sv-save-status" class="sv-save-status"></span>
                         </div>
                         <div class="sv-canvas-container" id="sv-canvas-container">
                             <svg id="sv-canvas-svg" class="sv-canvas-svg" xmlns="http://www.w3.org/2000/svg">
@@ -353,6 +354,31 @@
                 </div>
 
             </section>
+
+<!-- Workspace Browser Modal -->
+<div id="sv-ws-modal-overlay" class="sv-ws-modal-overlay" aria-modal="true" role="dialog" aria-label="Workspace Browser" style="display:none">
+    <div class="sv-ws-modal" id="sv-ws-modal">
+        <div class="sv-ws-modal-header">
+            <div class="sv-ws-modal-title-row">
+                <h2 class="sv-ws-modal-title">Workspaces</h2>
+                <span class="sv-ws-modal-subtitle" id="sv-ws-modal-subtitle"></span>
+            </div>
+            <div class="sv-ws-modal-header-actions">
+                <button class="sv-ws-btn-primary" id="sv-ws-new-btn">+ New Workspace</button>
+                <button class="sv-ws-modal-close-btn" id="sv-ws-close-btn" aria-label="Close">&times;</button>
+            </div>
+        </div>
+        <div class="sv-ws-modal-body">
+            <div class="sv-ws-grid" id="sv-ws-grid">
+                <!-- Cards injected by JS -->
+            </div>
+            <div class="sv-ws-empty" id="sv-ws-empty" style="display:none">
+                <p>No workspaces yet.</p>
+                <p class="sv-ws-empty-sub">Click <strong>+ New Workspace</strong> to get started.</p>
+            </div>
+        </div>
+    </div>
+</div>
         </main>
         <!-- Output Console (Global) -->
         <aside id="output-section" class="console-sidebar">

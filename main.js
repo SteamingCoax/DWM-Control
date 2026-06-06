@@ -912,6 +912,94 @@ ipcMain.handle('sv-load-recent-file', async (_event, filePath) => {
   }
 });
 
+// ─── Workspace Browser ────────────────────────────────────────────────────
+
+function getWorkspacesDir() {
+  const dir = path.join(app.getPath('userData'), 'workspaces');
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+ipcMain.handle('sv-ws-list', async () => {
+  const dir = getWorkspacesDir();
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.svws'));
+  const workspaces = [];
+  for (const f of files) {
+    try {
+      const raw = fs.readFileSync(path.join(dir, f), 'utf8');
+      const data = JSON.parse(raw);
+      workspaces.push({
+        id:             f.slice(0, -5),
+        name:           data.name || 'Untitled',
+        createdAt:      data.createdAt   || null,
+        modifiedAt:     data.modifiedAt  || null,
+        componentCount: data.componentCount || 0,
+        thumbnail:      data.thumbnail   || null,
+      });
+    } catch (_) {}
+  }
+  workspaces.sort((a, b) => (b.modifiedAt || '').localeCompare(a.modifiedAt || ''));
+  return { workspaces };
+});
+
+ipcMain.handle('sv-ws-save', async (_event, { id, name, schematic, thumbnail, componentCount }) => {
+  const dir = getWorkspacesDir();
+  const wsId = id || ('ws-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6));
+  const filePath = path.join(dir, wsId + '.svws');
+  let createdAt = new Date().toISOString();
+  if (fs.existsSync(filePath)) {
+    try { createdAt = JSON.parse(fs.readFileSync(filePath, 'utf8')).createdAt || createdAt; } catch (_) {}
+  }
+  const data = {
+    version: 1, name, createdAt,
+    modifiedAt: new Date().toISOString(),
+    componentCount, thumbnail, schematic,
+  };
+  fs.writeFileSync(filePath, JSON.stringify(data), 'utf8');
+  return { success: true, id: wsId };
+});
+
+ipcMain.handle('sv-ws-load', async (_event, { id }) => {
+  const filePath = path.join(getWorkspacesDir(), id + '.svws');
+  try {
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    return { success: true, id, name: data.name, schematic: data.schematic };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle('sv-ws-delete', async (_event, { id }) => {
+  const filePath = path.join(getWorkspacesDir(), id + '.svws');
+  try { fs.unlinkSync(filePath); return { success: true }; }
+  catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('sv-ws-rename', async (_event, { id, name }) => {
+  const filePath = path.join(getWorkspacesDir(), id + '.svws');
+  try {
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    data.name = name;
+    data.modifiedAt = new Date().toISOString();
+    fs.writeFileSync(filePath, JSON.stringify(data), 'utf8');
+    return { success: true };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
+ipcMain.handle('sv-ws-duplicate', async (_event, { id }) => {
+  const dir = getWorkspacesDir();
+  const srcPath = path.join(dir, id + '.svws');
+  try {
+    const data = JSON.parse(fs.readFileSync(srcPath, 'utf8'));
+    const newId = 'ws-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+    data.name = (data.name || 'Untitled') + ' (Copy)';
+    data.createdAt = new Date().toISOString();
+    data.modifiedAt = new Date().toISOString();
+    fs.writeFileSync(path.join(dir, newId + '.svws'), JSON.stringify(data), 'utf8');
+    return { success: true, id: newId };
+  } catch (e) { return { success: false, error: e.message }; }
+});
+
 // Get file statistics — path is restricted to the user's home directory
 ipcMain.handle('get-file-stats', async (event, filePath) => {
   try {
