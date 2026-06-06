@@ -1419,3 +1419,75 @@
     background: rgba(239, 68, 68, 0.12);
     border-color: var(--color-danger, #ef4444);
 }
+
+/* ─── Inline workspace name form ─────────────────────────────────────────── */
+
+.sv-ws-name-form {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0 14px;
+    border-bottom: 1px solid var(--border-light);
+    margin-bottom: 16px;
+}
+
+.sv-ws-name-input {
+    flex: 1;
+    background: var(--bg-primary);
+    border: 1.5px solid var(--color-primary, #3b82f6);
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 13px;
+    color: var(--text-primary);
+    outline: none;
+}
+.sv-ws-name-input:focus {
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
+}
+
+.sv-ws-name-cancel-btn {
+    background: transparent;
+    border: 1px solid var(--border-light);
+    color: var(--text-secondary);
+    border-radius: 6px;
+    padding: 7px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.12s;
+}
+.sv-ws-name-cancel-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+/* ─── Inline confirm bar ─────────────────────────────────────────────────── */
+
+.sv-ws-confirm-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 24px;
+    background: rgba(239, 68, 68, 0.08);
+    border-bottom: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.sv-ws-confirm-msg {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.sv-ws-btn-danger {
+    background: var(--color-danger, #ef4444);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.sv-ws-btn-danger:hover {
+    background: #dc2626;
+}

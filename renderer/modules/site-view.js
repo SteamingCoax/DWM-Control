@@ -481,14 +481,40 @@
         this._svUpdateUndoRedoBtns();
 
         // Workspace browser modal
-        const wsCloseBtn = document.getElementById('sv-ws-close-btn');
-        const wsNewBtn   = document.getElementById('sv-ws-new-btn');
-        const wsOverlay  = document.getElementById('sv-ws-modal-overlay');
+        const wsCloseBtn       = document.getElementById('sv-ws-close-btn');
+        const wsNewBtn         = document.getElementById('sv-ws-new-btn');
+        const wsOverlay        = document.getElementById('sv-ws-modal-overlay');
+        const wsNameForm       = document.getElementById('sv-ws-name-form');
+        const wsNameInput      = document.getElementById('sv-ws-name-input');
+        const wsNameConfirmBtn = document.getElementById('sv-ws-name-confirm-btn');
+        const wsNameCancelBtn  = document.getElementById('sv-ws-name-cancel-btn');
+
         if (wsCloseBtn) wsCloseBtn.addEventListener('click', () => this._svCloseWorkspaceBrowser());
-        if (wsNewBtn)   wsNewBtn.addEventListener('click',   () => this._svWsNew());
         if (wsOverlay)  wsOverlay.addEventListener('click', (e) => {
             if (e.target === wsOverlay) this._svCloseWorkspaceBrowser();
         });
+
+        // New Workspace: show inline name form
+        if (wsNewBtn) wsNewBtn.addEventListener('click', () => {
+            if (!wsNameForm || !wsNameInput) return;
+            wsNameConfirmBtn.textContent = 'Create';
+            wsNameInput.value = '';
+            wsNameInput.placeholder = 'Workspace name…';
+            wsNameInput.dataset.mode = 'new';
+            wsNameInput.dataset.wsId = '';
+            wsNameForm.style.display = 'flex';
+            wsNameInput.focus();
+        });
+
+        // Name form confirm (Create or Rename)
+        if (wsNameConfirmBtn) wsNameConfirmBtn.addEventListener('click', () => {
+            this._svWsNameFormSubmit();
+        });
+        if (wsNameInput) wsNameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') this._svWsNameFormSubmit();
+            if (e.key === 'Escape') this._svWsNameFormHide();
+        });
+        if (wsNameCancelBtn) wsNameCancelBtn.addEventListener('click', () => this._svWsNameFormHide());
 
         const _svDoZoom = (factor) => {
             const container = document.getElementById('sv-canvas-container');
@@ -2406,57 +2432,64 @@
     };
 
     DWMControl.prototype._svWsOpen = function (wsId) {
+        const doLoad = () => {
+            window.electronAPI.svWsLoad({ id: wsId }).then(result => {
+                if (!result?.success) { console.error('Load workspace failed:', result?.error); return; }
+                const data = result.schematic;
+                if (!data || data.version !== 1) { console.error('Invalid workspace data'); return; }
+                this.sv.nodes.clear();
+                this.sv.connections.clear();
+                this.sv.selectedNodeId  = null;
+                this.sv.selectedConnId  = null;
+                this.sv.selectedNodeIds.clear();
+                if (Array.isArray(data.nodes)) {
+                    for (const node of data.nodes) {
+                        if (node?.id && node.type) this.sv.nodes.set(node.id, node);
+                    }
+                }
+                if (Array.isArray(data.connections)) {
+                    for (const conn of data.connections) {
+                        if (conn?.id) this.sv.connections.set(conn.id, conn);
+                    }
+                }
+                if (data.viewport && typeof data.viewport.scale === 'number') {
+                    this.sv.viewport = {
+                        x:     data.viewport.x ?? 0,
+                        y:     data.viewport.y ?? 0,
+                        scale: Math.min(4, Math.max(0.2, data.viewport.scale)),
+                    };
+                }
+                this.sv.currentWsId   = wsId;
+                this.sv.currentWsName = result.name || 'Untitled';
+                this.sv.isDirty       = false;
+                this._svRender();
+                this._svRenderProperties();
+                this._svUpdateWsNameDisplay();
+                this._svSetSaveStatus('Loaded');
+                this._svCloseWorkspaceBrowser();
+            }).catch(err => console.error('Open workspace error:', err));
+        };
+
         if (this.sv.isDirty) {
-            if (!window.confirm('You have unsaved changes. Open workspace anyway?')) return;
+            this._svWsConfirm('Unsaved changes will be lost. Open workspace anyway?', doLoad);
+        } else {
+            doLoad();
         }
-        window.electronAPI.svWsLoad({ id: wsId }).then(result => {
-            if (!result?.success) { console.error('Load workspace failed:', result?.error); return; }
-            const data = result.schematic;
-            if (!data || data.version !== 1) { console.error('Invalid workspace data'); return; }
-            this.sv.nodes.clear();
-            this.sv.connections.clear();
-            this.sv.selectedNodeId  = null;
-            this.sv.selectedConnId  = null;
-            this.sv.selectedNodeIds.clear();
-            if (Array.isArray(data.nodes)) {
-                for (const node of data.nodes) {
-                    if (node?.id && node.type) this.sv.nodes.set(node.id, node);
-                }
-            }
-            if (Array.isArray(data.connections)) {
-                for (const conn of data.connections) {
-                    if (conn?.id) this.sv.connections.set(conn.id, conn);
-                }
-            }
-            if (data.viewport && typeof data.viewport.scale === 'number') {
-                this.sv.viewport = {
-                    x:     data.viewport.x ?? 0,
-                    y:     data.viewport.y ?? 0,
-                    scale: Math.min(4, Math.max(0.2, data.viewport.scale)),
-                };
-            }
-            this.sv.currentWsId   = wsId;
-            this.sv.currentWsName = result.name || 'Untitled';
-            this.sv.isDirty       = false;
-            this._svRender();
-            this._svRenderProperties();
-            this._svUpdateWsNameDisplay();
-            this._svSetSaveStatus('Loaded');
-            this._svCloseWorkspaceBrowser();
-        }).catch(err => console.error('Open workspace error:', err));
     };
 
     DWMControl.prototype._svWsRename = function (wsId, currentName) {
-        const newName = window.prompt('Rename workspace:', currentName || 'Untitled');
-        if (!newName || newName.trim() === '') return;
-        window.electronAPI.svWsRename({ id: wsId, name: newName.trim() }).then(result => {
-            if (!result?.success) return;
-            if (wsId === this.sv.currentWsId) {
-                this.sv.currentWsName = newName.trim();
-                this._svUpdateWsNameDisplay();
-            }
-            this._svRefreshWorkspaceBrowser();
-        }).catch(err => console.error('Rename failed:', err));
+        const wsNameForm       = document.getElementById('sv-ws-name-form');
+        const wsNameInput      = document.getElementById('sv-ws-name-input');
+        const wsNameConfirmBtn = document.getElementById('sv-ws-name-confirm-btn');
+        if (!wsNameForm || !wsNameInput) return;
+        wsNameConfirmBtn.textContent = 'Rename';
+        wsNameInput.value = currentName || 'Untitled';
+        wsNameInput.placeholder = 'Workspace name…';
+        wsNameInput.dataset.mode = 'rename';
+        wsNameInput.dataset.wsId = wsId;
+        wsNameForm.style.display = 'flex';
+        wsNameInput.focus();
+        wsNameInput.select();
     };
 
     DWMControl.prototype._svWsDuplicate = function (wsId) {
@@ -2467,29 +2500,77 @@
     };
 
     DWMControl.prototype._svWsDelete = function (wsId) {
-        if (!window.confirm('Delete this workspace? This cannot be undone.')) return;
-        window.electronAPI.svWsDelete({ id: wsId }).then(result => {
-            if (!result?.success) return;
-            if (wsId === this.sv.currentWsId) {
-                this.sv.currentWsId   = null;
-                this.sv.currentWsName = 'Untitled';
-                this._svUpdateWsNameDisplay();
-            }
-            this._svRefreshWorkspaceBrowser();
-        }).catch(err => console.error('Delete failed:', err));
+        this._svWsConfirm('Delete this workspace? This cannot be undone.', () => {
+            window.electronAPI.svWsDelete({ id: wsId }).then(result => {
+                if (!result?.success) return;
+                if (wsId === this.sv.currentWsId) {
+                    this.sv.currentWsId   = null;
+                    this.sv.currentWsName = 'Untitled';
+                    this._svUpdateWsNameDisplay();
+                }
+                this._svRefreshWorkspaceBrowser();
+            }).catch(err => console.error('Delete failed:', err));
+        });
     };
 
     DWMControl.prototype._svWsNew = function () {
-        const name = window.prompt('New workspace name:', 'Untitled');
-        if (name === null) return;
-        if (this.sv.isDirty) {
-            if (!window.confirm('Save current workspace before creating a new one?')) {
-                this._svWsNewBlank(name.trim() || 'Untitled');
-                return;
-            }
-            this._svSaveToFile();
+        // Handled via inline form — this is now a no-op stub kept for compat
+    };
+
+    // ─── Inline name form helpers ─────────────────────────────────────────────
+
+    DWMControl.prototype._svWsNameFormHide = function () {
+        const form = document.getElementById('sv-ws-name-form');
+        if (form) form.style.display = 'none';
+    };
+
+    DWMControl.prototype._svWsNameFormSubmit = function () {
+        const wsNameInput = document.getElementById('sv-ws-name-input');
+        if (!wsNameInput) return;
+        const name  = wsNameInput.value.trim() || 'Untitled';
+        const mode  = wsNameInput.dataset.mode;
+        const wsId  = wsNameInput.dataset.wsId;
+        this._svWsNameFormHide();
+        if (mode === 'rename' && wsId) {
+            window.electronAPI.svWsRename({ id: wsId, name }).then(result => {
+                if (!result?.success) return;
+                if (wsId === this.sv.currentWsId) {
+                    this.sv.currentWsName = name;
+                    this._svUpdateWsNameDisplay();
+                }
+                this._svRefreshWorkspaceBrowser();
+            }).catch(err => console.error('Rename failed:', err));
+        } else {
+            // mode === 'new'
+            if (this.sv.isDirty) this._svSaveToFile();
+            this._svWsNewBlank(name);
         }
-        this._svWsNewBlank(name.trim() || 'Untitled');
+    };
+
+    // ─── Inline confirm helper (no native dialogs) ────────────────────────────
+
+    DWMControl.prototype._svWsConfirm = function (message, onConfirm) {
+        const modal = document.getElementById('sv-ws-modal');
+        if (!modal) { if (onConfirm) onConfirm(); return; }
+
+        // Remove any existing confirm banner
+        const old = modal.querySelector('.sv-ws-confirm-bar');
+        if (old) old.remove();
+
+        const bar = document.createElement('div');
+        bar.className = 'sv-ws-confirm-bar';
+        bar.innerHTML =
+            `<span class="sv-ws-confirm-msg">${_esc(message)}</span>` +
+            `<button class="sv-ws-btn-danger sv-ws-confirm-yes">Confirm</button>` +
+            `<button class="sv-ws-name-cancel-btn sv-ws-confirm-no">Cancel</button>`;
+
+        modal.querySelector('.sv-ws-modal-header').insertAdjacentElement('afterend', bar);
+
+        bar.querySelector('.sv-ws-confirm-yes').addEventListener('click', () => {
+            bar.remove();
+            if (onConfirm) onConfirm();
+        });
+        bar.querySelector('.sv-ws-confirm-no').addEventListener('click', () => bar.remove());
     };
 
     DWMControl.prototype._svWsNewBlank = function (name) {
