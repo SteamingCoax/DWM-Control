@@ -932,7 +932,7 @@ function saveWsPrefs() {
 
 function getWorkspacesDir() {
   if (!WS_PREFS) loadWsPrefs();
-  const dir = WS_PREFS.workspacesDir || path.join(app.getPath('userData'), 'workspaces');
+  const dir = WS_PREFS.workspacesDir || path.join(os.homedir(), 'DWM-Control', 'Workspaces');
   if (!fs.existsSync(dir)) {
     try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}
   }
@@ -1086,8 +1086,8 @@ let activeLogPath    = null;  // full path to the current log file
 function getLogsDir() {
   if (!WS_PREFS) loadWsPrefs();
   const dir = WS_PREFS.logsDir || path.join(
-    WS_PREFS.workspacesDir || path.join(app.getPath('userData'), 'workspaces'),
-    'logs'
+    WS_PREFS.workspacesDir || path.join(os.homedir(), 'DWM-Control', 'Workspaces'),
+    'Logs'
   );
   if (!fs.existsSync(dir)) {
     try { fs.mkdirSync(dir, { recursive: true }); } catch (_) {}

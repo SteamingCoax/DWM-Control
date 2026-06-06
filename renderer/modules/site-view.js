@@ -1710,7 +1710,7 @@
 <div class="sv-props-field sv-log-dir-field">
     <label class="sv-props-label">Save Folder</label>
     <div class="sv-log-dir-row">
-        <span class="sv-log-dir-path" id="sv-log-dir-path" title="${_esc(this.sv.logsDir || '')}">Loading…</span>
+        <span class="sv-log-dir-path" id="sv-log-dir-path" title="${_esc(this.sv.logsDir || '')}">${_esc(this.sv.logsDir || 'Loading…')}</span>
         <button class="sv-props-btn sv-props-btn-sm" id="sv-log-dir-btn">Change…</button>
     </div>
 </div>
@@ -1720,7 +1720,7 @@
 <div class="sv-props-field sv-props-actions">
     <button class="sv-props-btn${this.sv.logging ? ' sv-props-btn-danger' : ''}" id="sv-ws-log-toggle">${this.sv.logging ? 'Stop Logging' : 'Start Logging'}</button>
 </div>
-<div class="sv-props-hint">Each row is written to disk immediately — safe against app crashes. Logging locks the workspace.</div>
+<div class="sv-props-hint">Locks the workspace while active. Writes to CSV in real-time.</div>
 </div>`;
 
             // Wire workspace settings
