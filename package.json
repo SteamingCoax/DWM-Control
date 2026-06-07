@@ -58,6 +58,7 @@
       "index.html",
       "styles.css",
       "styles-control.css",
+      "styles-site-view.css",
       "assets/",
       "Programs/",
       "node_modules/serialport/**/*",
