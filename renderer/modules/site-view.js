@@ -1099,7 +1099,12 @@
 
         if (this.sv.selectedNodeId) {
             const node = this.sv.nodes.get(this.sv.selectedNodeId);
-            if (!node) { content.innerHTML = ''; return; }
+            if (!node) {
+                // Node was deleted but ID wasn't cleared — show workspace settings
+                this.sv.selectedNodeId = null;
+                this._svRenderProperties();
+                return;
+            }
 
             let html = `<div class="sv-props-section">
 <div class="sv-props-title">${_esc(window.SiteViewComponents?.COMPONENT_TYPES?.[node.type]?.label || node.type)}</div>
@@ -1269,6 +1274,31 @@
     <label class="sv-props-label">Frequency (MHz)</label>
     <input class="sv-props-input" type="number" id="sv-prop-tx-freq"
            value="${_esc(String(node.props.freqMHz ?? ''))}" placeholder="e.g. 98.1" min="0" step="0.001">
+</div>`;
+            }
+
+            // ── Receiver ──────────────────────────────────────────────────────
+            if (node.type === 'receiver') {
+                html += `
+<div class="sv-props-field">
+    <label class="sv-props-label">Frequency (MHz)</label>
+    <input class="sv-props-input" type="number" id="sv-prop-rx-freq"
+           value="${_esc(String(node.props.freqMHz ?? ''))}" placeholder="e.g. 98.1" min="0" step="0.001">
+</div>`;
+            }
+
+            // ── Analyzer ──────────────────────────────────────────────────────
+            if (node.type === 'analyzer') {
+                html += `
+<div class="sv-props-field">
+    <label class="sv-props-label">Start Freq (MHz)</label>
+    <input class="sv-props-input" type="number" id="sv-prop-anlz-start"
+           value="${_esc(String(node.props.startFreqMHz ?? ''))}" placeholder="e.g. 88.0" min="0" step="0.1">
+</div>
+<div class="sv-props-field">
+    <label class="sv-props-label">Stop Freq (MHz)</label>
+    <input class="sv-props-input" type="number" id="sv-prop-anlz-stop"
+           value="${_esc(String(node.props.stopFreqMHz ?? ''))}" placeholder="e.g. 108.0" min="0" step="0.1">
 </div>`;
             }
 
@@ -1607,6 +1637,44 @@
                         this._svPushUndo();
                         const v = txFreq.value.trim();
                         node.props.freqMHz = v === '' ? null : parseFloat(v);
+                        this._svRender();
+                        this._svMarkDirty();
+                    });
+                }
+            }
+
+            // Wire up receiver frequency
+            if (node.type === 'receiver') {
+                const rxFreq = document.getElementById('sv-prop-rx-freq');
+                if (rxFreq) {
+                    rxFreq.addEventListener('change', () => {
+                        this._svPushUndo();
+                        const v = rxFreq.value.trim();
+                        node.props.freqMHz = v === '' ? null : parseFloat(v);
+                        this._svRender();
+                        this._svMarkDirty();
+                    });
+                }
+            }
+
+            // Wire up analyzer frequency range
+            if (node.type === 'analyzer') {
+                const anlzStart = document.getElementById('sv-prop-anlz-start');
+                const anlzStop  = document.getElementById('sv-prop-anlz-stop');
+                if (anlzStart) {
+                    anlzStart.addEventListener('change', () => {
+                        this._svPushUndo();
+                        const v = anlzStart.value.trim();
+                        node.props.startFreqMHz = v === '' ? null : parseFloat(v);
+                        this._svRender();
+                        this._svMarkDirty();
+                    });
+                }
+                if (anlzStop) {
+                    anlzStop.addEventListener('change', () => {
+                        this._svPushUndo();
+                        const v = anlzStop.value.trim();
+                        node.props.stopFreqMHz = v === '' ? null : parseFloat(v);
                         this._svRender();
                         this._svMarkDirty();
                     });
@@ -2188,7 +2256,8 @@
                 'load-terminator': 'Load',     'coax-switch': 'Coax Switch',
                 '4port-switch': '4-Port SW',   'filter': 'Filter',
                 'coupler': 'Coupler',          'tx-line': 'TX Line',
-                'return-loss': 'Return Loss',
+                'return-loss': 'Return Loss',  'receiver': 'Receiver',
+                'analyzer': 'Analyzer',
             };
             const nodeProps = (node) => {
                 const p = node.props || {};
@@ -2204,6 +2273,8 @@
                     case 'filter':      return [p.filterType || 'lowpass', p.freqMHz != null ? `${p.freqMHz} MHz` : ''].filter(Boolean).join(', ');
                     case 'tx-line':     return p.lengthFt != null ? `${p.lengthFt} ft` : '';
                     case 'antenna':     return p.freqMHz != null ? `${p.freqMHz} MHz` : '';
+                    case 'receiver':    return p.freqMHz != null ? `${p.freqMHz} MHz` : '';
+                    case 'analyzer':    return [p.startFreqMHz != null ? `${p.startFreqMHz}` : '', p.stopFreqMHz != null ? `${p.stopFreqMHz} MHz` : ''].filter(Boolean).join('–');
                     default: return '';
                 }
             };

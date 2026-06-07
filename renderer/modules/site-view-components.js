@@ -574,6 +574,78 @@
             },
         },
 
+        // ── Receiver ─────────────────────────────────────────────────────────
+        'receiver': {
+            id: 'receiver',
+            label: 'Receiver',
+            category: 'load',
+            width: 150,
+            height: 80,
+            defaultLabel: 'RX',
+            ports: [
+                { id: 'rf-in', side: 'left', type: 'input', label: 'RF In', yRatio: 0.5 },
+            ],
+            renderBody(node) {
+                const w = this.width, h = this.height;
+                const cx = w * 0.67, cy = h * 0.5;
+                const freq = node.props?.freqMHz != null ? `${node.props.freqMHz} MHz` : '';
+                // Signal waves on left side (incoming)
+                const wx = w * 0.09;
+                return `
+                    <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="6"/>
+                    <text class="sv-node-type-icon" x="${cx}" y="${cy - 10}" text-anchor="middle">RX</text>
+                    <text class="sv-node-label" x="${cx}" y="${cy + 5}" text-anchor="middle">${_esc(node.label)}</text>
+                    ${freq ? `<text class="sv-node-label" x="${cx}" y="${cy + 18}" text-anchor="middle" font-size="9">${_esc(freq)}</text>` : ''}
+                    <line class="sv-node-deco" x1="${w*0.40}" y1="${cy}" x2="${w*0.46}" y2="${cy}" stroke-width="1.5"/>
+                    <path class="sv-node-deco" d="M${wx},${cy-8} C${wx+8},${cy-14} ${wx+16},${cy-2} ${wx+24},${cy-8} S${wx+40},${cy-14} ${wx+48},${cy-8}" fill="none" stroke-width="1.5" stroke-linecap="round" opacity="0.85"/>
+                    <path class="sv-node-deco" d="M${wx},${cy}   C${wx+8},${cy-6}  ${wx+16},${cy+6}  ${wx+24},${cy}   S${wx+40},${cy-6}  ${wx+48},${cy}"   fill="none" stroke-width="1.5" stroke-linecap="round" opacity="1"/>
+                    <path class="sv-node-deco" d="M${wx},${cy+8} C${wx+8},${cy+2}  ${wx+16},${cy+14} ${wx+24},${cy+8} S${wx+40},${cy+2}  ${wx+48},${cy+8}" fill="none" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+                `;
+            },
+        },
+
+        // ── Spectrum Analyzer ─────────────────────────────────────────────────
+        'analyzer': {
+            id: 'analyzer',
+            label: 'Analyzer',
+            category: 'meters',
+            width: 160,
+            height: 100,
+            defaultLabel: 'SA',
+            ports: [
+                { id: 'rf-in', side: 'left', type: 'input', label: 'RF In', yRatio: 0.5 },
+            ],
+            renderBody(node) {
+                const w = this.width, h = this.height;
+                const startFreq = node.props?.startFreqMHz != null ? `${node.props.startFreqMHz}` : '';
+                const stopFreq  = node.props?.stopFreqMHz  != null ? `${node.props.stopFreqMHz}`  : '';
+                const freqRange = (startFreq && stopFreq) ? `${startFreq}–${stopFreq} MHz` : '';
+
+                // Spectrum bars (decorative) in right portion
+                const specX = w * 0.28, specW = w * 0.67;
+                const specBottom = h * 0.76, maxBarH = h * 0.46;
+                const barHeights = [0.20, 0.45, 0.90, 0.65, 1.0, 0.75, 0.50, 0.30, 0.55, 0.40, 0.60, 0.35];
+                const bStep = specW / barHeights.length;
+                const bWidth = (bStep * 0.65).toFixed(1);
+                let bars = '';
+                for (let i = 0; i < barHeights.length; i++) {
+                    const bx = (specX + i * bStep).toFixed(1);
+                    const bh = (maxBarH * barHeights[i]).toFixed(1);
+                    const by = (specBottom - parseFloat(bh)).toFixed(1);
+                    bars += `<rect class="sv-node-deco" x="${bx}" y="${by}" width="${bWidth}" height="${bh}" opacity="0.65" rx="1"/>`;
+                }
+
+                return `
+                    <rect class="sv-node-body" x="0" y="0" width="${w}" height="${h}" rx="6"/>
+                    <text class="sv-node-type-icon" x="${w*0.14}" y="${h*0.36}" text-anchor="middle" font-size="13">SA</text>
+                    <text class="sv-node-label"     x="${w*0.14}" y="${h*0.52}" text-anchor="middle" font-size="10">${_esc(node.label)}</text>
+                    ${bars}
+                    <line class="sv-node-deco" x1="${(specX-2).toFixed(1)}" y1="${specBottom}" x2="${(specX+specW+2).toFixed(1)}" y2="${specBottom}" stroke-width="0.8" opacity="0.4"/>
+                    ${freqRange ? `<text class="sv-node-label" x="${(specX + specW/2).toFixed(1)}" y="${(specBottom + 14).toFixed(1)}" text-anchor="middle" font-size="8">${_esc(freqRange)}</text>` : ''}
+                `;
+            },
+        },
+
         // ── Return Loss / SWR ─────────────────────────────────────────────────
         'return-loss': {
             id: 'return-loss',
@@ -635,6 +707,8 @@
         if (type === 'antenna')      props = { freqMHz: null };
         if (type === 'return-loss')  props = { fwdDeviceUid: null, fwdDeviceName: null, rflDeviceUid: null, rflDeviceName: null, displayMode: 'rl' };
         if (type === 'tx-line')      props = { lengthFt: null };
+        if (type === 'receiver')     props = { freqMHz: null };
+        if (type === 'analyzer')     props = { startFreqMHz: null, stopFreqMHz: null };
 
         return {
             id:    'node-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
