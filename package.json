@@ -13,6 +13,7 @@
     "dev:no-gpu": "npx electron . --disable-gpu",
     "rebuild": "electron-rebuild",
     "postinstall": "node scripts/postinstall.js",
+    "test:control-protocol": "node test-control-protocol.js",
     "test": "node test-site-view.js",
     "package": "electron-forge package",
     "make": "electron-forge make",

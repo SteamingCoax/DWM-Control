@@ -185,9 +185,12 @@
                 }
                 record.elementType = String(response.etype || record.elementType || '30ua').toLowerCase();
                 if (response.range !== undefined) {
-                    record.rangeMultiplier = this._parseRangeMultiplier(response.range);
+                    record.rangeMultiplier = this._parseRangeMultiplier(response.range, { legacyNumeric: response.proto === '1' });
                 }
-                record.rangeCfg = record.rangeMultiplier >= 4 ? 1 : 0;
+                record.rangeCfg = this._parseRangeCfg(response.range, {
+                    fallback: this._rangeMultiplierToCfg(record.rangeMultiplier, { fallback: 1 }),
+                    legacyNumeric: response.proto === '1',
+                });
                 // Calculate max power and store it
                 if (record.state) {
                     record.state.elementRating = record.elementRating;
@@ -243,7 +246,7 @@
                 [`meter-${sid}-snap-elem`]: response.elem || '-',
                 [`meter-${sid}-snap-etype`]: response.etype || '-',
                 [`meter-${sid}-snap-eval`]: this.formatPower(response.eval),
-                [`meter-${sid}-snap-range`]: response.range || '-',
+                [`meter-${sid}-snap-range`]: this._formatRangeLabel(response.range, { legacyNumeric: response.proto === '1' }),
                 [`meter-${sid}-snap-scale`]: this.formatPower(scaleMax),
                 [`meter-${sid}-snap-updated`]: new Date().toLocaleTimeString(),
             };
@@ -412,10 +415,13 @@
 
             if (cfgKey === 'range') {
                 const record = this.meterRegistry.get(key);
-                const rangeCfg = Number.parseInt(response.val, 10);
-                if (record && (rangeCfg === 0 || rangeCfg === 1)) {
+                const rangeCfg = this._parseRangeCfg(response.val, {
+                    fallback: this._rangeMultiplierToCfg(record?.rangeMultiplier, { fallback: 1 }),
+                    legacyNumeric: response.proto === '1',
+                });
+                if (record) {
                     record.rangeCfg = rangeCfg;
-                    record.rangeMultiplier = rangeCfg === 1 ? 4 : 2;
+                    record.rangeMultiplier = this._rangeCfgToMultiplier(rangeCfg);
                     if (record.state) {
                         record.state.rangeMultiplier = record.rangeMultiplier;
                         record.state.maxPowerW = (record.elementRating || 0) * record.rangeMultiplier;

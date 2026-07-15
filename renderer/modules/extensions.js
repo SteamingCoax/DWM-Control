@@ -699,6 +699,8 @@
             lastPort: null,
             lastBaud: 115200,
             globalSampleIntervalMs: 100,
+            usbApiProtocolVersion: 2,
+            usbApiAcceptLegacyV1: true,
             globalDebugLoggingEnabled: false,
             meterCardOrder: [],
             boardCardOrder: [],

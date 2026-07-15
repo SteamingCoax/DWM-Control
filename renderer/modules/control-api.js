@@ -37,7 +37,15 @@
         if (!line.startsWith('proto=')) return;
 
         const frame = this.parseApiFrame(line);
-        if (!frame || frame.proto !== '1' || !frame.type) return;
+        if (!frame || !frame.type) return;
+
+        const expectedProto = this._getApiProtocolVersion();
+        const allowLegacyV1 = this._allowLegacyApiProtoV1();
+        const protoHelper = window.DWMControlProtocol;
+        const accepted = protoHelper && typeof protoHelper.isAcceptedProtocol === 'function'
+            ? protoHelper.isAcceptedProtocol(frame.proto, expectedProto, allowLegacyV1)
+            : (frame.proto === expectedProto || (allowLegacyV1 && frame.proto === '1'));
+        if (!accepted) return;
 
         this.updateMeterLastFrame(key);
 
@@ -58,7 +66,13 @@
         clearTimeout(pending.timeoutId);
         record.state.pendingRequests.delete(frame.req);
 
-        if (frame.type === 'resp' && frame.status === 'ok') {
+        if (frame.cmd && pending.command && frame.cmd !== pending.command) {
+            pending.reject(new Error(`Unexpected response command ${frame.cmd}; expected ${pending.command}`));
+            return;
+        }
+
+        const isSuccessStatus = frame.status === 'ok' || (!frame.status && frame.type === 'resp' && frame.proto === '1');
+        if (frame.type === 'resp' && isSuccessStatus) {
             pending.resolve(frame);
         } else {
             pending.reject(new Error(this.describeApiError(frame)));
@@ -73,6 +87,20 @@
             frame[token.slice(0, sep)] = token.slice(sep + 1);
         });
         return frame;
+    };
+
+    DWMControl.prototype._getApiProtocolVersion = function() {
+        const protoHelper = window.DWMControlProtocol;
+        const configured = this.config?.usbApiProtocolVersion;
+        if (protoHelper && typeof protoHelper.normalizeProtocolVersion === 'function') {
+            return protoHelper.normalizeProtocolVersion(configured, '2');
+        }
+        const value = String(configured ?? '').trim();
+        return (value === '1' || value === '2') ? value : '2';
+    };
+
+    DWMControl.prototype._allowLegacyApiProtoV1 = function() {
+        return this.config?.usbApiAcceptLegacyV1 !== false;
     };
 
     // ─── API command layer ────────────────────────────────────────────────────
@@ -300,10 +328,9 @@
   <div class="meter-fw-update-info">
     <span class="meter-fw-update-icon">&#x2B06;</span>
     <span class="meter-fw-update-text">Firmware update available &mdash; <strong>Latest: v${latestVerStr}</strong> &nbsp;(installed: v${deviceVerStr})</span>
-    <button class="btn btn-icon meter-fw-dismiss-btn" data-meter-action="dismiss-fw-notice" title="Dismiss">&times;</button>
   </div>
   <div class="meter-fw-update-actions">
-    <button class="btn btn-warning btn-small" data-meter-action="enter-dfu-from-update">Enter DFU Mode &amp; Update Firmware</button>
+    <button class="btn btn-warning btn-small" data-meter-action="enter-dfu-from-update">Enter DFU Mode</button>
   </div>
   <p class="meter-fw-update-note">&#x26A0; A manual power cycle (turn the meter off and on) is required after the firmware update completes.</p>
 </div>`;
@@ -352,8 +379,21 @@
     };
 
     DWMControl.prototype.buildApiFrame = function(command, requestId, fields = {}) {
+        const protoHelper = window.DWMControlProtocol;
+        const protocolVersion = this._getApiProtocolVersion();
+
+        if (protoHelper && typeof protoHelper.serializeFrame === 'function') {
+            return protoHelper.serializeFrame({
+                protocolVersion,
+                type: 'cmd',
+                command,
+                requestId,
+                fields,
+            });
+        }
+
         const tokens = [
-            ['proto', '1'],
+            ['proto', protocolVersion],
             ['type', 'cmd'],
             ['cmd', command],
             ['req', String(requestId)],
@@ -561,7 +601,7 @@
                 [`meter-${sid}-pinfo-elem`]:  response.elem,
                 [`meter-${sid}-pinfo-etype`]: response.etype,
                 [`meter-${sid}-pinfo-eval`]:  this.formatDecimal(response.eval, 6, ' W'),
-                [`meter-${sid}-pinfo-range`]: response.range,
+                [`meter-${sid}-pinfo-range`]: this._formatRangeLabel(response.range, { legacyNumeric: response.proto === '1' }),
             };
             Object.entries(mappings).forEach(([id, val]) => {
                 const el = document.getElementById(id);
@@ -581,8 +621,12 @@
                     record.elementId = elemRaw;
                 }
                 record.elementType = String(response.etype || record.elementType || '30ua').toLowerCase();
-                record.rangeMultiplier = this._parseRangeMultiplier(response.range);
-                record.rangeCfg = record.rangeMultiplier >= 4 ? 1 : 0;
+                const legacyNumeric = response.proto === '1';
+                record.rangeMultiplier = this._parseRangeMultiplier(response.range, { legacyNumeric });
+                record.rangeCfg = this._parseRangeCfg(response.range, {
+                    fallback: this._rangeMultiplierToCfg(record.rangeMultiplier, { fallback: 1 }),
+                    legacyNumeric,
+                });
                 this._updateGaugeScale(key);
 
                 const elemSelect = document.getElementById(`meter-${sid}-cfg-elem`);
@@ -624,7 +668,8 @@
             const nameEl = document.getElementById(`meter-${sid}-metric-name`);
             const valEl = document.getElementById(`meter-${sid}-metric-value`);
             if (nameEl) {
-                const ctx = [response.etype, response.range].filter(Boolean).join(' | ');
+                const rangeLabel = this._formatRangeLabel(response.range, { legacyNumeric: response.proto === '1' });
+                const ctx = [response.etype, rangeLabel].filter(Boolean).join(' | ');
                 nameEl.textContent = ctx ? `${response.met || metric} (${ctx})` : (response.met || metric);
             }
             if (valEl) valEl.textContent = this.formatDecimal(response.value, 6, ' W');
@@ -682,18 +727,7 @@
 
     // ─── Live panel helpers ───────────────────────────────────────────────────
 
-    DWMControl.prototype._persistMeterCardPrefs = function(key, partialPrefs) {
-        if (!key || !partialPrefs || typeof partialPrefs !== 'object') return;
-        if (!this.config.meterCards) this.config.meterCards = {};
-        if (!this.config.meterCards[key]) this.config.meterCards[key] = {};
-        Object.assign(this.config.meterCards[key], partialPrefs);
-        this.saveConfig();
-    };
-
     DWMControl.prototype._setMeterView = function(key, view) {
-        const record = this.meterRegistry.get(key);
-        if (record?.state) record.state.viewMode = view;
-
         const sid = this.meterSafeId(key);
         const gaugesView = document.getElementById(`meter-${sid}-gauges-view`);
         const histView   = document.getElementById(`meter-${sid}-history-view`);
@@ -707,14 +741,9 @@
                 const btnView = btn.dataset.meterAction === 'view-meters' ? 'meters' : 'history';
                 btn.classList.toggle('active', btnView === view);
             });
-            const chartActions = cardEl.querySelector('.meter-chart-actions');
-            if (chartActions) chartActions.style.display = view === 'history' ? '' : 'none';
         }
 
         if (view === 'history') this._drawMeterHistory(key);
-
-        // Persist view preference
-        this._persistMeterCardPrefs(key, { viewMode: view });
     };
 
     DWMControl.prototype._setMeterCardLayout = function(key, layout) {
@@ -722,8 +751,6 @@
         if (!record?.state) return;
         record.state.cardLayout = layout;
 
-        // Persist layout preference
-        this._persistMeterCardPrefs(key, { cardLayout: layout });
         const sid        = this.meterSafeId(key);
         const gaugesView = document.getElementById(`meter-${sid}-gauges-view`);
         if (gaugesView) gaugesView.dataset.layout = layout;
@@ -732,7 +759,7 @@
         const cardEl = document.querySelector(`[data-meter-key="${key}"]`);
         if (cardEl) {
             const sel = cardEl.querySelector('.meter-layout-select');
-            if (sel && document.activeElement !== sel) sel.value = layout;
+            if (sel) sel.value = layout;
         }
 
         // Hide panels that aren't shown in this layout
@@ -745,21 +772,11 @@
             panelR.style.display = showR ? '' : 'none';
         }
 
-        // Force gauge repaint at new size — double rAF ensures CSS layout has settled
-        // before we measure canvas dimensions (single rAF can still read stale sizes).
+        // Force gauge repaint at new size
         const liveRecord = this.meterRegistry.get(key);
-        requestAnimationFrame(() => {
-            // Bust the cached canvas size so _getCachedCanvasSize re-measures
-            if (gaugesView) {
-                gaugesView.querySelectorAll('canvas').forEach(c => {
-                    delete c.dataset.cssWidth;
-                    delete c.dataset.cssHeight;
-                });
-            }
-            if (liveRecord?.state?.lastSnapshotResponse) {
-                requestAnimationFrame(() => this._updateMeterGauges(key, liveRecord.state.lastSnapshotResponse));
-            }
-        });
+        if (liveRecord?.state?.lastSnapshotResponse) {
+            requestAnimationFrame(() => this._updateMeterGauges(key, liveRecord.state.lastSnapshotResponse));
+        }
     };
 
     DWMControl.prototype._setSwrCardLayout = function(id, layout) {
@@ -768,9 +785,6 @@
         if (!rec?.state) return;
         rec.state.cardLayout = layout;
 
-        // Persist layout preference
-        const swrCfg = (this.config.swrCards || []).find(c => c.id === id);
-        if (swrCfg) { swrCfg.cardLayout = layout; this.saveConfig(); }
         const sid        = this.swrSafeId(id);
         const gaugesView = document.getElementById(`swr-${sid}-gauges-view`);
         if (gaugesView) gaugesView.dataset.layout = layout;
@@ -785,18 +799,10 @@
             rlPanel.style.display  = showRl  ? '' : 'none';
         }
 
-        // Force gauge repaint at new size — double rAF ensures CSS layout has settled.
+        // Force gauge repaint at new size using the fwd meter key
         const fwdKey = rec.fwdKey;
-        requestAnimationFrame(() => {
-            if (gaugesView) {
-                gaugesView.querySelectorAll('canvas').forEach(c => {
-                    delete c.dataset.cssWidth;
-                    delete c.dataset.cssHeight;
-                });
-            }
-            if (fwdKey && rec.state.lastComputed) {
-                requestAnimationFrame(() => this._updateSwrCardsForMeter(fwdKey));
-            }
-        });
+        if (fwdKey && rec.state.lastComputed) {
+            requestAnimationFrame(() => this._updateSwrCardsForMeter(fwdKey));
+        }
     };
 })();

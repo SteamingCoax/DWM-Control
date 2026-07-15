@@ -35,6 +35,16 @@ Supported platforms:
 - Device controls are generated dynamically for supported hardware
 - Includes live device discovery and interaction workflow
 
+### USB API v2 Migration Note
+- Outgoing USB API frames now default to `proto=2` with `type=cmd`.
+- Incoming responses are expected as protocol v2 (`proto=2`) and parsed with the v2 envelope.
+- Transition fallback: legacy `proto=1` responses are still accepted when `usbApiAcceptLegacyV1` is enabled (default `true`).
+- Breaking range enum change in config flows:
+  - `0 = 1x`
+  - `1 = 2x`
+  - `2 = 4x`
+- Text range values `1x`, `2x`, and `4x` are accepted in power and config parsing paths.
+
 ### De-Embed Tab
 - Power and unit configuration
 - Measurement and sampling helpers

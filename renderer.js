@@ -382,6 +382,14 @@ class DWMControl {
         const existing = this.meterRegistry.get(key) || {};
         const meterPrefs = this.config?.meterCards?.[key] || {};
         const existingState = existing.state || null;
+        const existingRangeMultiplier = Number.isFinite(existing.rangeMultiplier) ? existing.rangeMultiplier : 2;
+        let existingRangeCfg = Number.parseInt(existing.rangeCfg, 10);
+        if (!Number.isFinite(existingRangeCfg) || existingRangeCfg < 0 || existingRangeCfg > 2) {
+            existingRangeCfg = existingRangeMultiplier >= 4 ? 2 : (existingRangeMultiplier >= 2 ? 1 : 0);
+        }
+        // Migrate old persisted values where cfg used 0=2x, 1=4x.
+        if (existingRangeCfg === 0 && existingRangeMultiplier === 2) existingRangeCfg = 1;
+        if (existingRangeCfg === 1 && existingRangeMultiplier === 4) existingRangeCfg = 2;
         const nextRecord = {
             key,
             portPath: port.path,
@@ -403,8 +411,8 @@ class DWMControl {
             elementRating: Number.isFinite(existing.elementRating) ? existing.elementRating : 0,
             elementType: existing.elementType || '30ua',
             elementProfiles: Array.isArray(existing.elementProfiles) ? existing.elementProfiles : [],
-            rangeMultiplier: Number.isFinite(existing.rangeMultiplier) ? existing.rangeMultiplier : 1,
-            rangeCfg: Number.isFinite(existing.rangeCfg) ? existing.rangeCfg : 0,
+            rangeMultiplier: existingRangeMultiplier,
+            rangeCfg: existingRangeCfg,
         };
 
         if (nextRecord.state) {

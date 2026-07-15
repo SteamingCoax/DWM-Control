@@ -1163,12 +1163,11 @@
 
 .meter-live-section {
     border-top: 1px solid var(--border-color);
-  padding: 16px 0;
+    padding: 16px 20px;
     display: flex;
     flex-direction: column;
     gap: 14px;
     background: var(--readings-bar-bg, rgba(0,0,0,0.08));
-  flex: 1 1 auto;
 }
 
 /* Toolbar: view toggle + poll controls */
@@ -1178,7 +1177,6 @@
     justify-content: space-between;
     gap: 10px;
     flex-wrap: wrap;
-  padding: 0 16px;
 }
 
 .meter-live-toolbar-left {
@@ -1354,8 +1352,7 @@
 /* Single-gauge layouts: constrain the visible panel to 90% width so it doesn't over-fill */
 .meter-gauges-view[data-layout="single-L"] .meter-gauge-radial-panel:first-child,
 .meter-gauges-view[data-layout="single-R"] .meter-gauge-radial-panel:last-child {
-  max-width: 100%;
-  width: 100%;
+    max-width: 90%;
     margin: 0 auto;
 }
 
@@ -1380,8 +1377,8 @@
 }
 
 .meter-gauge-radial-panel {
-  flex: 1 1 0;
-  min-width: 0;
+    flex: 1 1 180px;
+    min-width: 180px;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -1390,12 +1387,10 @@
 .meter-gauge-panel-controls {
   display: flex;
   gap: 6px;
-  flex-wrap: wrap;
 }
 
 .gauge-metric-select {
-    flex: 1 1 auto;
-    min-width: 0;
+    flex: 0 0 auto;
     width: auto;
     font-size: 13px;
     padding: 3px 6px;
@@ -1412,8 +1407,7 @@
 }
 
 .gauge-display-select {
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
   width: auto;
   font-size: 12px;
   padding: 3px 6px;
@@ -1431,8 +1425,8 @@
 
 .meter-gauge-radial-canvas {
     width: 100%;
-  min-height: clamp(280px, 34vh, 420px);
-  aspect-ratio: 4 / 3;
+  min-height: 300px;
+  aspect-ratio: 16 / 10;
   height: auto;
     display: block;
     border-radius: 6px;
@@ -1449,20 +1443,6 @@
   background: rgba(0,0,0,0.04);
   border-color: rgba(0,0,0,0.15);
   color: rgba(0,0,0,0.7);
-}
-
-/* Windows dark-mode native dropdown popup readability */
-[data-theme="dark"] select,
-[data-theme="dark"] .form-select,
-[data-theme="dark"] .gauge-metric-select,
-[data-theme="dark"] .gauge-display-select {
-    color: #eaf0ff;
-}
-
-[data-theme="dark"] select option,
-[data-theme="dark"] select optgroup {
-    color: #eaf0ff;
-    background-color: #1c2230;
 }
 
 .meter-snapshot-settings {
@@ -1503,8 +1483,6 @@
     justify-content: space-between;
     gap: 10px;
     padding: 2px 0;
-  padding-left: 16px;
-  padding-right: 16px;
 }
 
 .meter-history-range-select {
@@ -1543,7 +1521,7 @@
 
 .meter-history-canvas {
     width: 100%;
-    min-height: 260px;
+    min-height: 220px;
   aspect-ratio: 16 / 7;
   height: auto;
     border-radius: 6px;
@@ -1557,7 +1535,6 @@
     gap: 5px;
     font-size: 11px;
     font-weight: 600;
-  padding: 0 16px;
 }
 
 /* Metric toggle chip */
@@ -1680,16 +1657,10 @@
 }
 
 .meter-page-shell.settings-open .meter-settings-panel {
-  width: min(260px, 75vw);
+  width: min(300px, 75vw);
   opacity: 1;
-  padding: 0;
+  padding: 12px;
   border-left-color: var(--border-color);
-}
-
-/* sv-props-section resets inside the settings panel */
-.meter-settings-panel .sv-props-section {
-  padding: 10px 12px;
-  border-bottom: none;
 }
 
 /* Settings toggle rail — narrow strip between board and settings panel */
@@ -1824,32 +1795,6 @@
     padding: 16px;
 }
 
-/* Board layout modes (set via data-board-layout attribute) */
-.meter-board[data-board-layout="column"] {
-    display: flex;
-    flex-direction: column;
-}
-
-.meter-board[data-board-layout="auto-fit"] {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
-}
-
-.meter-board[data-board-layout="grid-2"] {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-}
-
-.meter-board[data-board-layout="grid-3"] {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-}
-
-.meter-board[data-board-layout="grid-4"] {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-}
-
 .meter-board-empty {
     text-align: center;
     padding: 48px 24px;
@@ -1867,12 +1812,9 @@
     border-radius: 10px;
     overflow: hidden;
     transition: border-color 0.2s;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
 }
 
-.meter-card:has(.meter-connect-btn-connected) {
+.meter-card:has(.meter-badge-connected) {
     border-color: var(--accent-color, #4a9eff);
 }
 
@@ -2040,19 +1982,6 @@
     flex-shrink: 0;
 }
 
-.meter-card-header-right .btn {
-    padding: 3px 10px;
-    font-size: 12px;
-    line-height: 1.5;
-}
-
-.meter-settings-btn {
-    padding: 3px 8px !important;
-    font-size: 15px !important;
-    line-height: 1 !important;
-    min-width: 0;
-}
-
 /* Connection state badge */
 .meter-badge {
     font-size: 11px;
@@ -2080,74 +2009,6 @@
     background: rgba(239, 68, 68, 0.12);
     color: #ef4444;
     border: 1px solid rgba(239, 68, 68, 0.25);
-}
-
-.meter-badge-not-configured {
-    background: rgba(245, 158, 11, 0.15);
-    color: #f59e0b;
-    border: 1px solid rgba(245, 158, 11, 0.3);
-}
-
-/* Combined connect/disconnect button states */
-.meter-connect-btn {
-    white-space: nowrap;
-    min-width: 7rem;
-}
-
-.meter-connect-btn-available {
-    background: var(--accent-primary);
-    color: #fff;
-    border-color: var(--accent-primary);
-}
-.meter-connect-btn-available:hover {
-    opacity: 0.85;
-}
-
-.meter-connect-btn-connected {
-    background: rgba(34, 197, 94, 0.15);
-    color: #22c55e;
-    border: 1px solid rgba(34, 197, 94, 0.3);
-    position: relative;
-    overflow: hidden;
-}
-.meter-connect-btn-connected:hover {
-    background: rgba(239, 68, 68, 0.15);
-    border-color: rgba(239, 68, 68, 0.4);
-    color: transparent;
-}
-.meter-connect-btn-connected:hover::after {
-    content: 'Disconnect';
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #ef4444;
-    font-size: 12px;
-    font-weight: 600;
-    pointer-events: none;
-}
-
-.meter-connect-btn-disconnected {
-    background: rgba(100, 100, 100, 0.15);
-    color: var(--text-muted);
-    border: 1px solid var(--border-color);
-}
-.meter-connect-btn-disconnected:hover {
-    background: var(--accent-primary);
-    color: #fff;
-    border-color: var(--accent-primary);
-}
-
-.meter-connect-btn-not-configured {
-    background: rgba(245, 158, 11, 0.12);
-    color: #f59e0b;
-    border: 1px solid rgba(245, 158, 11, 0.3);
-}
-.meter-connect-btn-not-configured:hover {
-    background: var(--accent-primary);
-    color: #fff;
-    border-color: var(--accent-primary);
 }
 
 /* Readings bar (shown when connected) */
@@ -2204,56 +2065,6 @@
 }
 
 /* Expand row */
-/* Detail dialog (replaces inline expand panel) */
-.meter-detail-dialog {
-    background: var(--card-bg, #1a1a1a);
-    border: 1px solid var(--border-color);
-    border-radius: 12px;
-    padding: 0;
-    max-width: 580px;
-    width: min(580px, 90vw);
-    max-height: 82vh;
-    overflow-y: auto;
-    color: var(--text-primary);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
-}
-
-.meter-detail-dialog::backdrop {
-    background: rgba(0, 0, 0, 0.55);
-}
-
-.meter-detail-dialog-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 20px 12px;
-    border-bottom: 1px solid var(--border-color);
-    position: sticky;
-    top: 0;
-    background: var(--card-bg, #1a1a1a);
-    z-index: 1;
-}
-
-.meter-detail-dialog-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.meter-detail-dialog-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-primary);
-}
-
-.meter-detail-dialog-body {
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-/* Legacy expand-row (no longer rendered, kept for safety) */
 .meter-card-expand-row {
     padding: 4px 12px;
     border-top: 1px solid var(--border-color);
@@ -2372,7 +2183,7 @@
     background: rgba(0,0,0,0.04);
 }
 
-[data-theme="light"] .meter-card:has(.meter-connect-btn-connected) {
+[data-theme="light"] .meter-card:has(.meter-badge-connected) {
     border-color: #2563eb;
 }
 
@@ -2495,13 +2306,6 @@
     gap:         10px;
     min-height:  28px;
 }
-.swr-card-header-right {
-  display:     flex;
-  align-items: center;
-  gap:         8px;
-  min-width:   0;
-  margin-left: auto;
-}
 .swr-card-title-area {
     flex: 1 1 0;
     display: flex;
@@ -2567,9 +2371,8 @@
 .swr-metric-row {
     display:     flex;
     align-items: center;
-    gap:         8px;
+    gap:         10px;
     margin-top:  6px;
-    flex-wrap:   wrap;
 }
 .swr-metric-row .swr-source-label {
     white-space: nowrap;
@@ -2580,6 +2383,21 @@
     width:     auto;
     font-size: 12px;
     padding:   4px 6px;
+}
+
+/* ── SWR toolbar ──────────────────────────────────────────────────────────── */
+.swr-toolbar {
+    display:     flex;
+    align-items: center;
+    gap:         8px;
+    margin-top:  8px;
+    flex-wrap:   wrap;
+}
+.swr-toolbar .form-select {
+    font-size: 12px;
+    padding:   4px 24px 4px 8px;
+    height:    28px;
+    width:     auto;
 }
 .swr-source-arrow {
     font-size:   22px;
@@ -2600,30 +2418,10 @@
 .swr-status-text {
     font-size:  11px;
     color:      rgba(160, 140, 210, 0.55);
-  flex:       0 1 auto;
+    flex:       1 1 auto;
     white-space: nowrap;
     overflow:   hidden;
     text-overflow: ellipsis;
-}
-.swr-card-header-right .swr-status-text {
-  max-width: 220px;
-  text-align: right;
-}
-
-/* Keep SWR header height stable in dense 4-column layout.
-   Reserve a fixed timestamp slot so text-length changes do not reflow the header. */
-.meter-board[data-board-layout="grid-4"] .swr-card-header-right {
-    flex: 0 0 170px;
-    width: 170px;
-    justify-content: flex-end;
-}
-
-.meter-board[data-board-layout="grid-4"] .swr-card-header-right .swr-status-text {
-    flex: 0 0 118px;
-    width: 118px;
-    max-width: 118px;
-    line-height: 1.2;
-    font-variant-numeric: tabular-nums;
 }
 
 /* ── Gauge view ────────────────────────────────────────────────────────────── */
