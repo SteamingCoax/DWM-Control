@@ -35,15 +35,12 @@ Supported platforms:
 - Device controls are generated dynamically for supported hardware
 - Includes live device discovery and interaction workflow
 
-### USB API v2 Migration Note
-- Outgoing USB API frames now default to `proto=2` with `type=cmd`.
-- Incoming responses are expected as protocol v2 (`proto=2`) and parsed with the v2 envelope.
-- Transition fallback: legacy `proto=1` responses are still accepted when `usbApiAcceptLegacyV1` is enabled (default `true`).
-- Breaking range enum change in config flows:
-  - `0 = 1x`
-  - `1 = 2x`
-  - `2 = 4x`
-- Text range values `1x`, `2x`, and `4x` are accepted in power and config parsing paths.
+### USB API Migration Note
+- Outgoing control frames now default to `proto=2`.
+- The app still accepts `proto=1` responses during the transition window, but that compatibility path is temporary.
+- If a meter only speaks the original API, the app will fall back to `proto=1` per device automatically.
+- When it falls back, the app translates the modern command names to the legacy v1 vocabulary automatically.
+- Range values now use `1x`, `2x`, and `4x` in power responses, with config values mapped as `0 = 1x`, `1 = 2x`, and `2 = 4x`.
 
 ### De-Embed Tab
 - Power and unit configuration

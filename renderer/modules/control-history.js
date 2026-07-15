@@ -90,7 +90,7 @@
 
         const firstTs = hist[0].t;
         const elementRating = record.state.elementRating || 0;
-        const rangeMultiplier = record.state.rangeMultiplier || 1;
+        const rangeMultiplier = record.state.rangeMultiplier || 2;
         const rows = [
             `# Element Rating: ${elementRating} W, Range: ${rangeMultiplier}x`,
             'timestamp_iso,epoch_ms,elapsed_ms,inst_w,avg_w,peak_w,max_w,min_w,dev_w,element_rating_w,range_mult',

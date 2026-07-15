@@ -11,7 +11,7 @@
 ## Control Tab (USB API)
 - [x] Enable Control tab in app configuration
 - [x] Render new Control tab UI structure
-- [x] Add framed USB API command builder (`proto=1 type=cmd ...`) 
+- [x] Add framed USB API command builder (`proto=2 type=cmd ...`)
 - [x] Add serial frame parser for `type=resp` / `type=err`
 - [x] Add req/id request correlation with timeout handling
 - [x] Implement `system.identity` read flow

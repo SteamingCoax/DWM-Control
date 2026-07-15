@@ -184,13 +184,11 @@
                     record.elementId = elemRaw;
                 }
                 record.elementType = String(response.etype || record.elementType || '30ua').toLowerCase();
-                if (response.range !== undefined) {
-                    record.rangeMultiplier = this._parseRangeMultiplier(response.range, { legacyNumeric: response.proto === '1' });
+                const rangeInfo = this._normalizeRange(response.range);
+                if (rangeInfo) {
+                    record.rangeCfg = rangeInfo.cfg;
+                    record.rangeMultiplier = rangeInfo.multiplier;
                 }
-                record.rangeCfg = this._parseRangeCfg(response.range, {
-                    fallback: this._rangeMultiplierToCfg(record.rangeMultiplier, { fallback: 1 }),
-                    legacyNumeric: response.proto === '1',
-                });
                 // Calculate max power and store it
                 if (record.state) {
                     record.state.elementRating = record.elementRating;
@@ -246,7 +244,7 @@
                 [`meter-${sid}-snap-elem`]: response.elem || '-',
                 [`meter-${sid}-snap-etype`]: response.etype || '-',
                 [`meter-${sid}-snap-eval`]: this.formatPower(response.eval),
-                [`meter-${sid}-snap-range`]: this._formatRangeLabel(response.range, { legacyNumeric: response.proto === '1' }),
+                [`meter-${sid}-snap-range`]: response.range || '-',
                 [`meter-${sid}-snap-scale`]: this.formatPower(scaleMax),
                 [`meter-${sid}-snap-updated`]: new Date().toLocaleTimeString(),
             };
@@ -415,13 +413,10 @@
 
             if (cfgKey === 'range') {
                 const record = this.meterRegistry.get(key);
-                const rangeCfg = this._parseRangeCfg(response.val, {
-                    fallback: this._rangeMultiplierToCfg(record?.rangeMultiplier, { fallback: 1 }),
-                    legacyNumeric: response.proto === '1',
-                });
-                if (record) {
-                    record.rangeCfg = rangeCfg;
-                    record.rangeMultiplier = this._rangeCfgToMultiplier(rangeCfg);
+                const rangeInfo = this._normalizeRange(response.val);
+                if (record && rangeInfo) {
+                    record.rangeCfg = rangeInfo.cfg;
+                    record.rangeMultiplier = rangeInfo.multiplier;
                     if (record.state) {
                         record.state.rangeMultiplier = record.rangeMultiplier;
                         record.state.maxPowerW = (record.elementRating || 0) * record.rangeMultiplier;
@@ -429,8 +424,8 @@
                     const sid = this.meterSafeId(key);
                     const rangeSelect = document.getElementById(`meter-${sid}-cfg-range`);
                     const rangeReadOnly = document.getElementById(`meter-${sid}-cfg-range-readonly`);
-                    if (rangeSelect) rangeSelect.value = String(rangeCfg);
-                    if (rangeReadOnly) rangeReadOnly.value = String(rangeCfg);
+                    if (rangeSelect) rangeSelect.value = String(rangeInfo.cfg);
+                    if (rangeReadOnly) rangeReadOnly.value = String(rangeInfo.cfg);
                     this._updateGaugeScale(key);
                 }
             }

@@ -4,72 +4,12 @@
         console.error('DWMControl not defined before control module loaded');
         return;
     }
-    DWMControl.prototype._parseRangeCfg = function(rangeValue, options = {}) {
-        const helper = window.DWMControlProtocol;
-        if (helper && typeof helper.parseRangeConfig === 'function') {
-            return helper.parseRangeConfig(rangeValue, options);
-        }
-
-        const fallback = Number.parseInt(options.fallback, 10);
-        const fallbackCfg = Number.isFinite(fallback) && fallback >= 0 && fallback <= 2 ? fallback : 1;
-        const s = String(rangeValue ?? '').trim().toLowerCase();
-        if (s === '1x') return 0;
-        if (s === '2x') return 1;
-        if (s === '4x') return 2;
-        const n = Number.parseInt(s, 10);
-        if (Number.isFinite(n) && n >= 0 && n <= 2) return n;
-        return fallbackCfg;
+    DWMControl.prototype._parseRangeMultiplier = function(rangeStr) {
+        return window.DWMProtocol.parseRangeMultiplier(rangeStr);
     };
 
-    DWMControl.prototype._rangeCfgToMultiplier = function(cfg) {
-        const helper = window.DWMControlProtocol;
-        if (helper && typeof helper.rangeConfigToMultiplier === 'function') {
-            return helper.rangeConfigToMultiplier(cfg);
-        }
-
-        const n = Number.parseInt(cfg, 10);
-        if (n === 0) return 1;
-        if (n === 1) return 2;
-        if (n === 2) return 4;
-        return 2;
-    };
-
-    DWMControl.prototype._rangeMultiplierToCfg = function(multiplier, options = {}) {
-        const helper = window.DWMControlProtocol;
-        if (helper && typeof helper.rangeMultiplierToConfig === 'function') {
-            return helper.rangeMultiplierToConfig(multiplier, options);
-        }
-
-        const fallback = Number.parseInt(options.fallback, 10);
-        const fallbackCfg = Number.isFinite(fallback) && fallback >= 0 && fallback <= 2 ? fallback : 1;
-        const n = Number.parseFloat(multiplier);
-        if (!Number.isFinite(n) || n <= 0) return fallbackCfg;
-        if (n >= 4) return 2;
-        if (n >= 2) return 1;
-        return 0;
-    };
-
-    DWMControl.prototype._parseRangeMultiplier = function(rangeValue, options = {}) {
-        const helper = window.DWMControlProtocol;
-        if (helper && typeof helper.parseRangeMultiplier === 'function') {
-            return helper.parseRangeMultiplier(rangeValue, options);
-        }
-        const cfg = this._parseRangeCfg(rangeValue, {
-            fallback: this._rangeMultiplierToCfg(options.fallback, { fallback: 1 }),
-            legacyNumeric: options.legacyNumeric === true,
-        });
-        return this._rangeCfgToMultiplier(cfg);
-    };
-
-    DWMControl.prototype._formatRangeLabel = function(rangeValue, options = {}) {
-        const helper = window.DWMControlProtocol;
-        if (helper && typeof helper.normalizeRangeLabel === 'function') {
-            return helper.normalizeRangeLabel(rangeValue, options);
-        }
-        const cfg = this._parseRangeCfg(rangeValue, options);
-        if (cfg === 0) return '1x';
-        if (cfg === 1) return '2x';
-        return '4x';
+    DWMControl.prototype._normalizeRange = function(rangeValue) {
+        return window.DWMProtocol.normalizeRange(rangeValue);
     };
 
     DWMControl.prototype._computeGaugeMax = function(key) {
