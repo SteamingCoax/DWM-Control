@@ -8,10 +8,15 @@ const { SerialPort } = require('serialport');
 const ss = require('simple-statistics');
 const os = require('os');
 
-// Disable GPU acceleration IMMEDIATELY if safe-mode flag is present
-// This must be done before app.whenReady()
-if (process.argv.includes('--safe-mode') || process.argv.includes('--disable-gpu')) {
-  console.log('GPU acceleration disabled via command line flag');
+// Disable GPU acceleration IMMEDIATELY when requested.
+// This must be done before app.whenReady().
+const shouldDisableGpu =
+  process.argv.includes('--safe-mode') ||
+  process.argv.includes('--disable-gpu') ||
+  process.env.DWM_DISABLE_GPU === '1';
+
+if (shouldDisableGpu) {
+  console.log('GPU acceleration disabled by startup configuration');
   app.disableHardwareAcceleration();
   // Also set additional Chromium flags for complete GPU disable
   app.commandLine.appendSwitch('--disable-gpu');
@@ -218,8 +223,8 @@ function createWindow() {
     mainWindow = null;
   });
 
-  // Open DevTools in development and for debugging packaged app
-  if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
+  // Keep DevTools opt-in to avoid noisy Chromium protocol warnings in normal runs.
+  if (process.env.DWM_OPEN_DEVTOOLS === '1') {
     mainWindow.webContents.openDevTools();
   }
   
