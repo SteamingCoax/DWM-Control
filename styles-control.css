@@ -1439,6 +1439,11 @@
   contain: layout paint;
 }
 
+.meter-card .meter-gauge-radial-canvas {
+  min-height: 0;
+  aspect-ratio: auto;
+}
+
 [data-theme="light"] .gauge-metric-select {
     background: rgba(0,0,0,0.04);
     border-color: rgba(0,0,0,0.15);
@@ -1869,7 +1874,8 @@
     transition: border-color 0.2s;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: auto;
+  align-self: start;
 }
 
 .meter-card:has(.meter-connect-btn-connected) {

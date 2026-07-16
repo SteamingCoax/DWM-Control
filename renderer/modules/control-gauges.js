@@ -193,15 +193,28 @@
         const cssW = sizeProbe.cssW;
         const sc   = Math.max(0.5, cssW / 420);
 
+        // Target readout typography close to pre-compact sizing.
+        const refStr = (this.formatPowerWithClip && Number.isFinite(scaleMax))
+            ? this.formatPowerWithClip(scaleMax, scaleMax) : '';
+        const refLen = Math.max(refStr.length, 6);
+        const valFSMaxWTarget = Math.floor((cssW - 20) / refLen * 1.1);
+        const metricFSTarget = Math.max(11, Math.round(34 * sc));
+        const valFSTarget = Math.max(Math.round(14 * sc), Math.min(Math.round(64 * sc), valFSMaxWTarget));
+        const digPadY = Math.max(5, Math.round(7 * sc));
+        const digGapY = Math.max(3, Math.round(4 * sc));
+
         const TRACK_W  = Math.max(6,  Math.round(14  * sc));
         const PAD_SIDE = Math.round(cssW * 0.200);   // keeps tick labels clear; ≈ 84 px at 420 px
         const PAD_TOP  = Math.max(14, Math.round(52  * sc));
-        const DIG_H    = Math.max(26, Math.round(72  * sc));
+        const DIG_H    = Math.max(24, metricFSTarget + valFSTarget + digPadY * 2 + digGapY);
 
         const radius = Math.max(20, Math.floor((cssW - PAD_SIDE * 2) / 2));
         const cx     = cssW / 2;
         const cy     = PAD_TOP + TRACK_W / 2 + radius;
         const fallbackCssH = cy + 14 + DIG_H + BOT_PAD;
+        // Pin meter gauge canvas CSS height to the content-fit target so the
+        // element doesn't stay taller than the gauge/readout drawing.
+        canvas.dataset.cssHeight = String(Math.max(140, Math.round(fallbackCssH)));
         const size = this._getCachedCanvasSize(canvas, fallbackCssH, 140);
         if (!size) return;
         const cssH   = size.cssH;
@@ -350,8 +363,10 @@
 
         // ── Digital readout strip below pivot
         const digTop = cy + 14;
-        const digH   = cssH - digTop - BOT_PAD;
-        if (digH > 18) {
+        const digAvailH = cssH - digTop - BOT_PAD;
+        if (digAvailH > 18) {
+            const digH = digAvailH;
+
             ctx.fillStyle = pal.digBg;
             ctx.beginPath();
             ctx.roundRect(6, digTop, cssW - 12, digH, 5);
@@ -363,27 +378,23 @@
             ctx.moveTo(6, digTop); ctx.lineTo(cssW - 6, digTop);
             ctx.stroke();
 
-            const metricFS = Math.max(11, Math.min(Math.round(34 * sc), Math.floor(digH * 0.35)));
+            const metricFS = Math.max(11, Math.min(metricFSTarget, Math.floor(digH * 0.42)));
             ctx.fillStyle    = pal.zoneColor(pct);
             ctx.font         = `bold ${metricFS}px sans-serif`;
             ctx.textAlign    = 'center';
             ctx.textBaseline = 'top';
-            const labelTop = digTop + Math.round(4 * sc);
+            const labelTop = digTop + digPadY;
             ctx.fillText(metricLabel, cx, labelTop);
             const labelBot = labelTop + metricFS;
 
             // Font sized from scale factor only (not current value length) so both gauges
             // in a dual layout always match. Width-capped to the longest possible string.
-            const refStr = (this.formatPowerWithClip && Number.isFinite(scaleMax))
-                ? this.formatPowerWithClip(scaleMax, scaleMax) : '';
-            const refLen    = Math.max(refStr.length, 6);
-            const valFSMaxW = Math.floor((cssW - 20) / refLen * 1.1);
-            const valSpace  = digTop + digH - labelBot;
-            const valFS     = Math.max(Math.round(14 * sc), Math.min(Math.round(64 * sc), valFSMaxW, Math.floor(valSpace * 0.78)));
+            const valSpace  = digTop + digH - (labelBot + digGapY + digPadY);
+            const valFS     = Math.max(Math.round(14 * sc), Math.min(valFSTarget, Math.floor(valSpace * 0.98)));
             ctx.fillStyle    = pal.readout;
             ctx.font         = `bold ${valFS}px monospace`;
             ctx.textBaseline = 'middle';
-            ctx.fillText(valStr, cx, labelBot + valSpace * 0.52);
+            ctx.fillText(valStr, cx, labelBot + digGapY + (valSpace * 0.5));
         }
 
         ctx.restore();
@@ -396,6 +407,8 @@
         if (!sizeProbe) return;
         const cssW = sizeProbe.cssW;
         const fallbackCssH = Math.max(190, Math.floor(cssW * 0.62));
+        // Keep numeric mode canvas compact to its intended content height.
+        canvas.dataset.cssHeight = String(Math.max(140, Math.round(fallbackCssH)));
         const size = this._getCachedCanvasSize(canvas, fallbackCssH, 140);
         if (!size) return;
         const cssH = size.cssH;

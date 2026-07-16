@@ -549,6 +549,14 @@
         return;
       }
 
+      // Keep card DOM stable while a detail dialog is open; discovery refresh
+      // can otherwise disturb the modal's internal scroll position.
+      const openDetailDialog = board.querySelector('.meter-detail-dialog[open]');
+      if (openDetailDialog) {
+        this._boardInteractionLockUntil = Date.now() + 1200;
+        return;
+      }
+
         const meterOrder = Array.isArray(this.config.meterCardOrder) ? this.config.meterCardOrder : [];
         const swrCards = Array.isArray(this.config.swrCards) ? this.config.swrCards : [];
         const swrCardMap = new Map(swrCards.map(cfg => [cfg.id, cfg]));
