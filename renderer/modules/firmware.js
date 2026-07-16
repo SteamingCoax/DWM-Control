@@ -87,7 +87,8 @@
 
     DWMControl.prototype.selectHexFile = async function() {
         try {
-            const filePath = await window.electronAPI.selectHexFile();
+            const result = await window.electronAPI.selectHexFile();
+            const filePath = (typeof result === 'string') ? result : result?.filePath;
             if (filePath) {
                 await this.handleFileSelection(filePath);
             }

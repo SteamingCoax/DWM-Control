@@ -1192,7 +1192,12 @@ app.on('before-quit', () => {
 // Get file statistics — path is restricted to the user's home directory
 ipcMain.handle('get-file-stats', async (event, filePath) => {
   try {
-    const resolvedPath = path.resolve(filePath);
+    const normalizedPath = (typeof filePath === 'string') ? filePath : filePath?.filePath;
+    if (typeof normalizedPath !== 'string' || !normalizedPath.trim()) {
+      throw new Error('Invalid file path argument');
+    }
+
+    const resolvedPath = path.resolve(normalizedPath);
     const homeDir = os.homedir();
     if (!resolvedPath.startsWith(homeDir + path.sep) && resolvedPath !== homeDir) {
       throw new Error('Access denied: path is outside the allowed directory');
