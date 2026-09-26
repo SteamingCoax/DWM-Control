@@ -89,7 +89,7 @@ Update checks are skipped only when `NODE_ENV=development` AND the app is not pa
 - Commit messages use `type(scope): summary` (`fix:`, `feat:`, `refactor:`, `docs:`, `ci:`, `chore:`). Release notes are generated from them.
 - Test tiers: `npm test` for pure logic; `npm run dev` against a real meter for UI and serial; `npm run build:mac:unsigned` and run the `.app` from `/tmp/dwm-dist` before merging anything that touches packaging, native modules, or DFU.
 - Releases are deliberate: `npm run release:publish -- X.Y.Z` from a clean `main`. Ship a pre-release first (`X.Y.Z-beta.N`), install it, verify it updates to the next beta, then publish the final. Apps on a pre-release version accept pre-release updates; apps on a stable version ignore them. Caveat: until `release.yml` and `publish-release.sh` pass `--prerelease` for tags containing a hyphen, a beta tag is published as a normal release and reaches every user, so do not publish beta tags before that fix lands. There is no rollback, so a bad stable release is fixed by publishing a higher version.
-- The self-hosted Linux runner only builds Windows and Linux release artifacts. GitHub auto-removes it after 14 days offline; re-register with `RUNNER_ALLOW_RUNASROOT=1 ./config.sh` as root in `/opt/actions-runner`.
+- The self-hosted Linux runner only builds Windows and Linux release artifacts and must never be targeted by a workflow that runs on `pull_request`. Operational details for it live outside the repo in `CLAUDE.local.md`.
 
 ## Things to know before editing
 
