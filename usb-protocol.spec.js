@@ -1,5 +1,5 @@
 const assert = require('assert');
-const protocol = require('./renderer/modules/protocol.js');
+const { protocol } = require('dwm-core');
 
 function test(name, fn) {
   try {
