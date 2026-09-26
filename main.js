@@ -1,10 +1,16 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, Menu } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
-const { spawn, exec, execFile } = require('child_process');
+const { execFile } = require('child_process');
 const fs = require('fs');
 const https = require('https');
-const { SerialPort } = require('serialport');
+const {
+  SerialManager,
+  listPorts,
+  listDfuDevices,
+  checkWinUsbDriver,
+  FirmwareUpdater,
+} = require('dwm-core');
 const ss = require('simple-statistics');
 const os = require('os');
 
@@ -487,24 +493,7 @@ const DFU_VID = '0483';
 const DFU_PID = 'DF11';
 const DFU_HARDWARE_ID = `USB\\VID_${DFU_VID}&PID_${DFU_PID}`;
 
-ipcMain.handle('check-winusb-driver', async () => {
-  if (process.platform !== 'win32') return { installed: true };
-  return new Promise((resolve) => {
-    // pnputil /enum-drivers lists all 3rd-party INF files; if ours is present the driver is installed.
-    // We also check pnputil /enum-devices to see if the HW ID is currently bound to WinUSB.
-    const { spawn } = require('child_process');
-    const child = spawn('pnputil', ['/enum-devices', '/connected'], { windowsHide: true });
-    let out = '';
-    child.stdout.on('data', d => { out += d.toString(); });
-    child.stderr.on('data', () => {});
-    child.on('close', () => {
-      // If "DFU in FS Mode" appears bound to WinUSB, driver is installed
-      const installed = /WinUSB/i.test(out) && new RegExp(DFU_VID, 'i').test(out);
-      resolve({ installed });
-    });
-    child.on('error', () => resolve({ installed: false }));
-  });
-});
+ipcMain.handle('check-winusb-driver', async () => checkWinUsbDriver());
 
 ipcMain.handle('install-winusb-driver', async () => {
   if (process.platform !== 'win32') return { success: false, error: 'Not Windows' };
@@ -525,121 +514,49 @@ ipcMain.handle('install-winusb-driver', async () => {
 });
 
 // IPC Handlers for DFU functionality
+//
+// dwm-core locates and drives dfu-util; everything below is presentation
+// policy — deciding which platform-specific guidance the renderer should show.
 ipcMain.handle('get-dfu-devices', async () => {
-  return new Promise((resolve, reject) => {
-    const dfuUtilPath = getDfuUtilPath();
-    
-    console.log('DFU Debug - Platform:', process.platform);
-    console.log('DFU Debug - Path:', dfuUtilPath);
-    console.log('DFU Debug - __dirname:', __dirname);
-    console.log('DFU Debug - NODE_ENV:', process.env.NODE_ENV);
-    
-    // Check if dfu-util exists (skip check for system commands on macOS/Linux)
-    const isSystemCommand = process.platform !== 'win32' && dfuUtilPath === 'dfu-util';
-    console.log('DFU Debug - Is system command:', isSystemCommand);
-    
-    if (!isSystemCommand) {
-      const fileExists = fs.existsSync(dfuUtilPath);
-      console.log('DFU Debug - File exists:', fileExists);
-      console.log('DFU Debug - Full path check:', dfuUtilPath);
-      
-      if (!fileExists) {
-        const errorMsg = process.platform === 'win32' 
-          ? `dfu-util.exe not found at: ${dfuUtilPath}. Please ensure Programs/dfu-util/dfu-util.exe exists.`
-          : 'dfu-util not found. Please install dfu-util or ensure it\'s in your PATH.';
-        
-        resolve({ 
-          success: false, 
-          error: errorMsg, 
-          output: '',
-          needsSetup: true 
-        });
-        return;
-      }
+  const result = await listDfuDevices({ command: getDfuUtilPath() });
+
+  if (!result.success) {
+    const isWindows = process.platform === 'win32';
+    return {
+      success: false,
+      error: isWindows
+        ? `Failed to run dfu-util: ${result.error}. Try running as Administrator.`
+        : `Failed to run dfu-util: ${result.error}`,
+      output: '',
+      needsSetup: true,
+      windowsHelp: isWindows,
+    };
+  }
+
+  if (result.devices.length === 0) {
+    if (process.platform === 'win32') {
+      return {
+        success: false,
+        error: 'No DFU devices found',
+        output: result.output,
+        windowsHelp: true,
+      };
     }
-    
-    const child = spawn(dfuUtilPath, ['-l']);
-    
-    let stdout = '';
-    let stderr = '';
-    
-    child.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
-    
-    child.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-    
-    child.on('close', (code) => {
-      console.log('DFU Debug - dfu-util exit code:', code);
-      console.log('DFU Debug - stdout length:', stdout.length);
-      console.log('DFU Debug - stderr length:', stderr.length);
-      console.log('DFU Debug - stdout content:', stdout);
-      console.log('DFU Debug - stderr content:', stderr);
-      
-      if (code === 0 || stdout.length > 0 || stderr.length > 0) {
-        // Some dfu-util builds (especially on Linux/ARM) write "Found DFU" lines to stderr
-        const combinedOutput = stdout + '\n' + stderr;
-        const devices = parseDfuDevices(combinedOutput);
-        console.log('DFU Debug - parsed devices:', devices.length);
-        console.log('DFU Debug - device details:', JSON.stringify(devices, null, 2));
-        
-        if (devices.length === 0 && process.platform === 'win32') {
-          // Provide Windows-specific guidance when no devices found
-          console.log('DFU Debug - Returning Windows help (no devices)');
-          resolve({ 
-            success: false, 
-            error: 'No DFU devices found', 
-            output: stdout,
-            windowsHelp: true
-          });
-        } else if (devices.length === 0 && process.platform === 'linux') {
-          // Check for permission error in stderr
-          const hasPermError = /LIBUSB_ERROR_ACCESS|permission denied|cannot open/i.test(stderr);
-          console.log('DFU Debug - Linux permission error detected:', hasPermError);
-          if (hasPermError) {
-            resolve({
-              success: false,
-              error: 'USB permission denied. Run: sudo usermod -aG plugdev $USER then log out and back in, or run the app with sudo.',
-              output: stderr
-            });
-          } else {
-            console.log('DFU Debug - Returning success with', devices.length, 'devices');
-            resolve({ success: true, devices, output: stdout });
-          }
-        } else {
-          console.log('DFU Debug - Returning success with', devices.length, 'devices');
-          console.log('DFU Debug - Devices being returned:', JSON.stringify(devices, null, 2));
-          resolve({ success: true, devices, output: stdout });
-        }
-      } else {
-        const errorMsg = process.platform === 'win32'
-          ? 'DFU scan failed. This may indicate driver issues or permissions problems.'
-          : 'DFU scan failed';
-          
-        resolve({ 
-          success: false, 
-          error: stderr || errorMsg, 
-          output: stderr,
-          windowsHelp: process.platform === 'win32'
-        });
-      }
-    });
-    
-    child.on('error', (error) => {
-      const errorMsg = process.platform === 'win32'
-        ? `Failed to run dfu-util: ${error.message}. Try running as Administrator.`
-        : `Failed to run dfu-util: ${error.message}`;
-        
-      resolve({ 
-        success: false, 
-        error: errorMsg, 
-        output: '',
-        windowsHelp: process.platform === 'win32'
-      });
-    });
-  });
+
+    if (
+      process.platform === 'linux' &&
+      /LIBUSB_ERROR_ACCESS|permission denied|cannot open/i.test(result.output)
+    ) {
+      return {
+        success: false,
+        error:
+          'USB permission denied. Run: sudo usermod -aG plugdev $USER then log out and back in, or run the app with sudo.',
+        output: result.output,
+      };
+    }
+  }
+
+  return { success: true, devices: result.devices, output: result.output };
 });
 
 ipcMain.handle('upload-firmware', async (event, { hexFilePath, deviceInfo }) => {
@@ -652,109 +569,41 @@ ipcMain.handle('upload-firmware', async (event, { hexFilePath, deviceInfo }) => 
   ) {
     return { success: false, error: 'Invalid firmware file path.', output: '' };
   }
-  return new Promise((resolve, reject) => {
-    // Convert hex to bin first
-    convertHexToBin(resolvedHex)
-      .then(binFilePath => {
-        const dfuUtilPath = getDfuUtilPath();
-        const args = [
-          '-a', '0',
-          '-i', '0',
-          '-D', binFilePath,
-          '-s', '0x08000000:leave',
-          '-R'
-        ];
-        
-        const child = spawn(dfuUtilPath, args);
-        let output = '';
-        
-        child.stdout.on('data', (data) => {
-          const line = data.toString();
-          output += line;
+
+  const updater = new FirmwareUpdater({ command: getDfuUtilPath() });
+
+  try {
+    const result = await updater.upload(resolvedHex, {
+      log: (line) => {
+        if (!event.sender.isDestroyed()) {
           event.sender.send('upload-progress', line);
-        });
-        
-        child.stderr.on('data', (data) => {
-          const line = data.toString();
-          output += line;
-          event.sender.send('upload-progress', line);
-        });
-        
-        child.on('close', (code) => {
-          // Clean up temporary bin file
-          if (fs.existsSync(binFilePath)) {
-            fs.unlinkSync(binFilePath);
-          }
-          
-          if (code === 0 || code === 74) { // 74 is success code for DFU
-            resolve({ success: true, output });
-          } else {
-            resolve({ success: false, error: `Upload failed with code ${code}`, output });
-          }
-        });
-        
-        child.on('error', (error) => {
-          resolve({ success: false, error: error.message, output });
-        });
-      })
-      .catch(error => {
-        resolve({ success: false, error: error.message, output: '' });
-      });
-  });
+        }
+      },
+    });
+    return { success: result.success, error: result.error, output: result.output };
+  } catch (error) {
+    return { success: false, error: error.message, output: '' };
+  }
 });
 
-// Multi-port serial state — keyed by portPath
-const serialPorts = new Map();
+// Serial transport is owned by dwm-core; this process only bridges it to the
+// renderer over IPC.
+const serialManager = new SerialManager();
 
-// Decode a Buffer of bytes into a UTF-8 string, skipping invalid sequences
-function decodeSerialBuffer(buf) {
-  const buffer = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
-  let text = '';
-  for (let i = 0; i < buffer.length; i++) {
-    const byte = buffer[i];
-    if (byte < 0x80) {
-      text += String.fromCharCode(byte);
-    } else if ((byte & 0xE0) === 0xC0 && i + 1 < buffer.length) {
-      const b2 = buffer[i + 1];
-      if ((b2 & 0xC0) === 0x80) {
-        text += String.fromCharCode(((byte & 0x1F) << 6) | (b2 & 0x3F));
-        i += 1;
-      } else {
-        text += String.fromCharCode(byte);
-      }
-    } else if ((byte & 0xF0) === 0xE0 && i + 2 < buffer.length) {
-      const b2 = buffer[i + 1]; const b3 = buffer[i + 2];
-      if ((b2 & 0xC0) === 0x80 && (b3 & 0xC0) === 0x80) {
-        text += String.fromCharCode(((byte & 0x0F) << 12) | ((b2 & 0x3F) << 6) | (b3 & 0x3F));
-        i += 2;
-      } else {
-        text += String.fromCharCode(byte);
-      }
-    } else if ((byte & 0xF8) === 0xF0 && i + 3 < buffer.length) {
-      const b2 = buffer[i + 1]; const b3 = buffer[i + 2]; const b4 = buffer[i + 3];
-      if ((b2 & 0xC0) === 0x80 && (b3 & 0xC0) === 0x80 && (b4 & 0xC0) === 0x80) {
-        const cp = ((byte & 0x07) << 18) | ((b2 & 0x3F) << 12) | ((b3 & 0x3F) << 6) | (b4 & 0x3F);
-        if (cp > 0xFFFF) {
-          const adj = cp - 0x10000;
-          text += String.fromCharCode(0xD800 + (adj >> 10), 0xDC00 + (adj & 0x3FF));
-        } else {
-          text += String.fromCharCode(cp);
-        }
-        i += 3;
-      } else {
-        text += String.fromCharCode(byte);
-      }
-    }
-    // invalid sequences are skipped silently
+serialManager.on('data', ({ portPath, data }) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('serial-data', { portPath, data });
   }
-  return text;
-}
+});
+
+serialManager.on('error', ({ portPath, error }) => {
+  console.error('Serial port error on', portPath, ':', error.message);
+});
 
 // IPC Handlers for Serial Port functionality
 ipcMain.handle('get-serial-ports', async () => {
   try {
-    const ports = await SerialPort.list();
-    return { success: true, ports };
+    return { success: true, ports: await listPorts() };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -763,48 +612,7 @@ ipcMain.handle('get-serial-ports', async () => {
 // Open serial port — supports multiple simultaneous ports
 ipcMain.handle('open-serial-port', async (event, { portPath, baudRate }) => {
   try {
-    // Close existing port at this path if already open
-    const existing = serialPorts.get(portPath);
-    if (existing) {
-      try {
-        if (existing.isOpen) {
-          await new Promise((resolve) => existing.close(() => resolve()));
-        }
-      } catch (err) {
-        console.warn('Error closing existing port at', portPath, ':', err.message);
-      }
-      serialPorts.delete(portPath);
-    }
-
-    const port = new SerialPort({
-      path: portPath,
-      baudRate: baudRate || 115200,
-      autoOpen: false,
-    });
-
-    await new Promise((resolve, reject) => {
-      port.open((err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
-
-    port.on('data', (data) => {
-      if (mainWindow) {
-        mainWindow.webContents.send('serial-data', { portPath, data: decodeSerialBuffer(data) });
-      }
-    });
-
-    port.on('close', () => {
-      serialPorts.delete(portPath);
-    });
-
-    port.on('error', (err) => {
-      console.error('Serial port error on', portPath, ':', err.message);
-      serialPorts.delete(portPath);
-    });
-
-    serialPorts.set(portPath, port);
+    await serialManager.open(portPath, baudRate || 115200);
     return { success: true };
   } catch (error) {
     console.error('Error opening serial port:', error);
@@ -815,25 +623,7 @@ ipcMain.handle('open-serial-port', async (event, { portPath, baudRate }) => {
 // Close a specific serial port (or all ports if portPath is omitted)
 ipcMain.handle('close-serial-port', async (event, { portPath } = {}) => {
   try {
-    if (portPath) {
-      const port = serialPorts.get(portPath);
-      if (port) {
-        if (port.isOpen) {
-          await new Promise((resolve) => port.close(() => resolve()));
-        }
-        serialPorts.delete(portPath);
-      }
-    } else {
-      // Close all open ports (e.g. on app shutdown)
-      for (const [path, port] of serialPorts) {
-        try {
-          if (port.isOpen) await new Promise((resolve) => port.close(() => resolve()));
-        } catch (err) {
-          console.warn('Error closing port', path, ':', err.message);
-        }
-        serialPorts.delete(path);
-      }
-    }
+    await serialManager.close(portPath);
     return { success: true };
   } catch (error) {
     console.error('Error closing serial port:', error);
@@ -844,18 +634,7 @@ ipcMain.handle('close-serial-port', async (event, { portPath } = {}) => {
 // Write data to a specific serial port
 ipcMain.handle('write-serial', async (event, { portPath, data }) => {
   try {
-    const port = serialPorts.get(portPath);
-    if (!port || !port.isOpen) {
-      return { success: false, error: 'Serial port not open' };
-    }
-
-    await new Promise((resolve, reject) => {
-      port.write(data, (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
-
+    await serialManager.write(portPath, data);
     return { success: true };
   } catch (error) {
     console.error('Error writing to serial port:', error);
@@ -1702,161 +1481,6 @@ function getDfuUtilPath() {
     console.log('getDfuUtilPath - Bundled dfu-util not found, falling back to system');
     return 'dfu-util';
   }
-}
-
-function parseDfuDevices(output) {
-  const devices = [];
-  // Handle both Windows (\r\n) and Unix (\n) line endings
-  const lines = output.split(/\r?\n/);
-  
-  for (const line of lines) {
-    if (line.includes('Found DFU')) {
-      // More flexible regex to match different dfu-util output formats
-      const match = line.match(/Found DFU: \[([0-9a-f]{4}):([0-9a-f]{4})\]/i);
-      
-      if (match) {
-        const vid = match[1];
-        const pid = match[2];
-        
-        // Extract serial number - try multiple patterns
-        let serial = 'unknown';
-        const serialMatch = line.match(/serial="([^"]+)"/);
-        if (serialMatch) {
-          serial = serialMatch[1];
-        } else {
-          // Alternative pattern if serial is at the end without quotes
-          const altSerialMatch = line.match(/serial=([^\s,]+)/);
-          if (altSerialMatch) {
-            serial = altSerialMatch[1];
-          }
-        }
-        
-        // Extract alt interface number for better identification
-        let altInterface = 0;
-        const altMatch = line.match(/alt=(\d+)/);
-        if (altMatch) {
-          altInterface = parseInt(altMatch[1]);
-        }
-        
-        // Extract interface name if available
-        let interfaceName = '';
-        const nameMatch = line.match(/name="([^"]+)"/);
-        if (nameMatch) {
-          interfaceName = nameMatch[1];
-        }
-        
-        devices.push({
-          vid: vid,
-          pid: pid,
-          serial: serial,
-          alt: altInterface,
-          name: interfaceName,
-          description: line.trim()
-        });
-      }
-    }
-  }
-  
-  // Group by device (same VID:PID:Serial) and keep only the main flash interface (usually alt=0)
-  const deviceMap = {};
-  console.log('DFU Debug - Grouping', devices.length, 'devices');
-  
-  for (const device of devices) {
-    const key = `${device.vid}:${device.pid}:${device.serial}`;
-    console.log('DFU Debug - Processing device:', key, 'alt=' + device.alt, 'name=' + device.name);
-    
-    // Prefer the main flash interface (alt=0) or "Internal Flash" interface
-    if (!deviceMap[key] || 
-        device.alt === 0 || 
-        device.name.toLowerCase().includes('internal flash')) {
-      console.log('DFU Debug - Keeping device:', key);
-      deviceMap[key] = device;
-    } else {
-      console.log('DFU Debug - Skipping device:', key, '(already have better match)');
-    }
-  }
-  
-  const finalDevices = Object.values(deviceMap);
-  console.log('DFU Debug - Final device count:', finalDevices.length);
-  return finalDevices;
-}
-
-function convertHexToBin(hexFilePath) {
-  return new Promise((resolve, reject) => {
-    try {
-      const hexData = fs.readFileSync(hexFilePath, 'utf8');
-      console.log(`Converting hex file: ${hexFilePath}`);
-      
-      // Create temporary bin file
-      const tempDir = require('os').tmpdir();
-      const binFilePath = path.join(tempDir, `firmware_temp_${Date.now()}.bin`);
-      
-      // Parse the hex file manually to avoid memory issues
-      const lines = hexData.split('\n').filter(line => line.trim().startsWith(':'));
-      console.log(`Processing ${lines.length} hex lines`);
-      
-      // Find the address range
-      let minAddr = 0x08000000; // STM32 flash start
-      let maxAddr = 0x08000000;
-      let baseAddr = 0;
-      
-      // First pass: find the actual address range
-      for (const line of lines) {
-        if (line.length < 11) continue;
-        
-        const recType = parseInt(line.substr(7, 2), 16);
-        if (recType === 0x04) { // Extended Linear Address
-          baseAddr = parseInt(line.substr(9, 4), 16) << 16;
-        } else if (recType === 0x00) { // Data record
-          const addr = baseAddr + parseInt(line.substr(3, 4), 16);
-          const dataLen = parseInt(line.substr(1, 2), 16);
-          minAddr = Math.min(minAddr, addr);
-          maxAddr = Math.max(maxAddr, addr + dataLen - 1);
-        }
-      }
-      
-      console.log(`Address range: 0x${minAddr.toString(16)} - 0x${maxAddr.toString(16)}`);
-      
-      const size = maxAddr - minAddr + 1;
-      if (size > 1024 * 1024) { // 1MB limit
-        throw new Error(`Firmware too large: ${size} bytes`);
-      }
-      
-      // Create buffer for the exact size needed
-      const buffer = Buffer.alloc(size, 0xFF);
-      baseAddr = 0;
-      
-      // Second pass: fill the buffer with data
-      for (const line of lines) {
-        if (line.length < 11) continue;
-        
-        const recType = parseInt(line.substr(7, 2), 16);
-        if (recType === 0x04) { // Extended Linear Address
-          baseAddr = parseInt(line.substr(9, 4), 16) << 16;
-        } else if (recType === 0x00) { // Data record
-          const addr = baseAddr + parseInt(line.substr(3, 4), 16);
-          const dataLen = parseInt(line.substr(1, 2), 16);
-          
-          for (let i = 0; i < dataLen; i++) {
-            const byteVal = parseInt(line.substr(9 + i * 2, 2), 16);
-            const bufferIndex = addr + i - minAddr;
-            if (bufferIndex >= 0 && bufferIndex < buffer.length) {
-              buffer[bufferIndex] = byteVal;
-            }
-          }
-        }
-      }
-      
-      console.log(`Converted to binary: ${buffer.length} bytes`);
-      
-      // Write binary data to file
-      fs.writeFileSync(binFilePath, buffer);
-      resolve(binFilePath);
-    } catch (error) {
-      console.error('Hex to bin conversion error:', error);
-      reject(error);
-    }
-  });
 }
 
 // IPC handlers for manual update checking
