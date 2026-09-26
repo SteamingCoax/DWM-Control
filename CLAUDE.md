@@ -15,10 +15,10 @@ npm run dev                 # npx electron .  (plain)
 npm run dev:safe            # --safe-mode --disable-gpu --no-sandbox (use if the window is blank/crashes)
 DWM_OPEN_DEVTOOLS=1 npm run dev   # open DevTools on launch
 
-npm test                    # runs usb-protocol.spec.js; plain node + assert, no runner
+npm test                    # node --test "test/**/*.spec.js" (built-in node:test runner)
 ```
 
-Notes on tests: `.gitignore` excludes `test-*.js`, so any file named that way will be silently untracked. Use the `*.spec.js` naming for new tests and add them to the `test` script.
+Notes on tests: the suite lives in `test/*.spec.js` and is picked up by the glob, so no registration is needed. `.gitignore` excludes `test-*.js`, so never name a test file that way. Renderer code is tested under plain Node through `test/helpers/renderer-harness.js`, which installs browser-shaped globals and runs `renderer.js` plus every module through `vm` in `index.html` order; `makeControlStub()` gives a `this` for calling `DWMControl.prototype` methods without the constructor. Pure main-process helpers in `lib/` are required directly. `RELEASE_CHECKLIST.md` lists the manual tiers that run against hardware and packaged builds.
 
 Builds (output in `dist/`; mac targets write to `/tmp/dwm-dist`):
 
@@ -42,13 +42,14 @@ CI: `.github/workflows/ci.yml` runs on every PR and push to `main` (GitHub-hoste
 
 ### Process split
 
-- `main.js` is the entire main process: window creation, native app menu, all `ipcMain.handle` handlers, serial port ownership, dfu-util spawning, auto-updater, Site View file/workspace/log I/O, and the polynomial regression math for De-Embed.
+- `main.js` is the entire main process: window creation, native app menu, all `ipcMain.handle` handlers, serial port ownership, dfu-util spawning, auto-updater, and Site View file/workspace/log I/O.
 - `preload.js` exposes `window.electronAPI` via `contextBridge`. It is the only bridge; `nodeIntegration` is off and `contextIsolation` is on. Every IPC channel must be listed here, and event channels must also be added to the allowlists in `onMenuAction` and `removeAllListeners`.
 - Renderer is classic `<script>` tags loaded in order from `index.html`. There are no ES modules or imports in the renderer.
+- Pure, Electron-free helpers used by `main.js` (the polynomial regression math for De-Embed, dfu-util path resolution) live in `lib/` and are unit-tested directly with `node:test`.
 
 ### Renderer: one class, many prototype-extension files
 
-`renderer.js` defines `class DWMControl` (core: tab switching, theme, meter discovery loop, serial connect/disconnect) and instantiates it on `DOMContentLoaded`. Every file in `renderer/modules/` is an IIFE that attaches more methods to `DWMControl.prototype`. Load order in `index.html` matters: `renderer.js` first, then `protocol.js` before the `control-*.js` files, then `site-view-components.js` before `site-view.js`.
+`renderer.js` defines `class DWMControl` (core: tab switching, theme, meter discovery loop, serial connect/disconnect) and instantiates it on `DOMContentLoaded`. Every file in `renderer/modules/` is an IIFE that attaches more methods to `DWMControl.prototype`. Load order in `index.html` matters: dwm-core's browser bundle (`node_modules/dwm-core/dist/dwm-protocol.browser.js`, which defines `window.DWMProtocol`) before `renderer.js`, then the modules, with `site-view-components.js` before `site-view.js`.
 
 Module responsibilities:
 
@@ -66,14 +67,14 @@ Tabs are toggled by `tabSettings` in the `DWMControl` constructor (the terminal 
 
 ### Multi-meter model
 
-The app supports many meters at once. `this.meterRegistry` is a `Map` keyed by a stable device key (`usbmodem:<uid>` on macOS, `usbserial:<sn>` on Windows/Linux, else `port:<path>`). `isMeterPort` in `renderer.js` decides what counts as a DWM V2 (manufacturer string "DWM V2", or VID 0483 / PID 5740). A 2 s discovery loop calls `scanAndSyncMeters` and auto-connects. Each record carries its own `state` (request ids, pending requests, serial buffer, polling timers, protocol version). Main process keeps one `SerialPort` per path in a `Map` and forwards `serial-data` events tagged with `portPath`; the renderer routes them by looking up the record for that path.
+The app supports many meters at once. `this.meterRegistry` is a `Map` keyed by a device key from `buildMeterKey`: `usbmodem:<uid>` from the port path on macOS, `usbserial:<sn>` from the tail of a backslash-separated Windows `pnpId` when it is 4+ alphanumeric characters, else `port:<path>`. On Linux the key is therefore the path, which is not stable across re-enumeration; `port.serialNumber` is not consulted. `isMeterPort` in `renderer.js` decides what counts as a DWM V2 (manufacturer string "DWM V2", or VID 0483 / PID 5740). A 2 s discovery loop calls `scanAndSyncMeters` and auto-connects. Each record carries its own `state` (request ids, pending requests, serial buffer, polling timers, protocol version). The main process owns ports through dwm-core's `SerialManager` (one connection per path) and forwards `serial-data` events tagged with `portPath`; the renderer routes them by looking up the record for that path.
 
 ### USB API protocol
 
 Reference docs live in `USB API Versions/USB_API_Reference v2.md` (current) and `v1.md` (legacy). Frames are space-separated `key=value` tokens ending in `\r\n`, for example `proto=2 type=cmd cmd=pwr.snap req=101`. Responses echo `req`, which is how `handleControlSerialLine` resolves the matching promise in `state.pendingRequests`.
 
-- `renderer/modules/protocol.js` (`window.DWMProtocol`) is the shared frame builder and range parser. It is the module tested by `usb-protocol.spec.js` and is written UMD-style so it loads in both the browser and `node`.
-- `renderer/modules/control-protocol.js` (`DWMControlProtocol`) is a similar helper that is not loaded by `index.html` and not referenced anywhere. Prefer `protocol.js`.
+- The protocol layer (frame builder, range parser, snapshot decoding) lives in the [dwm-core](https://github.com/SteamingCoax/dwm-core) package, pinned to a commit in `package.json`. The main process requires it; the renderer gets the same code as `window.DWMProtocol` from the package's browser bundle. `test/protocol.spec.js` covers it from the app's side.
+- Error frames reject the pending promise with an `Error` whose `code` property carries the `ERR_*` code; the message is the human description from `describeApiError`. Fallback logic must check `error.code`, not the message.
 - `sendApiCommand` serializes commands per meter through `state.apiCommandQueue`, applies `globalApiPacingMs` between sends, and on timeout / `ERR_UNKNOWN_CMD` / `ERR_BAD_FRAME` / `ERR_BAD_ENUM` falls back to `proto=1` for that meter and remembers it in `state.protocolVersion`.
 - Range values: config `0/1/2` map to multipliers `1x/2x/4x`. Both forms appear on the wire, so always go through the `DWMProtocol` range helpers.
 
