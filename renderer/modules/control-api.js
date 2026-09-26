@@ -65,7 +65,9 @@
             }
             pending.resolve(frame);
         } else {
-            pending.reject(new Error(this.describeApiError(frame)));
+            const error = new Error(this.describeApiError(frame));
+            error.code = frame.code || null; // machine-readable; the message is for humans
+            pending.reject(error);
         }
     };
 
@@ -137,7 +139,8 @@
         const primaryCommand = queue.catch(() => {}).then(() => runCommand(preferredProto));
         const finalCommand = allowLegacyFallback && preferredProto !== '1'
             ? primaryCommand.catch(async error => {
-                const fallbackReason = /timed out|Failed to write|ERR_(UNKNOWN_CMD|BAD_FRAME|BAD_ENUM)/i.test(error?.message || '');
+                const fallbackCode = /^ERR_(UNKNOWN_CMD|BAD_FRAME|BAD_ENUM)$/i.test(String(error?.code || ''));
+                const fallbackReason = fallbackCode || /timed out|Failed to write/i.test(error?.message || '');
                 if (!fallbackReason) throw error;
                 state.protocolVersion = '1';
                 return runCommand('1');
