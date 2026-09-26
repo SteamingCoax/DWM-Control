@@ -1,0 +1,96 @@
+name: CI
+
+# Fast checks for every pull request and every push to main.
+# SECURITY: this workflow runs on pull_request, so it must only ever use
+# GitHub-hosted runners. Never add the self-hosted label here.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check (no bundler, so catch parse errors early)
+        run: |
+          node --check main.js
+          node --check preload.js
+          node --check renderer.js
+          for f in renderer/modules/*.js; do node --check "$f"; done
+
+      - name: Unit tests
+        run: npm test
+
+  package:
+    name: Packaging dry run
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Electron download
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/electron
+          key: electron-linux-${{ hashFiles('package-lock.json') }}
+
+      # Unpacked directory build only: no installers, no signing, no publish.
+      # Verifies the electron-builder "files" config, asar packing and
+      # asarUnpack rules without producing release artifacts.
+      - name: Build unpacked Linux app
+        run: npx electron-builder --linux dir --x64 --publish=never
+
+      - name: Verify packaged app contents
+        run: |
+          APP_DIR="$(find dist -maxdepth 1 -type d -name 'linux-unpacked' | head -n 1)"
+          [ -n "$APP_DIR" ] || { echo "linux-unpacked not found" >&2; exit 1; }
+          echo "== resources =="
+          ls "$APP_DIR/resources"
+          [ -f "$APP_DIR/resources/app.asar" ] || { echo "app.asar missing" >&2; exit 1; }
+          # On Linux, dfu-util ships inside app.asar.unpacked (see getDfuUtilPath in main.js).
+          # The linux-<arch> binaries themselves are only downloaded by release.yml.
+          [ -d "$APP_DIR/resources/app.asar.unpacked/Programs/dfu-util" ] || { echo "Programs/dfu-util not asarUnpacked" >&2; exit 1; }
+          echo "== asar contents (top level) =="
+          npx --yes @electron/asar list "$APP_DIR/resources/app.asar" | grep -E '^/(main\.js|preload\.js|renderer\.js|index\.html)$'
+          npx --yes @electron/asar list "$APP_DIR/resources/app.asar" | grep -q '^/renderer/modules/protocol\.js$'
+          UNPACKED="$(find "$APP_DIR/resources/app.asar.unpacked" -name '*.node' | head -n 1)"
+          [ -n "$UNPACKED" ] || { echo "serialport prebuild not asarUnpacked" >&2; exit 1; }
+          echo "OK: $UNPACKED"

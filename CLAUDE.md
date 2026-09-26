@@ -36,6 +36,8 @@ npm run release:republish -- 1.2.3   # re-run CI on an existing tag
 
 Requires a clean tree and an authenticated `gh`. Maintainer details are in `.internal/release-reference.md`.
 
+CI: `.github/workflows/ci.yml` runs on every PR and push to `main` (GitHub-hosted only): syntax check of every renderer/main file, `npm test`, and an unpacked Linux packaging dry run that verifies the `files`/`asarUnpack` config. `release.yml` runs only on `v*` tags and manual dispatch.
+
 ## Architecture
 
 ### Process split
@@ -88,14 +90,14 @@ Update checks are skipped only when `NODE_ENV=development` AND the app is not pa
 - Never commit directly to `main`. Branch per change (`fix/...`, `feat/...`, `chore/...`, `ci/...`), open a PR with `gh pr create`, squash-merge.
 - Commit messages use `type(scope): summary` (`fix:`, `feat:`, `refactor:`, `docs:`, `ci:`, `chore:`). Release notes are generated from them.
 - Test tiers: `npm test` for pure logic; `npm run dev` against a real meter for UI and serial; `npm run build:mac:unsigned` and run the `.app` from `/tmp/dwm-dist` before merging anything that touches packaging, native modules, or DFU.
-- Releases are deliberate: `npm run release:publish -- X.Y.Z` from a clean `main`. Ship a pre-release first (`X.Y.Z-beta.N`), install it, verify it updates to the next beta, then publish the final. Apps on a pre-release version accept pre-release updates; apps on a stable version ignore them. Caveat: until `release.yml` and `publish-release.sh` pass `--prerelease` for tags containing a hyphen, a beta tag is published as a normal release and reaches every user, so do not publish beta tags before that fix lands. There is no rollback, so a bad stable release is fixed by publishing a higher version.
-- The self-hosted Linux runner only builds Windows and Linux release artifacts and must never be targeted by a workflow that runs on `pull_request`. Operational details for it live outside the repo in `CLAUDE.local.md`.
+- Releases are deliberate: `npm run release:publish -- X.Y.Z` from a clean `main`. Ship a pre-release first (`X.Y.Z-beta.N`), install it, verify it updates to the next beta, then publish the final. electron-updater decides by the version string: apps on a pre-release version accept pre-release updates, apps on a stable version skip any version with a pre-release suffix. Tags with a hyphen are additionally created as GitHub pre-releases so they never become the repo's "Latest" release. There is no rollback, so a bad stable release is fixed by publishing a higher version.
+- The self-hosted Linux runner only builds Windows and Linux release artifacts and must never be targeted by a workflow that runs on `pull_request` (`ci.yml` is GitHub-hosted only). Operational details for it live outside the repo in `CLAUDE.local.md`.
 
 ## Things to know before editing
 
 - `package.json` `build.files` excludes `test-*.js`, `build/`, `dist/`, `.env*`, `*.bat`, `setup-*.sh`. Anything new that must ship in the app has to not match those patterns.
 - `serialport` is never compiled locally or in CI: `build.npmRebuild` is `false` and the module's N-API prebuild works on any Electron. If a native rebuild is ever needed, `npm run rebuild` exists, but the pinned node-gyp needs Python < 3.12.
-- Electron 42's npm package has no install script. The binary downloads lazily on the first `npx electron` run (or `npx install-electron`), and the package requires Node >= 22.12. On Node 26 that download's unzip step exits silently after one file, leaving `node_modules/electron/dist` half-extracted, so use Node 22. CI still installs with Node 20, which works only because electron-builder fetches its own Electron for packaging.
+- Electron 42's npm package has no install script. The binary downloads lazily on the first `npx electron` run (or `npx install-electron`), and the package requires Node >= 22.12 (`engines` in `package.json`). On Node 26 that download's unzip step exits silently after one file, leaving `node_modules/electron/dist` half-extracted, so use Node 22. Both workflows read the Node version from `.nvmrc`.
 - `Programs/` is copied as `extraResources` and `dfu-util` is `asarUnpack`ed; if you add a binary, update both `getDfuUtilPath` and the packaging config.
 - User settings live in renderer `localStorage` (`dwm-control-config`, `dwm-siteview-*`), while Site View workspaces, recent files, and stream logs are written by the main process under the app's userData directory.
 - `PROJECT_CHECKLIST.md` tracks feature status and open hardware-validation items; `AUTO_UPDATE_GUIDE.md` and `build/CODE_SIGNING_GUIDE.md` cover updater and signing setup.
