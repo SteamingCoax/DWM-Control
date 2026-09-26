@@ -90,7 +90,8 @@ jobs:
           [ -d "$APP_DIR/resources/app.asar.unpacked/Programs/dfu-util" ] || { echo "Programs/dfu-util not asarUnpacked" >&2; exit 1; }
           echo "== asar contents (top level) =="
           npx --yes @electron/asar list "$APP_DIR/resources/app.asar" | grep -E '^/(main\.js|preload\.js|renderer\.js|index\.html)$'
-          npx --yes @electron/asar list "$APP_DIR/resources/app.asar" | grep -q '^/renderer/modules/protocol\.js$'
+          # The renderer loads the protocol layer from dwm-core's browser bundle.
+          npx --yes @electron/asar list "$APP_DIR/resources/app.asar" | grep -q '^/node_modules/dwm-core/dist/dwm-protocol\.browser\.js$'
           UNPACKED="$(find "$APP_DIR/resources/app.asar.unpacked" -name '*.node' | head -n 1)"
           [ -n "$UNPACKED" ] || { echo "serialport prebuild not asarUnpacked" >&2; exit 1; }
           echo "OK: $UNPACKED"
