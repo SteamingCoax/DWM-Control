@@ -6,8 +6,8 @@ This is an internal reference for repeatable local builds and publishing.
 
 From repo root:
 
-- Install dependencies:
-  npm install
+- Install dependencies (Node 22, see .nvmrc):
+  npm ci
 
 - Run app locally:
   npm start
@@ -31,7 +31,8 @@ From repo root:
   npm run build:all
 
 Artifacts are written to:
-- dist/
+- dist/ (Windows and Linux)
+- /tmp/dwm-dist (macOS targets)
 
 ## 2) Publish a New Version (Recommended)
 
@@ -55,12 +56,13 @@ What this does:
 - GitHub CLI installed (gh)
 - GitHub CLI authenticated:
   gh auth login
-- Self-hosted runners online:
-  - macOS runner
-  - Linux runner (also used for Windows cross-build)
-- GitHub secrets configured for mac signing:
+- Self-hosted Linux runner online (builds Linux and, via Wine, Windows; macOS builds run on GitHub-hosted macos-15)
+- GitHub secrets configured for mac signing and notarization:
   - MAC_CERT_P12
   - MAC_CERT_PASSWORD
+  - APPLE_ID
+  - APPLE_ID_APP_PASSWORD
+  - APPLE_TEAM_ID
 
 ## 4) Manual Publish Alternative (If Needed)
 
@@ -116,4 +118,4 @@ Use this when re-running uploads for an existing tag/release.
 - Existing local or remote tag with same version
 - gh not authenticated
 - Missing runner dependencies (wine, Xvfb, makensis)
-- Missing mac signing secrets
+- Missing mac signing or notarization secrets
