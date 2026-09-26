@@ -126,3 +126,6 @@ test-*.ps1
 
 # Agent memory artifacts
 memories/
+
+# Claude Code machine-local notes
+CLAUDE.local.md
