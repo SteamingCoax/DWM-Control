@@ -13,6 +13,14 @@ const {
 } = require('dwm-core');
 const ss = require('simple-statistics');
 const os = require('os');
+const {
+  calculateZeroOffsetPolynomial,
+  transpose,
+  multiply,
+  multiplyVector,
+  gaussianElimination,
+} = require('./lib/regression');
+const { resolveDfuUtilPath } = require('./lib/dfu-path');
 
 // Disable GPU acceleration IMMEDIATELY when requested.
 // This must be done before app.whenReady().
@@ -1177,92 +1185,6 @@ ipcMain.handle('polynomial-regression', async (event, { xData, yData, degree = 3
 });
 
 
-// Helper function for zero-offset polynomial calculation
-function calculateZeroOffsetPolynomial(x, y, degree) {
-  const n = x.length;
-  
-  // Create design matrix (without constant term for zero offset)
-  const A = [];
-  for (let i = 0; i < n; i++) {
-    const row = [];
-    for (let j = 1; j <= degree; j++) {
-      row.push(Math.pow(x[i], j));
-    }
-    A.push(row);
-  }
-  
-  // Calculate A^T * A
-  const AT = transpose(A);
-  const ATA = multiply(AT, A);
-  const ATy = multiplyVector(AT, y);
-  
-  // Solve using Gaussian elimination
-  return gaussianElimination(ATA, ATy);
-}
-
-function transpose(matrix) {
-  return matrix[0].map((_, colIndex) => matrix.map(row => row[colIndex]));
-}
-
-function multiply(a, b) {
-  const result = [];
-  for (let i = 0; i < a.length; i++) {
-    result[i] = [];
-    for (let j = 0; j < b[0].length; j++) {
-      result[i][j] = 0;
-      for (let k = 0; k < a[0].length; k++) {
-        result[i][j] += a[i][k] * b[k][j];
-      }
-    }
-  }
-  return result;
-}
-
-function multiplyVector(matrix, vector) {
-  return matrix.map(row => 
-    row.reduce((sum, val, i) => sum + val * vector[i], 0)
-  );
-}
-
-function gaussianElimination(A, b) {
-  const n = A.length;
-  const augmented = A.map((row, i) => [...row, b[i]]);
-  
-  // Forward elimination
-  for (let i = 0; i < n; i++) {
-    // Find pivot
-    let maxRow = i;
-    for (let k = i + 1; k < n; k++) {
-      if (Math.abs(augmented[k][i]) > Math.abs(augmented[maxRow][i])) {
-        maxRow = k;
-      }
-    }
-    
-    // Swap rows
-    [augmented[i], augmented[maxRow]] = [augmented[maxRow], augmented[i]];
-    
-    // Make all rows below this one 0 in current column
-    for (let k = i + 1; k < n; k++) {
-      const c = augmented[k][i] / augmented[i][i];
-      for (let j = i; j <= n; j++) {
-        augmented[k][j] -= c * augmented[i][j];
-      }
-    }
-  }
-  
-  // Back substitution
-  const solution = new Array(n);
-  for (let i = n - 1; i >= 0; i--) {
-    solution[i] = augmented[i][n];
-    for (let j = i + 1; j < n; j++) {
-      solution[i] -= augmented[i][j] * solution[j];
-    }
-    solution[i] /= augmented[i][i];
-  }
-  
-  return solution;
-}
-
 // Helper function to fetch latest release from GitHub
 function fetchLatestRelease() {
   return new Promise((resolve, reject) => {
@@ -1386,7 +1308,7 @@ function getDfuUtilPath() {
   const isExplicitDev = process.env.NODE_ENV === 'development';
   const isRunningFromSource = !app.isPackaged;
   const isDev = isExplicitDev && isRunningFromSource;
-  
+
   let basePath;
   if (isDev) {
     basePath = __dirname;
@@ -1394,7 +1316,7 @@ function getDfuUtilPath() {
     // For packaged apps, try multiple possible paths
     basePath = process.resourcesPath || path.dirname(process.execPath);
   }
-  
+
   console.log('getDfuUtilPath - isExplicitDev:', isExplicitDev);
   console.log('getDfuUtilPath - isRunningFromSource:', isRunningFromSource);
   console.log('getDfuUtilPath - isDev:', isDev);
@@ -1403,84 +1325,16 @@ function getDfuUtilPath() {
   console.log('getDfuUtilPath - process.resourcesPath:', process.resourcesPath);
   console.log('getDfuUtilPath - process.execPath:', process.execPath);
   console.log('getDfuUtilPath - app.isPackaged:', app.isPackaged);
-  
-  if (process.platform === 'win32') {
-    // Try multiple possible paths for Windows
-    const possiblePaths = [
-      path.join(basePath, 'app.asar.unpacked', 'Programs', 'dfu-util', 'dfu-util.exe'),
-      path.join(basePath, 'Programs', 'dfu-util', 'dfu-util.exe'),
-      path.join(basePath, 'app', 'Programs', 'dfu-util', 'dfu-util.exe'),
-      path.join(basePath, 'resources', 'app.asar.unpacked', 'Programs', 'dfu-util', 'dfu-util.exe'),
-      path.join(basePath, 'resources', 'Programs', 'dfu-util', 'dfu-util.exe'),
-    ];
-    
-    for (const testPath of possiblePaths) {
-      console.log('getDfuUtilPath - Testing Windows path:', testPath);
-      if (fs.existsSync(testPath)) {
-        console.log('getDfuUtilPath - Found dfu-util at:', testPath);
-        return testPath;
-      }
-    }
-    
-    // Default to first path for error reporting
-    const defaultPath = possiblePaths[0];
-    console.log('getDfuUtilPath - No dfu-util found, using default:', defaultPath);
-    return defaultPath;
-  } else if (process.platform === 'darwin') {
-    // On macOS, try bundled version first when packaged, then system.
-    // asarUnpack files land in app.asar.unpacked/, NOT directly under resourcesPath.
-    if (!isDev) {
-      const possiblePaths = [
-        // Correct location for asarUnpacked files (should always be here when packaged)
-        path.join(basePath, 'app.asar.unpacked', 'Programs', 'dfu-util', 'dfu-util'),
-        // Legacy fallback — older builds or non-asar packaging
-        path.join(basePath, 'Programs', 'dfu-util', 'dfu-util'),
-      ];
-      for (const testPath of possiblePaths) {
-        console.log('getDfuUtilPath - macOS testing path:', testPath);
-        if (fs.existsSync(testPath)) {
-          try {
-            fs.chmodSync(testPath, 0o755);
-          } catch (error) {
-            console.log('getDfuUtilPath - chmod failed:', error.message);
-          }
-          console.log('getDfuUtilPath - Using bundled dfu-util:', testPath);
-          return testPath;
-        }
-      }
-      console.log('getDfuUtilPath - Bundled dfu-util not found, falling back to system');
-    } else {
-      console.log('getDfuUtilPath - Development mode, using system dfu-util');
-    }
-    // Fallback to system dfu-util (dev mode, or bundled binary missing)
-    console.log('getDfuUtilPath - Using system dfu-util');
-    return 'dfu-util';
-  } else {
-    // For Linux, use an arch-specific bundled binary.
-    // process.arch is 'x64', 'arm64', or 'arm' (for armv7l/armhf).
-    const arch = process.arch;
-    console.log('getDfuUtilPath - Linux arch:', arch);
-    const possiblePaths = [
-      // Correct location for asarUnpacked files
-      path.join(basePath, 'app.asar.unpacked', 'Programs', 'dfu-util', `linux-${arch}`, 'dfu-util'),
-      // Legacy fallback
-      path.join(basePath, 'Programs', 'dfu-util', `linux-${arch}`, 'dfu-util'),
-    ];
-    for (const testPath of possiblePaths) {
-      console.log('getDfuUtilPath - Linux testing path:', testPath);
-      if (fs.existsSync(testPath)) {
-        try {
-          fs.chmodSync(testPath, 0o755);
-        } catch (e) {
-          console.log('getDfuUtilPath - chmod failed:', e.message);
-        }
-        console.log('getDfuUtilPath - Using bundled dfu-util:', testPath);
-        return testPath;
-      }
-    }
-    console.log('getDfuUtilPath - Bundled dfu-util not found, falling back to system');
-    return 'dfu-util';
-  }
+
+  return resolveDfuUtilPath({
+    platform: process.platform,
+    arch: process.arch,
+    isDev,
+    basePath,
+    exists: fs.existsSync,
+    chmod: fs.chmodSync,
+    log: console.log,
+  });
 }
 
 // IPC handlers for manual update checking
