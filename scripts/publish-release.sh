@@ -103,10 +103,19 @@ git push origin HEAD
 git push origin "$tag"
 
 if ! gh release view "$tag" >/dev/null 2>&1; then
-  echo "Creating GitHub release $tag"
+  # SemVer pre-release (has a hyphen, e.g. 1.4.0-beta.1) -> GitHub pre-release,
+  # so it never becomes the repo's "Latest" release.
+  prerelease_args=()
+  if [[ "$version" == *-* ]]; then
+    prerelease_args=(--prerelease)
+    echo "Creating GitHub pre-release $tag"
+  else
+    echo "Creating GitHub release $tag"
+  fi
   gh release create "$tag" \
     --title "DWM Control $tag" \
-    --generate-notes
+    --generate-notes \
+    "${prerelease_args[@]}"
 fi
 
 echo "Release process started for $tag"

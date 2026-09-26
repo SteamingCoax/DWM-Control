@@ -16,6 +16,9 @@ permissions:
 
 env:
   RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag }}
+  # A hyphen in the tag (v1.4.0-beta.1) marks a SemVer pre-release. Such tags are
+  # created as GitHub pre-releases so they never become the repo's "Latest" release.
+  PRERELEASE_FLAG: ${{ contains(github.ref_type == 'tag' && github.ref_name || inputs.release_tag, '-') && '--prerelease' || '' }}
 
 jobs:
   publish-mac:
@@ -30,10 +33,10 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
 
       - name: Install dependencies
-        run: SKIP_ELECTRON_BUILDER_INSTALL_APP_DEPS=1 npm install
+        run: npm ci
 
       - name: Cache Electron binaries
         uses: actions/cache@v4
@@ -207,7 +210,8 @@ jobs:
             gh release create "$RELEASE_TAG" \
               --repo "${{ github.repository }}" \
               --title "DWM Control $RELEASE_TAG" \
-              --notes "Automated release for $RELEASE_TAG"
+              --notes "Automated release for $RELEASE_TAG" \
+              $PRERELEASE_FLAG
           fi
 
       - name: Upload macOS assets to existing release
@@ -246,10 +250,10 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
 
       - name: Install dependencies
-        run: SKIP_ELECTRON_BUILDER_INSTALL_APP_DEPS=1 npm install
+        run: npm ci
 
       - name: Prepare Wine runtime directory
         run: |
@@ -291,7 +295,8 @@ jobs:
             gh release create "$RELEASE_TAG" \
               --repo "${{ github.repository }}" \
               --title "DWM Control $RELEASE_TAG" \
-              --notes "Automated release for $RELEASE_TAG"
+              --notes "Automated release for $RELEASE_TAG" \
+              $PRERELEASE_FLAG
           fi
 
       - name: Upload Windows assets to existing release
@@ -327,10 +332,10 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version-file: .nvmrc
 
       - name: Install dependencies
-        run: SKIP_ELECTRON_BUILDER_INSTALL_APP_DEPS=1 npm install
+        run: npm ci
 
       - name: Bundle dfu-util for all Linux architectures
         run: |
@@ -390,7 +395,8 @@ jobs:
             gh release create "$RELEASE_TAG" \
               --repo "${{ github.repository }}" \
               --title "DWM Control $RELEASE_TAG" \
-              --notes "Automated release for $RELEASE_TAG"
+              --notes "Automated release for $RELEASE_TAG" \
+              $PRERELEASE_FLAG
           fi
 
       - name: Upload Linux assets to existing release
