@@ -259,6 +259,10 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/xdg-runtime"
           chmod 700 "$RUNNER_TEMP/xdg-runtime"
+          # Wine refuses to create its prefix when the parent directory is not owned
+          # by the current user (the runner's _work/_temp can be owned by a previous
+          # runner user). Create a parent we own and keep the prefix inside it.
+          mkdir -p "$RUNNER_TEMP/wine"
 
       - name: Build Windows artifacts
         env:
@@ -267,7 +271,7 @@ jobs:
           XDG_RUNTIME_DIR: ${{ runner.temp }}/xdg-runtime
           DISPLAY: ":99"
           WINEARCH: win64
-          WINEPREFIX: ${{ runner.temp }}/wine64
+          WINEPREFIX: ${{ runner.temp }}/wine/prefix
         run: |
           export ELECTRON_CACHE="$(dirname "$GITHUB_WORKSPACE")/electron-cache"
           mkdir -p "$ELECTRON_CACHE"
