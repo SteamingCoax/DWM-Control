@@ -103,8 +103,11 @@ sudo udevadm control --reload-rules &amp;&amp; sudo udevadm trigger</pre><button
         (function (btn) {
           var kind = btn.getAttribute('data-kind'), arch = btn.getAttribute('data-arch');
           btn.href = BASE + fileName(kind, arch);
-          btn.setAttribute('download', '');
-          btn.addEventListener('click', function () { pick(kind, arch); });  // the download itself proceeds via href
+          // The section lives in an iframe on Wix: a same-frame navigation would replace it
+          // with GitHub's download page, so the download opens in a new tab instead.
+          btn.setAttribute('target', '_blank');
+          btn.setAttribute('rel', 'noopener');
+          btn.addEventListener('click', function () { pick(kind, arch); });
         })(btns[b]);
       }
       pick('deb', 'amd64');
