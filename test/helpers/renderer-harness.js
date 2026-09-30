@@ -10,10 +10,29 @@ const vm = require('node:vm');
 const ROOT = path.resolve(__dirname, '..', '..');
 
 function makeElement(tag = 'div') {
+  const classSet = new Set();
   const el = {
-    tagName: String(tag).toUpperCase(), id: '', className: '', style: {}, dataset: {}, children: [],
+    tagName: String(tag).toUpperCase(), id: '', get className() { return [...classSet].join(' '); }, set className(v) {
+      classSet.clear();
+      if (v) v.split(/\s+/).filter(Boolean).forEach(c => classSet.add(c));
+    },
+    style: {}, dataset: {}, children: [],
     textContent: '', innerText: '', innerHTML: '', value: '', disabled: false, checked: false, hidden: false,
-    classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
+    classList: {
+      add(...names) { names.forEach(n => classSet.add(n)); },
+      remove(...names) { names.forEach(n => classSet.delete(n)); },
+      toggle(name, force) {
+        if (force === undefined) {
+          if (classSet.has(name)) classSet.delete(name);
+          else classSet.add(name);
+        } else if (force) {
+          classSet.add(name);
+        } else {
+          classSet.delete(name);
+        }
+      },
+      contains(name) { return classSet.has(name); },
+    },
     attributes: {},
     setAttribute(k, v) { this.attributes[k] = String(v); }, getAttribute(k) { return this.attributes[k] ?? null; },
     removeAttribute(k) { delete this.attributes[k]; },
@@ -48,6 +67,95 @@ function makeStorage() {
   };
 }
 
+function makeSpeechStubs() {
+  class SpeechSynthesisUtterance {
+    constructor(text) {
+      this.text = text;
+      this.rate = 1;
+      this.pitch = 1;
+      this.volume = 1;
+      this.voice = null;
+      this.lang = '';
+    }
+  }
+
+  const speechSynthesis = {
+    spoken: [],
+    cancelCount: 0,
+    voices: [],
+    speaking: false,
+    pending: false,
+    speak(u) { this.spoken.push(u); },
+    cancel() { this.cancelCount++; },
+    getVoices() { return this.voices; },
+    addEventListener() {},
+    removeEventListener() {},
+  };
+
+  return { speechSynthesis, SpeechSynthesisUtterance };
+}
+
+function makeAudioStubs() {
+  class AudioContext {
+    static instances = [];
+
+    constructor() {
+      this.state = 'suspended';
+      this.currentTime = 0;
+      this.destination = {};
+      AudioContext.instances.push(this);
+    }
+
+    async resume() {
+      this.state = 'running';
+      return Promise.resolve();
+    }
+
+    async close() {
+      return Promise.resolve();
+    }
+
+    createOscillator() {
+      return {
+        type: 'sine',
+        frequency: {
+          value: 440,
+          calls: [],
+          setTargetAtTime(v, t, c) {
+            this.value = v;
+            this.calls.push([v, t, c]);
+          },
+        },
+        started: 0,
+        stopped: 0,
+        disconnected: 0,
+        start() { this.started++; },
+        stop() { this.stopped++; },
+        disconnect() { this.disconnected++; },
+        connect(n) { this.connectedTo = n; return n; },
+      };
+    }
+
+    createGain() {
+      return {
+        gain: {
+          value: 1,
+          calls: [],
+          setTargetAtTime(v, t, c) {
+            this.value = v;
+            this.calls.push([v, t, c]);
+          },
+        },
+        disconnected: 0,
+        connect(n) { this.connectedTo = n; return n; },
+        disconnect() { this.disconnected++; },
+      };
+    }
+  }
+
+  return { AudioContext };
+}
+
 // Node 22 exposes some browser-named globals (navigator, ...) as getter-only
 // properties, so everything is (re)defined with defineProperty.
 function defineGlobal(name, value) {
@@ -57,6 +165,8 @@ function defineGlobal(name, value) {
 function installBrowserGlobals(overrides = {}) {
   const g = globalThis;
   const EventCtor = class { constructor(t) { this.type = t; } };
+  const { speechSynthesis, SpeechSynthesisUtterance } = makeSpeechStubs();
+  const { AudioContext } = makeAudioStubs();
   const globals = {
     window: g, self: g, document: makeDocument(), localStorage: makeStorage(), sessionStorage: makeStorage(),
     navigator: { userAgent: 'node-test', platform: process.platform, clipboard: { writeText: async () => {} } },
@@ -70,6 +180,7 @@ function installBrowserGlobals(overrides = {}) {
     MutationObserver: class { observe() {} disconnect() {} takeRecords() { return []; } },
     Image: class {}, HTMLElement: class {}, HTMLCanvasElement: class {},
     Event: EventCtor, CustomEvent: class extends EventCtor { constructor(t, i) { super(t); this.detail = i?.detail; } },
+    speechSynthesis, SpeechSynthesisUtterance, AudioContext,
     electronAPI: overrides.electronAPI || {},
     ...(overrides.globals || {}),
   };
@@ -94,6 +205,7 @@ const RENDERER_SCRIPTS = [
   'renderer/modules/control-gauges.js',
   'renderer/modules/control-history.js',
   'renderer/modules/control-monitor.js',
+  'renderer/modules/accessibility.js',
   'renderer/modules/firmware.js',
   'renderer/modules/site-view-components.js',
   'renderer/modules/site-view.js',
@@ -125,4 +237,4 @@ function makeControlStub(extra = {}) {
   return stub;
 }
 
-module.exports = { loadRenderer, makeControlStub, makeElement, makeStorage, installBrowserGlobals, runScript, RENDERER_SCRIPTS, ROOT };
+module.exports = { loadRenderer, makeControlStub, makeElement, makeStorage, installBrowserGlobals, runScript, RENDERER_SCRIPTS, ROOT, makeSpeechStubs, makeAudioStubs, makeDocument };
