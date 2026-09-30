@@ -1642,7 +1642,18 @@
 .meter-page-main {
   flex: 1;
   min-width: 0;
+  width: 100%;
   overflow-y: auto;
+}
+
+.meter-board-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px 0;
+  margin-bottom: 0;
 }
 
 .meter-global-toolbar {
@@ -1674,109 +1685,6 @@
 
 .meter-global-toolbar-input {
     width: 80px;
-}
-
-.meter-settings-panel {
-  width: 0;
-  overflow: hidden;
-  border-left: 1px solid transparent;
-  background: var(--card-bg);
-  opacity: 0;
-  padding: 0;
-  transition: width 0.22s ease, opacity 0.18s ease, padding 0.22s ease, border-color 0.22s ease;
-}
-
-.meter-page-shell.settings-open .meter-settings-panel {
-  width: min(260px, 75vw);
-  opacity: 1;
-  padding: 0;
-  border-left-color: var(--border-color);
-}
-
-/* sv-props-section resets inside the settings panel */
-.meter-settings-panel .sv-props-section {
-  padding: 10px 12px;
-  border-bottom: none;
-}
-
-/* Settings toggle rail — narrow strip between board and settings panel */
-.meter-settings-rail {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  width: 24px;
-  flex-shrink: 0;
-  background: linear-gradient(
-    to right,
-    rgba(0,0,0,0.18) 0%,
-    rgba(255,255,255,0.04) 40%,
-    rgba(255,255,255,0.06) 60%,
-    rgba(0,0,0,0.10) 100%
-  );
-  border-left: 1px solid var(--border-color);
-  border-right: 1px solid rgba(255,255,255,0.07);
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-/* Center line down the rail */
-.meter-settings-rail::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 1px;
-  transform: translateX(-50%);
-  background: rgba(255,255,255,0.08);
-  pointer-events: none;
-}
-
-.meter-settings-rail:hover {
-  background: linear-gradient(
-    to right,
-    rgba(0,0,0,0.14) 0%,
-    rgba(255,255,255,0.08) 40%,
-    rgba(255,255,255,0.10) 60%,
-    rgba(0,0,0,0.06) 100%
-  );
-}
-
-.meter-settings-rail-btn {
-  position: sticky;
-  top: calc((100vh - var(--header-height) - var(--nav-height)) / 2 - 16px);
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 6px 4px;
-  border-radius: 4px;
-  transition: color 0.15s, background 0.15s, border-color 0.15s, transform 0.22s ease;
-  transform: rotate(0deg);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.35);
-  z-index: 1;
-}
-
-.meter-settings-rail-btn:hover {
-  color: var(--text-primary);
-  background: var(--hover-bg, rgba(255, 255, 255, 0.10));
-  border-color: var(--accent-color, #4a9eff);
-}
-
-.meter-page-shell.settings-open .meter-settings-rail-btn {
-  transform: rotate(180deg);
-}
-
-.meter-settings-panel-header {
-  font-size: 0.86rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  margin-bottom: 10px;
-  color: var(--text-primary);
 }
 
 .meter-settings-group {
@@ -2263,6 +2171,110 @@
     gap: 16px;
 }
 
+/* App Settings dialog (index.html #app-settings-dialog, renderer/modules/settings.js) */
+.app-settings-dialog {
+    background: var(--card-bg, #1a1a1a);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 0;
+    width: min(720px, 92vw);
+    max-width: 720px;
+    max-height: 85vh;
+    overflow: hidden;
+    color: var(--text-primary);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+}
+
+.app-settings-dialog[open] {
+    display: flex;
+    flex-direction: column;
+}
+
+.app-settings-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.app-settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.app-settings-header h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.settings-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--border-color);
+    overflow-x: auto;
+    flex-shrink: 0;
+}
+
+.settings-tab {
+    padding: 10px 16px;
+    border: none;
+    border-bottom: 3px solid transparent;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm, 0.875rem);
+    font-weight: var(--font-weight-medium, 500);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all var(--transition-fast, 0.15s ease);
+}
+
+.settings-tab:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+.settings-tab.active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+    background: var(--color-primary-light);
+}
+
+.settings-tab:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+}
+
+.app-settings-body {
+    padding: 16px 20px 20px;
+    overflow-y: auto;
+    min-height: 0;
+    flex: 1;
+}
+
+.settings-panel[hidden] {
+    display: none !important;
+}
+
+.settings-panel .sv-props-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.settings-version {
+    margin: 0 0 12px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.settings-help {
+    margin: 4px 0 0;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
 /* Legacy expand-row (no longer rendered, kept for safety) */
 .meter-card-expand-row {
     padding: 4px 12px;
@@ -2394,46 +2406,6 @@
 @media (max-width: 640px) {
   .meter-page-shell {
     flex-direction: column;
-  }
-
-  .meter-settings-rail {
-    width: 100%;
-    height: 24px;
-    flex-direction: row;
-    border-left: none;
-    border-top: 1px solid var(--border-color);
-    border-right: none;
-    border-bottom: 1px solid rgba(255,255,255,0.07);
-    background: linear-gradient(
-      to bottom,
-      rgba(0,0,0,0.18) 0%,
-      rgba(255,255,255,0.06) 60%,
-      rgba(0,0,0,0.10) 100%
-    );
-  }
-
-  .meter-settings-rail::before {
-    top: 50%;
-    bottom: auto;
-    left: 0;
-    right: 0;
-    width: auto;
-    height: 1px;
-    transform: translateY(-50%);
-  }
-
-  .meter-settings-rail-btn {
-    transform: rotate(90deg);
-  }
-
-  .meter-page-shell.settings-open .meter-settings-rail-btn {
-    transform: rotate(270deg);
-  }
-
-  .meter-page-shell.settings-open .meter-settings-panel {
-    width: 100%;
-    border-left: none;
-    border-top: 1px solid var(--border-color);
   }
 
     .meter-card-header {

@@ -203,20 +203,6 @@
         if (persist) this.saveConfig();
     };
 
-    DWMControl.prototype._setGlobalSettingsPanelVisible = function(visible) {
-        const shell = document.getElementById('meter-page-shell');
-        if (!shell) return;
-
-        shell.classList.toggle('settings-open', visible);
-        const toggle = document.getElementById('meter-settings-toggle');
-        if (toggle) {
-            toggle.setAttribute('aria-expanded', visible ? 'true' : 'false');
-            toggle.title = visible ? 'Hide settings' : 'Show settings';
-        }
-        this.config.globalSettingsPanelVisible = visible;
-        this.saveConfig();
-    };
-
     DWMControl.prototype._getBoardLayout = function() {
         const valid = ['column', 'auto-fit', 'grid-2', 'grid-3', 'grid-4'];
         const v = this.config.boardLayout;
@@ -301,12 +287,15 @@
         if (!panel) return;
         const timingMs = this._getGlobalTimingMs();
         const boardLayout = this._getBoardLayout();
-        const smoothingPct = this._getGlobalGaugeSmoothing();
-        const panelVisible = Boolean(this.config.globalSettingsPanelVisible);
-        const debugLoggingEnabled = this.config.globalDebugLoggingEnabled === true;
+        // App-wide settings (refresh rate, layout, logging, accessibility) live in the
+        // Settings dialog (renderer/modules/settings.js).
         panel.innerHTML = `
-            <div class="meter-page-shell${panelVisible ? ' settings-open' : ''}" id="meter-page-shell">
+            <div class="meter-page-shell" id="meter-page-shell">
                 <div class="meter-page-main">
+                    <div class="meter-board-toolbar">
+                        <button class="btn btn-secondary btn-small" id="add-swr-card-btn">+ Add SWR / Return Loss Card</button>
+                        <button class="btn btn-secondary btn-small" id="open-settings-btn">Settings…</button>
+                    </div>
                     <div class="meter-board" id="meter-board">
                         <div class="meter-board-empty" id="meter-board-empty">
                             <p>No DWM meters detected.</p>
@@ -314,109 +303,16 @@
                         </div>
                     </div>
                 </div>
-                <div class="meter-settings-rail" id="meter-settings-rail">
-                    <button class="meter-settings-rail-btn" id="meter-settings-toggle"
-                        aria-expanded="${panelVisible ? 'true' : 'false'}"
-                        title="${panelVisible ? 'Hide settings' : 'Show settings'}">&#x276F;</button>
-                </div>
-                <aside class="meter-settings-panel" id="meter-settings-panel" aria-label="Global settings">
-                    <div class="sv-props-section">
-                        <div class="sv-props-title">Global Settings</div>
-                        <div class="sv-props-field">
-                            <label class="sv-props-label" for="global-timing-ms">Refresh Rate (ms)</label>
-                            <input type="number" id="global-timing-ms" class="sv-props-input"
-                                min="10" max="2000" step="10" value="${timingMs}">
-                        </div>
-                        <div class="sv-props-field" style="display:none">
-                            <label class="sv-props-label" for="global-gauge-smoothing">Gauge Smoothing (%)</label>
-                            <input type="range" id="global-gauge-smoothing" min="0" max="95" step="5" value="${smoothingPct}">
-                            <span id="global-gauge-smoothing-value" class="sv-props-label">${smoothingPct}%</span>
-                        </div>
-                        <div class="sv-props-field">
-                            <label class="sv-props-label">
-                                <input type="checkbox" id="global-debug-logging" ${debugLoggingEnabled ? 'checked' : ''}>
-                                Serial debug logging
-                            </label>
-                        </div>
-                        <div class="sv-props-field">
-                            <label class="sv-props-label" for="global-board-layout">Board Layout</label>
-                            <select id="global-board-layout" class="sv-props-select">
-                                <option value="column"${boardLayout === 'column' ? ' selected' : ''}>Single Column</option>
-                                <option value="auto-fit"${boardLayout === 'auto-fit' ? ' selected' : ''}>Auto-Fit Grid</option>
-                                <option value="grid-2"${boardLayout === 'grid-2' ? ' selected' : ''}>2 Columns</option>
-                                <option value="grid-3"${boardLayout === 'grid-3' ? ' selected' : ''}>3 Columns</option>
-                                <option value="grid-4"${boardLayout === 'grid-4' ? ' selected' : ''}>4 Columns</option>
-                            </select>
-                        </div>
-                        <div class="sv-props-field sv-props-field--action">
-                            <button class="sv-props-btn" id="add-swr-card-btn">+ Add SWR / Return Loss Card</button>
-                        </div>
-                    </div>
-                    ${this._a11yRenderSettingsGroup()}
-                </aside>
             </div>
         `;
-
-        const settingsToggle = document.getElementById('meter-settings-toggle');
-        const settingsRail   = document.getElementById('meter-settings-rail');
-        const doToggle = () => {
-            const visible = !document.getElementById('meter-page-shell')?.classList.contains('settings-open');
-            this._setGlobalSettingsPanelVisible(Boolean(visible));
-        };
-        if (settingsToggle) {
-            settingsToggle.addEventListener('click', (e) => {
-                e.stopPropagation(); // prevent rail handler from also firing
-                doToggle();
-            });
-        }
-        if (settingsRail) {
-            settingsRail.addEventListener('click', doToggle);
-        }
-
-        const timingInput = document.getElementById('global-timing-ms');
-        if (timingInput) {
-            timingInput.addEventListener('change', () => {
-                const ms = Number.parseInt(timingInput.value, 10);
-                if (!Number.isFinite(ms) || ms < 10 || ms > 2000) {
-                    timingInput.value = String(this._getGlobalTimingMs());
-                    return;
-                }
-                this._applyGlobalTimingMs(ms, { persist: true, restartTimers: true });
-            });
-        }
-
-        const smoothingInput = document.getElementById('global-gauge-smoothing');
-        const smoothingValue = document.getElementById('global-gauge-smoothing-value');
-        if (smoothingInput && smoothingValue) {
-            const updateSmoothing = () => {
-                const pct = Math.max(0, Math.min(95, Number.parseInt(smoothingInput.value, 10) || 0));
-                this.config.globalGaugeSmoothingPct = pct;
-                smoothingValue.textContent = `${pct}%`;
-                this.saveConfig();
-            };
-            smoothingInput.addEventListener('input', updateSmoothing);
-            smoothingInput.addEventListener('change', updateSmoothing);
-        }
-
-        const debugLoggingInput = document.getElementById('global-debug-logging');
-        if (debugLoggingInput) {
-          debugLoggingInput.addEventListener('change', () => {
-            this.config.globalDebugLoggingEnabled = Boolean(debugLoggingInput.checked);
-            this.saveConfig();
-          });
-        }
-
-        const boardLayoutSelect = document.getElementById('global-board-layout');
-        if (boardLayoutSelect) {
-            boardLayoutSelect.addEventListener('change', () => {
-                this._applyBoardLayout(boardLayoutSelect.value, true);
-            });
-        }
-        this._a11yBindSettingsEvents();
 
         const addSwrBtn = document.getElementById('add-swr-card-btn');
         if (addSwrBtn) {
             addSwrBtn.addEventListener('click', () => this.addSwrCard());
+        }
+        const openSettingsBtn = document.getElementById('open-settings-btn');
+        if (openSettingsBtn) {
+            openSettingsBtn.addEventListener('click', () => this.openSettings('control'));
         }
 
         this._applyGlobalTimingMs(timingMs, { persist: false, restartTimers: false });
