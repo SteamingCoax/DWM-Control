@@ -12,6 +12,10 @@
  * - headerConnection: Set to true to show the Serial Communication dropdown, false to hide it
  * - Restart the app for changes to take effect
  */
+// USB product IDs (lower-case hex) a DWM V2 presents in normal operation, all under VID 0483:
+// 5740 (ST generic CDC, older firmware) and a59c (assigned by ST to the DWM V2).
+const DWM_V2_APP_PIDS = ['5740', 'a59c'];
+
 class DWMControl {
     constructor() {
         this.selectedHexFile = null;
@@ -330,25 +334,26 @@ class DWMControl {
     }
 
     isMeterPort(port) {
-        // Primary match: USB product string "DWM V2 ComPort" — set on all DWM V2 devices.
-        // serialport exposes it via the manufacturer field on all platforms.
-        const manufacturer = (port?.manufacturer || '').toLowerCase();
-        if (manufacturer.includes('dwm v2')) return true;
+        // Primary match: the USB product string "DWM V2 ComPort", set by every DWM V2
+        // firmware regardless of PID. Where serialport surfaces it depends on the platform:
+        // Linux embeds it in pnpId (usb-STMicroelectronics_DWM_V2_ComPort_<serial>-if00),
+        // Windows may carry it in friendlyName, and some builds report it in manufacturer.
+        // macOS exposes no product string at all, only VID/PID.
+        const hasProductString = (value) => /dwm[ _]v2/i.test(String(value || ''));
+        if (hasProductString(port?.manufacturer)) return true;
+        if (hasProductString(port?.friendlyName)) return true;
+        if (hasProductString(port?.pnpId)) return true;
 
-        // Secondary match: Windows friendly name may also carry the product string.
-        const friendlyName = (port?.friendlyName || '').toLowerCase();
-        if (friendlyName.includes('dwm v2')) return true;
-
-        // Tertiary: VID 0483 + PID 5740 (STM32 CDC) with a USB-origin pnpId on Windows,
-        // or vendorId/productId fields on macOS/Linux — guards against other STM32 devices
-        // by requiring both the correct VID and PID together.
+        // Secondary: VID 0483 with one of the DWM V2 application PIDs. 5740 is ST's generic
+        // CDC PID used by older firmware; A59C is the PID ST assigned to the DWM V2. VID and
+        // PID must match together so other STM32 CDC devices are not misidentified.
         const vid = (port?.vendorId || '').toLowerCase().replace(/^0x/, '');
         const pid = (port?.productId || '').toLowerCase().replace(/^0x/, '');
-        if (vid === '0483' && pid === '5740') return true;
+        if (vid === '0483' && DWM_V2_APP_PIDS.includes(pid)) return true;
 
-        // Windows fallback when vendorId/productId fields are unpopulated
+        // Windows fallback when vendorId/productId fields are unpopulated: read them from pnpId.
         const pnpId = (port?.pnpId || '');
-        if (/VID_0483/i.test(pnpId) && /PID_5740/i.test(pnpId)) return true;
+        if (/VID_0483/i.test(pnpId) && /PID_(5740|A59C)/i.test(pnpId)) return true;
 
         return false;
     }

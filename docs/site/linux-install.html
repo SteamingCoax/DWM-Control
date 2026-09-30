@@ -60,6 +60,8 @@
     <div class="cmd"><pre>sudo tee /etc/udev/rules.d/49-dwm.rules &gt;/dev/null &lt;&lt;'EOF'
 SUBSYSTEM=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", ENV{ID_MM_DEVICE_IGNORE}="1"
 SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", MODE="0664", GROUP="dialout", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="a59c", ENV{ID_MM_DEVICE_IGNORE}="1"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="a59c", MODE="0664", GROUP="dialout", TAG+="uaccess"
 SUBSYSTEM=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="df11", MODE="0664", GROUP="plugdev", TAG+="uaccess"
 EOF
 sudo udevadm control --reload-rules &amp;&amp; sudo udevadm trigger</pre><button class="copy" type="button">Copy</button></div>
