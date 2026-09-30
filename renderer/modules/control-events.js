@@ -505,6 +505,7 @@
                 bar.style.display = isOpen ? 'none' : '';
                 const toggleBtn = document.querySelector(`[data-meter-key="${key}"] [data-meter-action="toggle-cfg"]`);
                 if (toggleBtn) toggleBtn.classList.toggle('active', !isOpen);
+                if (toggleBtn) toggleBtn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
                 if (record.state) record.state.cfgBarOpen = !isOpen;
                 break;
             }

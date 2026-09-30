@@ -334,11 +334,13 @@
 
             if (additionalValidPoints.length < 2) {
                 this.appendOutput('Error: Need at least 2 complete data points (beyond origin) with valid %FS values for polynomial fit', 'error');
+                this.announce('De-embed fit needs at least 2 complete data points beyond the origin', { assertive: true });
                 return;
             }
 
             if (this.deembedData.powerRating === null || this.deembedData.powerRating <= 0) {
                 this.appendOutput('Error: Please enter a valid power rating (full scale) before computing', 'error');
+                this.announce('De-embed fit needs a valid full-scale power rating', { assertive: true });
                 return;
             }
 
@@ -359,6 +361,7 @@
             }
 
             this.displayResults(result.coefficients, result.rSquared);
+            this._a11yOnFitResult(result.rSquared);
 
             const scaledCoefficients = [
                 (result.coefficients[0] * 1000) / 100,
@@ -382,6 +385,7 @@
         } catch (error) {
             console.error('Polynomial fit error:', error);
             this.appendOutput(`Error computing polynomial fit: ${error.message}`, 'error');
+            this.announce(`De-embed fit failed: ${error.message}`, { assertive: true });
         }
     };
 

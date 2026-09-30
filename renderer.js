@@ -56,6 +56,7 @@ class DWMControl {
 
         // Wire native macOS menu actions → in-app actions
         this.setupNativeMenuActions();
+        this.setupAccessibility();
     }
 
     initializeApp() {
