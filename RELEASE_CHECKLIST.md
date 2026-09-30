@@ -72,6 +72,11 @@ step, the three Linux architectures, and the update path itself.
 - [ ] Install beta.N on the Mac, Windows and Linux test machines. On each, run the
       Tier 3 boxes that apply (at minimum: launch, connect, bundled dfu-util path,
       one flash on Windows to exercise the WinUSB driver step).
+- [ ] Linux deb: after `sudo apt install ./DWM-Control-*.deb`, "DWM Control" is in
+      the application menu, `dwm-control` starts it from a terminal, a plugged-in
+      meter connects without adding the user to `dialout`, and
+      `/etc/udev/rules.d/49-dwm.rules` exists. After `sudo apt remove dwm-control`
+      the launcher and the rules file are gone.
 - [ ] Publish beta.N+1 (no code change needed). Every beta install offers it,
       downloads it, and restarts into it.
 - [ ] Only then publish the stable X.Y.Z. Confirm a stable-channel install offers it.

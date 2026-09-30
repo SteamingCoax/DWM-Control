@@ -72,11 +72,11 @@ jobs:
           path: ~/.cache/electron
           key: electron-linux-${{ hashFiles('package-lock.json') }}
 
-      # Unpacked directory build only: no installers, no signing, no publish.
-      # Verifies the electron-builder "files" config, asar packing and
-      # asarUnpack rules without producing release artifacts.
-      - name: Build unpacked Linux app
-        run: npx electron-builder --linux dir --x64 --publish=never
+      # No signing, no publish. The unpacked dir verifies the electron-builder
+      # "files" config, asar packing and asarUnpack rules; the deb is built only
+      # so its generated maintainer scripts can be inspected below.
+      - name: Build unpacked Linux app and deb
+        run: npx electron-builder --linux dir deb --x64 --publish=never
 
       - name: Verify packaged app contents
         run: |
@@ -95,3 +95,24 @@ jobs:
           UNPACKED="$(find "$APP_DIR/resources/app.asar.unpacked" -name '*.node' | head -n 1)"
           [ -n "$UNPACKED" ] || { echo "serialport prebuild not asarUnpacked" >&2; exit 1; }
           echo "OK: $UNPACKED"
+
+      # build/linux-postinstall.sh and build/linux-postremove.sh REPLACE
+      # electron-builder's default after-install/after-remove templates, so the
+      # launcher link (/usr/bin/dwm-control) and the udev rules must both be
+      # present, and every ${macro} must have been substituted.
+      - name: Verify deb maintainer scripts
+        run: |
+          DEB="$(find dist -maxdepth 1 -name '*.deb' | head -n 1)"
+          [ -n "$DEB" ] || { echo "deb not built" >&2; exit 1; }
+          for s in postinst postrm; do
+            dpkg-deb --ctrl-tarfile "$DEB" | tar -xO "./$s" > "dist/$s"
+            echo "== $s =="; cat "dist/$s"
+            bash -n "dist/$s"
+            if grep -q '\${' "dist/$s"; then echo "$s: unsubstituted macro" >&2; exit 1; fi
+          done
+          grep -q "'/opt/DWM Control/dwm-control' '/usr/bin/dwm-control'" dist/postinst || { echo "postinst: launcher link missing" >&2; exit 1; }
+          grep -q "chrome-sandbox" dist/postinst || { echo "postinst: chrome-sandbox permissions missing" >&2; exit 1; }
+          grep -q "49-dwm.rules" dist/postinst || { echo "postinst: udev rules missing" >&2; exit 1; }
+          grep -q "/usr/bin/dwm-control" dist/postrm || { echo "postrm: launcher link removal missing" >&2; exit 1; }
+          grep -q "49-dwm.rules" dist/postrm || { echo "postrm: udev cleanup missing" >&2; exit 1; }
+          echo "OK: deb maintainer scripts"

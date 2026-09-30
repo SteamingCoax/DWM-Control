@@ -1,0 +1,157 @@
+<!--
+  DWM Control: Linux install section for the website.
+  Paste this whole file into a Wix "Embed HTML" element. Self-contained (no external assets).
+  To update for a new release, change VERSION in the script at the bottom. Nothing else.
+-->
+<div id="dwm-linux" style="font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; color:#1f2933; max-width:860px; margin:0 auto; line-height:1.55; font-size:16px;">
+  <style>
+    #dwm-linux h2 { font-size:24px; margin:0 0 6px; }
+    #dwm-linux h3 { font-size:18px; margin:26px 0 8px; }
+    #dwm-linux h4 { font-size:15px; margin:14px 0 6px; color:#52606d; text-transform:uppercase; letter-spacing:.04em; }
+    #dwm-linux p, #dwm-linux li { margin:0 0 8px; }
+    #dwm-linux code { font-family: Menlo, Consolas, 'Courier New', monospace; font-size:14px; background:#eef2f6; padding:1px 5px; border-radius:4px; }
+    #dwm-linux .btns { display:flex; flex-wrap:wrap; gap:10px; margin:6px 0 10px; }
+    #dwm-linux .dl { display:inline-block; text-decoration:none; font-weight:600; font-size:15px; color:#fff; background:#2563eb; padding:10px 16px; border-radius:6px; border:2px solid #2563eb; }
+    #dwm-linux .dl:hover { background:#1d4ed8; border-color:#1d4ed8; }
+    #dwm-linux .dl.picked { background:#fff; color:#1d4ed8; }
+    #dwm-linux .dl small { display:block; font-weight:400; font-size:12px; opacity:.9; }
+    #dwm-linux .cmd { position:relative; margin:6px 0 12px; }
+    #dwm-linux pre { font-family: Menlo, Consolas, 'Courier New', monospace; font-size:14px; background:#1f2933; color:#f3f6f9; padding:12px 84px 12px 14px; border-radius:6px; overflow-x:auto; margin:0; white-space:pre; }
+    #dwm-linux .copy { position:absolute; top:8px; right:8px; font:600 12px -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; color:#f3f6f9; background:#3e4c59; border:0; border-radius:4px; padding:4px 10px; cursor:pointer; }
+    #dwm-linux .copy:hover { background:#52606d; }
+    #dwm-linux .copy.done { background:#2e8b57; }
+    #dwm-linux .hint { background:#eef2f6; border-radius:6px; padding:10px 14px; margin:10px 0 0; font-size:15px; }
+    #dwm-linux .note { background:#fff7e6; border-left:4px solid #f0a500; padding:10px 14px; border-radius:4px; margin:16px 0 0; }
+  </style>
+
+  <h2>Install DWM Control on Linux</h2>
+  <p>Version <span class="ver"></span>. Works on 64-bit PCs and on Raspberry Pi (64-bit and 32-bit OS).</p>
+
+  <h3>1. Download</h3>
+  <p>Pick the button that matches your computer. The commands below update to match your choice.</p>
+
+  <h4>Ubuntu, Debian, Linux Mint, Raspberry Pi OS</h4>
+  <div class="btns">
+    <a class="dl" data-kind="deb" data-arch="amd64"  href="#">64-bit PC<small>Intel or AMD</small></a>
+    <a class="dl" data-kind="deb" data-arch="arm64"  href="#">Raspberry Pi, 64-bit OS<small>Pi 3, 4, 5, 400, 500</small></a>
+    <a class="dl" data-kind="deb" data-arch="armv7l" href="#">Raspberry Pi, 32-bit OS<small>older or "Legacy" OS images</small></a>
+  </div>
+
+  <h4>Any other Linux (Fedora, openSUSE, Arch, ...)</h4>
+  <div class="btns">
+    <a class="dl" data-kind="app" data-arch="x86_64" href="#">64-bit PC<small>Intel or AMD</small></a>
+    <a class="dl" data-kind="app" data-arch="arm64"  href="#">64-bit ARM<small>Pi 3, 4, 5 with 64-bit OS</small></a>
+    <a class="dl" data-kind="app" data-arch="armv7l" href="#">32-bit ARM<small>Pi with 32-bit OS</small></a>
+  </div>
+  <div class="hint">Not sure if your Raspberry Pi OS is 64-bit? Open <em>Raspberry Pi Imager</em> and look at the OS you installed: 64-bit images say "(64-bit)" in the name. If it does not, it is 32-bit.</div>
+
+  <h3>2. Install</h3>
+
+  <div class="for-deb">
+    <p>Open the downloaded file and choose <strong>Install</strong>. Or, in a terminal in your Downloads folder:</p>
+    <div class="cmd"><pre>sudo apt install ./<span class="fname"></span></pre><button class="copy" type="button">Copy</button></div>
+    <p>The package also sets up USB access to the meter, so no other steps are needed.</p>
+  </div>
+
+  <div class="for-app" style="display:none">
+    <p>There is nothing to install. In a terminal in your Downloads folder, make the file executable:</p>
+    <div class="cmd"><pre>chmod +x <span class="fname"></span></pre><button class="copy" type="button">Copy</button></div>
+    <p>Then allow the app to talk to the meter. Copy this once, paste it in the terminal, and enter your password when asked:</p>
+    <div class="cmd"><pre>sudo tee /etc/udev/rules.d/49-dwm.rules &gt;/dev/null &lt;&lt;'EOF'
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", ENV{ID_MM_DEVICE_IGNORE}="1"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", MODE="0664", GROUP="dialout", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="df11", MODE="0664", GROUP="plugdev", TAG+="uaccess"
+EOF
+sudo udevadm control --reload-rules &amp;&amp; sudo udevadm trigger</pre><button class="copy" type="button">Copy</button></div>
+  </div>
+
+  <h3>3. Start DWM Control</h3>
+
+  <div class="for-deb">
+    <p>Open <strong>DWM Control</strong> from your application menu, or run it from any terminal:</p>
+    <div class="cmd"><pre>dwm-control</pre><button class="copy" type="button">Copy</button></div>
+  </div>
+
+  <div class="for-app" style="display:none">
+    <p>In a terminal in your Downloads folder:</p>
+    <div class="cmd"><pre>./<span class="fname"></span></pre><button class="copy" type="button">Copy</button></div>
+    <p>If no window appears, start it this way instead (works everywhere):</p>
+    <div class="cmd"><pre>./<span class="fname"></span> --appimage-extract-and-run</pre><button class="copy" type="button">Copy</button></div>
+  </div>
+
+  <h3>4. Plug in the meter</h3>
+  <p>Connect the DWM V2 by USB. The meter appears on the Control tab within a few seconds.</p>
+
+  <div class="note"><strong>After a firmware update</strong>, switch the meter off and on by hand. It does not restart on its own, and its name goes back to <code>DWM_V2</code>, so rename it from its card if you had given it a name.</div>
+
+  <script>
+    (function () {
+      var VERSION = '1.4.0';   // <-- the only thing to change for a new release
+      var BASE = 'https://github.com/SteamingCoax/DWM-Control/releases/download/v' + VERSION + '/';
+      var root = document.getElementById('dwm-linux');
+
+      function fileName(kind, arch) {
+        return 'DWM-Control-' + VERSION + '-Linux-' + arch + (kind === 'deb' ? '.deb' : '.AppImage');
+      }
+      function pick(kind, arch) {
+        var name = fileName(kind, arch);
+        var spans = root.querySelectorAll('.fname');
+        for (var i = 0; i < spans.length; i++) spans[i].textContent = name;
+        var debs = root.querySelectorAll('.for-deb'), apps = root.querySelectorAll('.for-app');
+        for (var d = 0; d < debs.length; d++) debs[d].style.display = kind === 'deb' ? '' : 'none';
+        for (var a = 0; a < apps.length; a++) apps[a].style.display = kind === 'deb' ? 'none' : '';
+        var btns = root.querySelectorAll('.dl');
+        for (var j = 0; j < btns.length; j++) {
+          var on = btns[j].getAttribute('data-kind') === kind && btns[j].getAttribute('data-arch') === arch;
+          btns[j].className = 'dl' + (on ? ' picked' : '');
+        }
+      }
+
+      var vers = root.querySelectorAll('.ver');
+      for (var v = 0; v < vers.length; v++) vers[v].textContent = VERSION;
+
+      var btns = root.querySelectorAll('.dl');
+      for (var b = 0; b < btns.length; b++) {
+        (function (btn) {
+          var kind = btn.getAttribute('data-kind'), arch = btn.getAttribute('data-arch');
+          btn.href = BASE + fileName(kind, arch);
+          // The section lives in an iframe on Wix: a same-frame navigation would replace it
+          // with GitHub's download page, so the download opens in a new tab instead.
+          btn.setAttribute('target', '_blank');
+          btn.setAttribute('rel', 'noopener');
+          btn.addEventListener('click', function () { pick(kind, arch); });
+        })(btns[b]);
+      }
+      pick('deb', 'amd64');
+
+      function fallbackCopy(text) {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed'; ta.style.top = '-1000px';
+        document.body.appendChild(ta); ta.select();
+        var ok = false;
+        try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+        document.body.removeChild(ta);
+        return ok;
+      }
+      function flash(btn, label) {
+        var old = btn.textContent;
+        btn.textContent = label; btn.className = 'copy done';
+        setTimeout(function () { btn.textContent = old; btn.className = 'copy'; }, 1500);
+      }
+      var copies = root.querySelectorAll('.copy');
+      for (var c = 0; c < copies.length; c++) {
+        copies[c].addEventListener('click', function () {
+          var btn = this;
+          var text = btn.parentNode.querySelector('pre').textContent;
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function () { flash(btn, 'Copied'); },
+              function () { flash(btn, fallbackCopy(text) ? 'Copied' : 'Select & copy'); });
+          } else {
+            flash(btn, fallbackCopy(text) ? 'Copied' : 'Select & copy');
+          }
+        });
+      }
+    })();
+  </script>
+</div>

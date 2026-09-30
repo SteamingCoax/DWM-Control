@@ -236,7 +236,8 @@
     },
     "deb": {
       "artifactName": "DWM-Control-${version}-Linux-${arch}.${ext}",
-      "afterInstall": "build/linux-postinstall.sh"
+      "afterInstall": "build/linux-postinstall.sh",
+      "afterRemove": "build/linux-postremove.sh"
     },
     "rpm": {},
     "publish": {
