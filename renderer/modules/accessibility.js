@@ -137,6 +137,7 @@
   P._a11yPersist = function(patch) {
     this.config.accessibility = this.normalizeAccessibility({ ...this._a11yCfg(), ...patch });
     this.saveConfig();
+    if (typeof this._a11ySyncSettingsForm === 'function') this._a11ySyncSettingsForm();
   };
 
   const ANNOUNCE_WINDOW_MS = 400;
@@ -462,6 +463,9 @@
       api?.onAccessibilitySupportChanged?.((v) => { st.screenReader = Boolean(v); });
     } catch (_) { /* bridge unavailable */ }
     if (cfg.toneEnabled) this._a11yToneStart();
+    try {
+      window.speechSynthesis?.addEventListener?.('voiceschanged', () => this._a11yRefreshVoiceOptions());
+    } catch (_) { /* no speech API */ }
   };
 
   // ─── Screen-reader text for gauges, DFU, de-embed ──────────────────────────
@@ -516,6 +520,159 @@
     const pct = Number((rSquared * 100).toFixed(1));
     const low = rSquared < 0.995;
     this.announce(`De-embed fit complete, quality ${pct} percent${low ? ' low quality' : ''}`, low ? { assertive: true } : undefined);
+  };
+
+  // ─── Global Settings panel: Accessibility group ────────────────────────────
+
+  const escAttr = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  // [id suffix, config key, kind]
+  const A11Y_FORM = [
+    ['speech-enabled', 'speechEnabled', 'bool'],
+    ['speech-mode', 'speechMode', 'str'],
+    ['speech-interval', 'speechIntervalS', 'num'],
+    ['speech-change-pct', 'speechChangePct', 'num'],
+    ['speech-metric', 'speechMetric', 'str'],
+    ['speech-rate', 'speechRate', 'num'],
+    ['speech-voice', 'speechVoice', 'str'],
+    ['speech-include-name', 'speechIncludeMeterName', 'bool'],
+    ['speech-include-swr', 'speechIncludeSwr', 'bool'],
+    ['tone-enabled', 'toneEnabled', 'bool'],
+    ['tone-min-hz', 'toneMinHz', 'num'],
+    ['tone-max-hz', 'toneMaxHz', 'num'],
+    ['tone-volume', 'toneVolume', 'num'],
+    ['tone-wave', 'toneWave', 'str'],
+    ['announcements', 'announcements', 'str'],
+    ['shortcuts-enabled', 'shortcutsEnabled', 'bool'],
+  ];
+
+  P._a11yRenderSettingsGroup = function() {
+    const cfg = this.config.accessibility || this._accessibilityDefaults();
+    const check = (id, key, text) => `<div class="sv-props-field">
+                            <label class="sv-props-label" for="a11y-${id}"><input type="checkbox" id="a11y-${id}"${cfg[key] ? ' checked' : ''}> ${text}</label>
+                        </div>`;
+    const num = (id, key, text, min, max, step) => `<div class="sv-props-field">
+                            <label class="sv-props-label" for="a11y-${id}">${text}</label>
+                            <input type="number" class="sv-props-input" id="a11y-${id}" min="${min}" max="${max}" step="${step}" value="${escAttr(cfg[key])}">
+                        </div>`;
+    const select = (id, key, text, options) => `<div class="sv-props-field">
+                            <label class="sv-props-label" for="a11y-${id}">${text}</label>
+                            <select class="sv-props-select" id="a11y-${id}">${options.map(([v, t]) => `<option value="${v}"${cfg[key] === v ? ' selected' : ''}>${t}</option>`).join('')}</select>
+                        </div>`;
+    const voiceOptions = this._a11yVoiceOptionsHtml(cfg.speechVoice);
+    return `<div class="sv-props-section" id="a11y-settings">
+                        <div class="sv-props-title">Accessibility</div>
+                        ${check('speech-enabled', 'speechEnabled', 'Spoken readouts')}
+                        ${select('speech-mode', 'speechMode', 'Readout mode', [['interval', 'Every N seconds'], ['change', 'When the value changes'], ['manual', 'Only on demand']])}
+                        ${num('speech-interval', 'speechIntervalS', 'Interval (seconds)', 1, 60, 1)}
+                        ${num('speech-change-pct', 'speechChangePct', 'Change threshold (% of full scale)', 1, 100, 1)}
+                        ${select('speech-metric', 'speechMetric', 'Readout metric', [['avg', 'Average'], ['peak', 'PEP (peak envelope)'], ['inst', 'Instantaneous'], ['max', 'Maximum']])}
+                        ${num('speech-rate', 'speechRate', 'Speech rate', 0.5, 2, 0.1)}
+                        <div class="sv-props-field">
+                            <label class="sv-props-label" for="a11y-speech-voice">Voice</label>
+                            <select class="sv-props-select" id="a11y-speech-voice">${voiceOptions}</select>
+                        </div>
+                        ${check('speech-include-name', 'speechIncludeMeterName', 'Say meter name')}
+                        ${check('speech-include-swr', 'speechIncludeSwr', 'Say SWR')}
+                        ${check('tone-enabled', 'toneEnabled', 'Tuning tone')}
+                        ${num('tone-min-hz', 'toneMinHz', 'Tone at zero (Hz)', 40, 2000, 10)}
+                        ${num('tone-max-hz', 'toneMaxHz', 'Tone at full scale (Hz)', 100, 8000, 10)}
+                        ${num('tone-volume', 'toneVolume', 'Tone volume', 0, 1, 0.05)}
+                        ${select('tone-wave', 'toneWave', 'Tone waveform', [['sine', 'Sine'], ['triangle', 'Triangle'], ['square', 'Square'], ['sawtooth', 'Sawtooth']])}
+                        ${select('announcements', 'announcements', 'Announcements', [['auto', 'Automatic'], ['live-region', 'Screen reader only'], ['speech', 'Built-in voice only'], ['both', 'Both']])}
+                        ${check('shortcuts-enabled', 'shortcutsEnabled', 'Keyboard shortcuts')}
+                        <details><summary>Shortcuts</summary>
+                            <ul>
+                                <li>Ctrl/Cmd+Shift+S: spoken readouts on or off</li>
+                                <li>T: tuning tone on or off</li>
+                                <li>R: speak now</li>
+                                <li>D: describe meter</li>
+                                <li>P: peak hold</li>
+                                <li>M: cycle range</li>
+                                <li>A: cycle readout metric</li>
+                                <li>Right / Left arrow: next / previous meter</li>
+                                <li>1 to 8: select meter</li>
+                            </ul>
+                        </details>
+                    </div>`;
+  };
+
+  P._a11yVoiceOptionsHtml = function(selectedUri) {
+    let list = [];
+    try {
+      if (typeof window !== 'undefined' && window.speechSynthesis && typeof window.speechSynthesis.getVoices === 'function') {
+        list = Array.from(window.speechSynthesis.getVoices() || []);
+      }
+    } catch (_) { list = []; }
+    let html = `<option value=""${selectedUri ? '' : ' selected'}>System default</option>`;
+    if (!list.length) return `${html}<option value="" disabled>No voices available</option>`;
+    for (const v of list) {
+      html += `<option value="${escAttr(v.voiceURI)}"${v.voiceURI === selectedUri ? ' selected' : ''}>${escAttr(`${v.name} (${v.lang})`)}</option>`;
+    }
+    return html;
+  };
+
+  P._a11yRefreshVoiceOptions = function() {
+    const el = document.getElementById('a11y-speech-voice');
+    if (!el) return;
+    const cfg = this.config.accessibility || this._accessibilityDefaults();
+    el.innerHTML = this._a11yVoiceOptionsHtml(cfg.speechVoice);
+  };
+
+  P._a11yReadSettingsForm = function() {
+    const out = {};
+    for (const [id, key, kind] of A11Y_FORM) {
+      const el = document.getElementById(`a11y-${id}`);
+      if (!el) continue;
+      if (kind === 'bool') out[key] = Boolean(el.checked);
+      else if (kind === 'num') out[key] = el.value === '' ? NaN : Number(el.value);
+      else out[key] = String(el.value);
+    }
+    return out;
+  };
+
+  P._a11yToneApplyConfig = function() {
+    const tone = this._a11yState().tone;
+    if (!tone.running || !tone.osc || !tone.gain) return;
+    const cfg = this._a11yCfg();
+    try {
+      tone.osc.type = cfg.toneWave;
+      tone.gain.gain.value = cfg.toneVolume;
+    } catch (_) { /* node gone */ }
+  };
+
+  P._a11yBindSettingsEvents = function() {
+    for (const [id, key] of A11Y_FORM) {
+      const el = document.getElementById(`a11y-${id}`);
+      if (!el) continue;
+      el.addEventListener('change', () => {
+        const prev = this._a11yCfg();
+        this.config.accessibility = this.normalizeAccessibility({ ...prev, ...this._a11yReadSettingsForm() });
+        this.saveConfig();
+        const cfg = this.config.accessibility;
+        if (key === 'toneEnabled') {
+          if (cfg.toneEnabled) this._a11yToneStart(); else this._a11yToneStop();
+        } else if (key === 'toneWave' || key === 'toneVolume') {
+          this._a11yToneApplyConfig();
+        } else if (key === 'speechEnabled' && !cfg.speechEnabled) {
+          try { window.speechSynthesis?.cancel(); } catch (_) { /* unavailable */ }
+        }
+        this._a11ySyncSettingsForm();
+      });
+    }
+  };
+
+  // Push the current config into whatever settings controls are rendered, so a
+  // change made by shortcut or menu is reflected in the panel (and typed values
+  // show their normalized form).
+  P._a11ySyncSettingsForm = function() {
+    const cfg = this._a11yCfg();
+    for (const [id, key, kind] of A11Y_FORM) {
+      const el = document.getElementById(`a11y-${id}`);
+      if (!el) continue;
+      if (kind === 'bool') el.checked = Boolean(cfg[key]);
+      else el.value = String(cfg[key]);
+    }
   };
 
 })();

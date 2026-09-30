@@ -352,6 +352,7 @@
                             <button class="sv-props-btn" id="add-swr-card-btn">+ Add SWR / Return Loss Card</button>
                         </div>
                     </div>
+                    ${this._a11yRenderSettingsGroup()}
                 </aside>
             </div>
         `;
@@ -411,6 +412,7 @@
                 this._applyBoardLayout(boardLayoutSelect.value, true);
             });
         }
+        this._a11yBindSettingsEvents();
 
         const addSwrBtn = document.getElementById('add-swr-card-btn');
         if (addSwrBtn) {
