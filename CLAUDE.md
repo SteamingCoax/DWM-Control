@@ -54,6 +54,7 @@ CI: `.github/workflows/ci.yml` runs on every PR and push to `main` (GitHub-hoste
 Module responsibilities:
 
 - `extensions.js`: auto-updater UI, `loadConfig`/`saveConfig` (persisted in `localStorage` under `dwm-control-config`), output log, native menu wiring.
+- `accessibility.js`: live-region announcer, spoken readouts (Web Speech), tuning tone (Web Audio), focused-meter shortcuts and the Accessibility settings group.
 - `control.js`: per-meter state factory (`createMeterState`) and meter card rendering/layouts.
 - `control-api.js`: serial line parsing, request/response correlation, `sendApiCommand`.
 - `control-monitor.js`: polling loop, snapshot refresh, watchdog reconnect.

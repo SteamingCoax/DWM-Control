@@ -35,6 +35,24 @@ Supported platforms:
 - Device controls are generated dynamically for supported hardware
 - Includes live device discovery and interaction workflow
 
+### Accessibility
+- **Screen readers**: NVDA on Windows, VoiceOver on macOS, and Orca on Linux all work without any configuration. The tab strip is a real tab list (use arrow keys to move between tabs). Each meter card is a named region, so NVDA users can press `D` to jump between meters. Each gauge exposes its current reading as text, the output console and upload log are live regions, and connection, range, firmware-upload and De-Embed results are announced automatically.
+- **Spoken readouts** (off by default): The app can speak the focused meter's reading using the system voice at a configurable interval, when the value changes, or on demand. Settings live in the Control tab's Global Settings panel under "Accessibility" and include metric selection, interval, change threshold, voice, playback rate, and options to include the meter name and SWR data.
+- **Tuning tone** (off by default): A continuous tone whose pitch follows the focused meter's power. By default, it ranges from 100 Hz at zero to 1 kHz at full scale; both ends are adjustable in the Accessibility settings for flexible tuning of amplifiers by ear.
+- **Keyboard shortcuts** (Ctrl+Shift on Windows and Linux, Cmd+Shift on macOS; all are also in the Accessibility menu): Shortcuts never fire while typing in a text field. NVDA users can use browse or focus mode as needed. On Linux, spoken readouts require `speech-dispatcher` to be installed (`sudo apt install speech-dispatcher` on Debian/Ubuntu). If the tone does not start after launch, press Ctrl+Shift+T once to restart it.
+
+| Shortcut | Action |
+| --- | --- |
+| Ctrl+Shift+S | Toggle spoken readouts |
+| Ctrl+Shift+T | Toggle tuning tone |
+| Ctrl+Shift+R | Speak the focused meter's reading now |
+| Ctrl+Shift+D | Describe the focused meter (name, element, range, full scale) |
+| Ctrl+Shift+P | Peak hold on/off (latches the highest reading until turned off) |
+| Ctrl+Shift+M | Cycle range 1x → 2x → 4x |
+| Ctrl+Shift+A | Cycle readout metric (average → PEP → instantaneous → maximum) |
+| Ctrl+Shift+Right / Left | Next / previous meter |
+| Ctrl+Shift+1 … 8 | Jump to meter 1 … 8 |
+
 ### USB API Migration Note
 - Outgoing control frames now default to `proto=2`.
 - The app still accepts `proto=1` responses during the transition window, but that compatibility path is temporary.

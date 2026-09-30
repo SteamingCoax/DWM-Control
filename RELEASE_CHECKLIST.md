@@ -31,6 +31,15 @@ Two meters attached, ideally one on protocol 1 firmware and one on protocol 2.
       updates, save and reload of a workspace round-trips.
 - [ ] Firmware tab: Refresh with no meter in DFU mode reports "No DFU devices found"
       without errors.
+- [ ] **NVDA on Windows**: Tab list arrows move between tabs, `D` key jumps between meter
+      regions, connect and disconnect are each announced once, Ctrl+Shift+R speaks the
+      focused meter's reading, Ctrl+Shift+T enables the tuning tone and the pitch follows
+      the needle, Ctrl+Shift+M cycles range and the "W FS" label updates, menu items read
+      their accelerators without duplication.
+- [ ] **VoiceOver on macOS**: Rotor lists four tabs and one region per meter, live regions
+      (connection status, snapshot updates, upload log) announce changes without repeating.
+- [ ] **Linux + Orca**: Spoken readouts work with `speech-dispatcher` installed, without it
+      only the screen reader works, tuning tone plays and follows the needle.
 
 ## Tier 3: packaged build on this Mac (`npm run build:mac:unsigned`)
 

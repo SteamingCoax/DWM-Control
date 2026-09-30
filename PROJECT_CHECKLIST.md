@@ -43,7 +43,8 @@
 - [x] Verify snapshot voltages (`power_voltage`, `supply_voltage`) and units
 - [x] Verify monitor poll stability at 500ms for at least 2 minutes
 - [ ] Verify parser behavior with mixed terminal output + API frames
-- [ ] Capture one successful and one error frame in logs for regression reference 
+- [ ] Capture one successful and one error frame in logs for regression reference
+- [ ] Accessibility sign-off with a blind operator using NVDA (spoken readouts, tuning tone, meter switching with 3+ meters) 
 
 ## Runtime / Environment
 - [ ] Confirm Node runtime is healthy (`node -v`, `npm -v`)
