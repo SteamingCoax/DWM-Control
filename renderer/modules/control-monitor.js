@@ -73,6 +73,7 @@
 
         this.appendOutput(`Watchdog: no response from ${record.portPath} — reconnecting…`);
         this.setMeterStatus(key, 'No response — reconnecting…', 'warning');
+        this.announce(`${record.friendlyName || 'DWM V2'} not responding, reconnecting`, { assertive: true });
 
         this.stopMeterMonitoring(key, true);
         try { await window.electronAPI.closeSerialPort(record.portPath); } catch (_) {}
@@ -121,6 +122,7 @@
                     if (!this.activeMeterKey) this.activeMeterKey = key;
                     this.updateMeterCardUI(key);
                     this.appendOutput(`Watchdog: reconnected to ${record.portPath} (history preserved)`);
+                    this.announce(`Reconnected to ${record.friendlyName || 'DWM V2'}`);
                     this._autoQueryMeterOnConnect(key);
                     this.startMeterMonitoring(key);
                 } else if (attempts < maxAttempts) {
@@ -129,6 +131,7 @@
                 } else {
                     record._watchdogActive = false;
                     this.setMeterStatus(key, 'Auto-reconnect failed. Use Connect to retry.', 'error');
+                    this.announce(`Auto-reconnect to ${record.friendlyName || 'DWM V2'} failed`, { assertive: true });
                 }
             } catch (err) {
                 if (attempts < maxAttempts) {
@@ -136,6 +139,7 @@
                 } else {
                     record._watchdogActive = false;
                     this.setMeterStatus(key, `Auto-reconnect failed: ${err.message}`, 'error');
+                    this.announce(`Auto-reconnect to ${record.friendlyName || 'DWM V2'} failed`, { assertive: true });
                 }
             }
         };
@@ -236,6 +240,7 @@
             this._pushMeterHistory(key, response, maxPower);
             this._drawMeterHistory(key);
             this._updateSwrCardsForMeter(key);
+            this._a11yOnSnapshot(key, displayResponse);
 
             const ids = {
                 // pvolt arrives in mV from the d=CSV field
@@ -303,6 +308,10 @@
         if (!inputEl) return;
         const val = inputEl.value.trim();
         if (!val) { this.setMeterStatus(key, `Enter a value for ${cfgKey} before setting.`, 'warning'); return; }
+        return this.applyCfgValue(key, cfgKey, val);
+    };
+
+    DWMControl.prototype.applyCfgValue = async function(key, cfgKey, val) {
         try {
             // cfg.set key=eval and key=etype require elem before val to identify which element to update
             let cmdFields;
@@ -427,6 +436,7 @@
                     if (rangeSelect) rangeSelect.value = String(rangeInfo.cfg);
                     if (rangeReadOnly) rangeReadOnly.value = String(rangeInfo.cfg);
                     this._updateGaugeScale(key);
+                    this._a11yAnnounceRange(key);
                 }
             }
 

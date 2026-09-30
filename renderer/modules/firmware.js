@@ -205,13 +205,16 @@
 
             if (result && result.success) {
                 this.updateProgressBar(100, 'Upload complete!');
+                this._a11yOnDfuResult(true, 'Upload complete!');
                 this.appendSerialMonitor('Firmware upload successful.');
             } else {
                 this.updateProgressBar(0, 'Upload failed');
+                this._a11yOnDfuResult(false, result && result.error ? result.error : 'Unknown error');
                 this.appendSerialMonitor(`Upload failed: ${result && result.error ? result.error : 'Unknown error'}`);
             }
         } catch (error) {
             this.updateProgressBar(0, 'Upload error');
+            this._a11yOnDfuResult(false, error.message);
             this.appendSerialMonitor(`Upload error: ${error.message}`);
             this.appendOutput(`DFU upload error: ${error.message}`);
         } finally {
@@ -231,6 +234,9 @@
 
         if (fill) { fill.style.width = `${safePercent}%`; }
         if (text) { text.textContent = message || `${safePercent}%`; }
+        const bar = document.getElementById('upload-progress');
+        if (bar) { bar.setAttribute('aria-valuenow', String(safePercent)); }
+        this._a11yOnDfuProgress(safePercent, message);
     };
 
     DWMControl.prototype.parseProgressFromDfuOutput = function(line) {

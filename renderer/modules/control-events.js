@@ -704,6 +704,7 @@
                         try { await window.electronAPI.closeSerialPort(record.portPath); } catch (_) {}
                         this.updateMeterCardUI(key);
                         this.appendOutput(`Device at ${record.portPath} did not respond to API probe — not configured for API.`);
+                        this.announce(`${record.friendlyName || 'DWM V2'} is not configured for the API`, { assertive: true });
                         return;
                     }
                 }
@@ -712,6 +713,7 @@
                 this.activeMeterKey = key;
                 this.isConnected = true;
                 this.appendOutput(`Connected to ${record.portPath}`);
+                this.announce(`Connected to ${record.friendlyName || 'DWM V2'}`);
                 this.updateMeterCardUI(key);
                 this._autoQueryMeterOnConnect(key);
                 // Start live polling immediately after connect unless globally disabled.
@@ -754,6 +756,7 @@
         this.resetMeterReadings(key);
         this.updateMeterCardUI(key);
         this.appendOutput(`Disconnected from ${record.portPath}`);
+        this.announce(`Disconnected from ${record.friendlyName || 'DWM V2'}`);
     };
 
     DWMControl.prototype.updateMeterCardUI = function(key) {
@@ -791,6 +794,8 @@
         if (headerName && !headerName.querySelector('.meter-name-inline-input')) {
             headerName.textContent = record.friendlyName || 'DWM V2';
         }
+        const meterCard = document.getElementById(`meter-card-${sid}`);
+        if (meterCard) meterCard.setAttribute('aria-label', `Meter ${record.friendlyName || 'DWM V2'}`);
         const headerUid = document.getElementById(`meter-${sid}-header-uid`);
         if (headerUid && record.apiUid) headerUid.textContent = record.apiUid;
 

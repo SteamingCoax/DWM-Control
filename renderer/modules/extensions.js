@@ -719,7 +719,10 @@
             const output = document.getElementById('output-console');
             if (output) {
                 const timestamp = new Date().toLocaleTimeString();
-                output.textContent += `[${timestamp}] ${message}\n`;
+                const line = document.createElement('div');
+                line.className = 'console-line';
+                line.textContent = `[${timestamp}] ${message}`;
+                output.appendChild(line);
                 output.scrollTop = output.scrollHeight;
             } else {
                 console.warn('Output console element not found');
@@ -742,7 +745,10 @@
             const serialMonitor = document.getElementById('serial-monitor-output');
             if (serialMonitor) {
                 const timestamp = new Date().toLocaleTimeString();
-                serialMonitor.textContent += `[${timestamp}] ${message}\n`;
+                const line = document.createElement('div');
+                line.className = 'console-line';
+                line.textContent = `[${timestamp}] ${message}`;
+                serialMonitor.appendChild(line);
                 serialMonitor.scrollTop = serialMonitor.scrollHeight;
             } else {
                 console.warn('Upload output element not found');
@@ -756,7 +762,7 @@
         try {
             const serialMonitor = document.getElementById('serial-monitor-output');
             if (serialMonitor) {
-                serialMonitor.textContent = '';
+                serialMonitor.replaceChildren();
             }
         } catch (error) {
             console.error('Error clearing upload output:', error);
