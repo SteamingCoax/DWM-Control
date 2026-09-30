@@ -83,6 +83,7 @@ describe('loadConfig / saveConfig round trip', () => {
       usbApiProtocolVersion: 1,
       usbApiAcceptLegacyV1: false,
       globalDebugLoggingEnabled: true,
+      updateChannel: 'beta',
       deembedPowerUnit: 'dBm',
       deembedVoltageMode: 'auto',
       deembedPowerRating: 100,
@@ -399,5 +400,46 @@ describe('accessibility config', () => {
     }));
     const loaded = ctl.loadConfig();
     assert.deepEqual(loaded.accessibility, ctl._accessibilityDefaults());
+  });
+});
+
+describe('updateChannel preference', () => {
+  it('defaults to null (automatic)', () => {
+    assert.equal(ctl.loadConfig().updateChannel, null);
+  });
+
+  it('normalizes stored values', () => {
+    const cases = [['beta', 'beta'], ['STABLE', 'stable'], ['nightly', null], [42, null]];
+    for (const [stored, expected] of cases) {
+      globalThis.localStorage.setItem(MAIN_KEY, JSON.stringify({ layoutVersion: 2, updateChannel: stored }));
+      assert.equal(ctl.loadConfig().updateChannel, expected, String(stored));
+    }
+  });
+
+  it('setUpdateChannel persists and notifies main', () => {
+    const calls = [];
+    const prev = globalThis.window.electronAPI;
+    globalThis.window.electronAPI = { ...(prev || {}), setUpdateChannel: (c) => { calls.push(c); return Promise.resolve({}); } };
+    try {
+      ctl.config = ctl.loadConfig();
+      assert.equal(ctl.setUpdateChannel('beta'), 'beta');
+      assert.deepEqual(calls, ['beta']);
+      assert.equal(JSON.parse(globalThis.localStorage.getItem(MAIN_KEY)).updateChannel, 'beta');
+      assert.equal(ctl.setUpdateChannel('bogus'), null);
+      ctl.applyUpdateChannel();
+      assert.deepEqual(calls, ['beta', null, null]);
+    } finally {
+      globalThis.window.electronAPI = prev;
+    }
+  });
+
+  it('isBetaUpdatesEnabled resolves effective state', () => {
+    ctl.config = { updateChannel: null };
+    assert.equal(ctl.isBetaUpdatesEnabled('1.4.0-beta.3'), true);
+    assert.equal(ctl.isBetaUpdatesEnabled('1.4.0'), false);
+    ctl.config = { updateChannel: 'beta' };
+    assert.equal(ctl.isBetaUpdatesEnabled('1.4.0'), true);
+    ctl.config = { updateChannel: 'stable' };
+    assert.equal(ctl.isBetaUpdatesEnabled('1.4.0-beta.3'), false);
   });
 });
