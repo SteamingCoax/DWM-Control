@@ -35,10 +35,22 @@ Supported platforms:
 - Device controls are generated dynamically for supported hardware
 - Includes live device discovery and interaction workflow
 
+### Settings
+The Settings dialog provides centralized configuration across four tabs:
+- **General**: Theme (Dark, Light, Ocean, Carbon, Amber)
+- **Control**: Refresh rate, board layout, serial debug logging, auto-start polling on connect
+- **Accessibility**: Spoken readouts, tuning tone, announcements, keyboard shortcuts
+- **Updates**: Version info, "Accept beta (pre-release) updates" checkbox, manual update check
+
+Open Settings from: the gear button in the title bar, the keyboard shortcut (Ctrl+, on Windows/Linux; Cmd+, on macOS), or the "Settings…" button above the meter board. Press Escape to close and return focus.
+
+### Beta Updates
+The Updates tab includes a checkbox to control whether the app offers beta (pre-release) versions. With "Accept beta updates" checked, the app offers pre-release versions as they are published. Unchecked, it ignores any newer beta and only installs stable releases. Until you adjust this setting, the checkbox reflects automatic behaviour: checked if the running version carries a pre-release suffix, otherwise unchecked.
+
 ### Accessibility
 - **Screen readers**: NVDA on Windows, VoiceOver on macOS, and Orca on Linux all work without any configuration. The tab strip is a real tab list (use arrow keys to move between tabs). Each meter card is a named region, so NVDA users can press `D` to jump between meters. Each gauge exposes its current reading as text, the output console and upload log are live regions, and connection, range, firmware-upload and De-Embed results are announced automatically.
-- **Spoken readouts** (off by default): The app can speak the focused meter's reading using the system voice at a configurable interval, when the value changes, or on demand. Settings live in the Control tab's Global Settings panel under "Accessibility" and include metric selection, interval, change threshold, voice, playback rate, and options to include the meter name and SWR data.
-- **Tuning tone** (off by default): A continuous tone whose pitch follows the focused meter's power. By default, it ranges from 100 Hz at zero to 1 kHz at full scale; both ends are adjustable in the Accessibility settings for flexible tuning of amplifiers by ear.
+- **Spoken readouts** (off by default): The app can speak the focused meter's reading using the system voice at a configurable interval, when the value changes, or on demand. Settings live in the Settings dialog's Accessibility tab and include metric selection, interval, change threshold, voice, playback rate, and options to include the meter name and SWR data.
+- **Tuning tone** (off by default): A continuous tone whose pitch follows the focused meter's power. By default, it ranges from 100 Hz at zero to 1 kHz at full scale; both ends are adjustable in the Settings dialog's Accessibility tab for flexible tuning of amplifiers by ear.
 - **Keyboard shortcuts** (Ctrl+Shift on Windows and Linux, Cmd+Shift on macOS; all are also in the Accessibility menu): Shortcuts never fire while typing in a text field. NVDA users can use browse or focus mode as needed. On Linux, spoken readouts require `speech-dispatcher` to be installed (`sudo apt install speech-dispatcher` on Debian/Ubuntu). If the tone does not start after launch, press Ctrl+Shift+T once to restart it.
 
 | Shortcut | Action |
