@@ -50,13 +50,12 @@
   <div class="for-deb">
     <p>Open the downloaded file and choose <strong>Install</strong>. Or, in a terminal in your Downloads folder:</p>
     <div class="cmd"><pre>sudo apt install ./<span class="fname"></span></pre><button class="copy" type="button">Copy</button></div>
-    <p>That is all. The package also sets up USB access to the meter, so no other steps are needed.</p>
+    <p>The package also sets up USB access to the meter, so no other steps are needed.</p>
   </div>
 
   <div class="for-app" style="display:none">
-    <p>In a terminal in your Downloads folder, make the file executable and start it:</p>
-    <div class="cmd"><pre>chmod +x <span class="fname"></span>
-./<span class="fname"></span></pre><button class="copy" type="button">Copy</button></div>
+    <p>There is nothing to install. In a terminal in your Downloads folder, make the file executable:</p>
+    <div class="cmd"><pre>chmod +x <span class="fname"></span></pre><button class="copy" type="button">Copy</button></div>
     <p>Then allow the app to talk to the meter. Copy this once, paste it in the terminal, and enter your password when asked:</p>
     <div class="cmd"><pre>sudo tee /etc/udev/rules.d/49-dwm.rules &gt;/dev/null &lt;&lt;'EOF'
 SUBSYSTEM=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", ENV{ID_MM_DEVICE_IGNORE}="1"
@@ -64,12 +63,24 @@ SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", MODE="0664"
 SUBSYSTEM=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="df11", MODE="0664", GROUP="plugdev", TAG+="uaccess"
 EOF
 sudo udevadm control --reload-rules &amp;&amp; sudo udevadm trigger</pre><button class="copy" type="button">Copy</button></div>
-    <p>If the app window does not appear when you start it, start it this way instead (works everywhere):</p>
+  </div>
+
+  <h3>3. Start DWM Control</h3>
+
+  <div class="for-deb">
+    <p>Open <strong>DWM Control</strong> from your application menu, or run it from any terminal:</p>
+    <div class="cmd"><pre>dwm-control</pre><button class="copy" type="button">Copy</button></div>
+  </div>
+
+  <div class="for-app" style="display:none">
+    <p>In a terminal in your Downloads folder:</p>
+    <div class="cmd"><pre>./<span class="fname"></span></pre><button class="copy" type="button">Copy</button></div>
+    <p>If no window appears, start it this way instead (works everywhere):</p>
     <div class="cmd"><pre>./<span class="fname"></span> --appimage-extract-and-run</pre><button class="copy" type="button">Copy</button></div>
   </div>
 
-  <h3>3. Plug in the meter</h3>
-  <p>Connect the DWM V2 by USB and start DWM Control. The meter appears on the Control tab within a few seconds.</p>
+  <h3>4. Plug in the meter</h3>
+  <p>Connect the DWM V2 by USB. The meter appears on the Control tab within a few seconds.</p>
 
   <div class="note"><strong>After a firmware update</strong>, switch the meter off and on by hand. It does not restart on its own, and its name goes back to <code>DWM_V2</code>, so rename it from its card if you had given it a name.</div>
 
@@ -86,8 +97,9 @@ sudo udevadm control --reload-rules &amp;&amp; sudo udevadm trigger</pre><button
         var name = fileName(kind, arch);
         var spans = root.querySelectorAll('.fname');
         for (var i = 0; i < spans.length; i++) spans[i].textContent = name;
-        root.querySelector('.for-deb').style.display = kind === 'deb' ? '' : 'none';
-        root.querySelector('.for-app').style.display = kind === 'deb' ? 'none' : '';
+        var debs = root.querySelectorAll('.for-deb'), apps = root.querySelectorAll('.for-app');
+        for (var d = 0; d < debs.length; d++) debs[d].style.display = kind === 'deb' ? '' : 'none';
+        for (var a = 0; a < apps.length; a++) apps[a].style.display = kind === 'deb' ? 'none' : '';
         var btns = root.querySelectorAll('.dl');
         for (var j = 0; j < btns.length; j++) {
           var on = btns[j].getAttribute('data-kind') === kind && btns[j].getAttribute('data-arch') === arch;
