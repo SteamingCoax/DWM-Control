@@ -7,6 +7,181 @@
         return;
     }
 
+    const A11Y_DEFAULTS = Object.freeze({
+        speechEnabled: false,
+        speechMode: 'interval',
+        speechIntervalS: 5,
+        speechChangePct: 10,
+        speechMinGapMs: 1500,
+        speechMetric: 'avg',
+        speechRate: 1.0,
+        speechVolume: 1.0,
+        speechVoice: '',
+        speechIncludeMeterName: true,
+        speechIncludeSwr: true,
+        toneEnabled: false,
+        toneMinHz: 100,
+        toneMaxHz: 1000,
+        toneVolume: 0.3,
+        toneWave: 'sine',
+        toneMuteBelowPct: 1,
+        announcements: 'auto',
+        shortcutsEnabled: true,
+        focusedMeterKey: null,
+    });
+
+    DWMControl.prototype._accessibilityDefaults = function _accessibilityDefaults() {
+        return { ...A11Y_DEFAULTS };
+    };
+
+    DWMControl.prototype.normalizeAccessibility = function normalizeAccessibility(prefs) {
+        // If prefs is not an object, return all defaults
+        if (!prefs || typeof prefs !== 'object') {
+            return this._accessibilityDefaults();
+        }
+
+        const normalized = { ...A11Y_DEFAULTS };
+        const defaults = A11Y_DEFAULTS;
+
+        // speechEnabled (boolean)
+        if (typeof prefs.speechEnabled === 'boolean') {
+            normalized.speechEnabled = prefs.speechEnabled;
+        }
+
+        // speechMode (enum: 'interval' | 'change' | 'manual')
+        const allowedSpeechModes = new Set(['interval', 'change', 'manual']);
+        if (typeof prefs.speechMode === 'string' && allowedSpeechModes.has(prefs.speechMode)) {
+            normalized.speechMode = prefs.speechMode;
+        }
+
+        // speechIntervalS (integer 1..60, CLAMPED not rejected)
+        if (Number.isFinite(prefs.speechIntervalS)) {
+            let val = Math.trunc(prefs.speechIntervalS);
+            val = Math.max(1, Math.min(60, val));
+            normalized.speechIntervalS = val;
+        }
+
+        // speechChangePct (number 1..100)
+        if (Number.isFinite(prefs.speechChangePct)) {
+            const val = prefs.speechChangePct;
+            if (val >= 1 && val <= 100) {
+                normalized.speechChangePct = val;
+            }
+        }
+
+        // speechMinGapMs (integer 500..10000, CLAMPED not rejected)
+        if (Number.isFinite(prefs.speechMinGapMs)) {
+            let val = Math.trunc(prefs.speechMinGapMs);
+            val = Math.max(500, Math.min(10000, val));
+            normalized.speechMinGapMs = val;
+        }
+
+        // speechMetric (enum: 'avg' | 'peak' | 'inst' | 'max')
+        const allowedSpeechMetrics = new Set(['avg', 'peak', 'inst', 'max']);
+        if (typeof prefs.speechMetric === 'string' && allowedSpeechMetrics.has(prefs.speechMetric)) {
+            normalized.speechMetric = prefs.speechMetric;
+        }
+
+        // speechRate (number 0.5..2)
+        if (Number.isFinite(prefs.speechRate)) {
+            const val = prefs.speechRate;
+            if (val >= 0.5 && val <= 2) {
+                normalized.speechRate = val;
+            }
+        }
+
+        // speechVolume (number 0..1)
+        if (Number.isFinite(prefs.speechVolume)) {
+            const val = prefs.speechVolume;
+            if (val >= 0 && val <= 1) {
+                normalized.speechVolume = val;
+            }
+        }
+
+        // speechVoice (string or '')
+        if (typeof prefs.speechVoice === 'string') {
+            normalized.speechVoice = prefs.speechVoice;
+        }
+
+        // speechIncludeMeterName (boolean)
+        if (typeof prefs.speechIncludeMeterName === 'boolean') {
+            normalized.speechIncludeMeterName = prefs.speechIncludeMeterName;
+        }
+
+        // speechIncludeSwr (boolean)
+        if (typeof prefs.speechIncludeSwr === 'boolean') {
+            normalized.speechIncludeSwr = prefs.speechIncludeSwr;
+        }
+
+        // toneEnabled (boolean)
+        if (typeof prefs.toneEnabled === 'boolean') {
+            normalized.toneEnabled = prefs.toneEnabled;
+        }
+
+        // toneMinHz (number 40..2000)
+        if (Number.isFinite(prefs.toneMinHz)) {
+            const val = prefs.toneMinHz;
+            if (val >= 40 && val <= 2000) {
+                normalized.toneMinHz = val;
+            }
+        }
+
+        // toneMaxHz (number > toneMinHz, <= 8000)
+        if (Number.isFinite(prefs.toneMaxHz)) {
+            const val = prefs.toneMaxHz;
+            if (val > normalized.toneMinHz && val <= 8000) {
+                normalized.toneMaxHz = val;
+            }
+        }
+
+        // If toneMaxHz <= toneMinHz after normalization, set it to max(min + 50, default), capped at 8000
+        if (normalized.toneMaxHz <= normalized.toneMinHz) {
+            normalized.toneMaxHz = Math.min(Math.max(normalized.toneMinHz + 50, defaults.toneMaxHz), 8000);
+        }
+
+        // toneVolume (number 0..1)
+        if (Number.isFinite(prefs.toneVolume)) {
+            const val = prefs.toneVolume;
+            if (val >= 0 && val <= 1) {
+                normalized.toneVolume = val;
+            }
+        }
+
+        // toneWave (enum: 'sine' | 'triangle' | 'square' | 'sawtooth')
+        const allowedWaves = new Set(['sine', 'triangle', 'square', 'sawtooth']);
+        if (typeof prefs.toneWave === 'string' && allowedWaves.has(prefs.toneWave)) {
+            normalized.toneWave = prefs.toneWave;
+        }
+
+        // toneMuteBelowPct (number 0..50)
+        if (Number.isFinite(prefs.toneMuteBelowPct)) {
+            const val = prefs.toneMuteBelowPct;
+            if (val >= 0 && val <= 50) {
+                normalized.toneMuteBelowPct = val;
+            }
+        }
+
+        // announcements (enum: 'auto' | 'live-region' | 'speech' | 'both')
+        const allowedAnnouncements = new Set(['auto', 'live-region', 'speech', 'both']);
+        if (typeof prefs.announcements === 'string' && allowedAnnouncements.has(prefs.announcements)) {
+            normalized.announcements = prefs.announcements;
+        }
+
+        // shortcutsEnabled (boolean)
+        if (typeof prefs.shortcutsEnabled === 'boolean') {
+            normalized.shortcutsEnabled = prefs.shortcutsEnabled;
+        }
+
+        // focusedMeterKey (non-empty string or null)
+        if (typeof prefs.focusedMeterKey === 'string' && prefs.focusedMeterKey.length > 0) {
+            normalized.focusedMeterKey = prefs.focusedMeterKey;
+        } else {
+            normalized.focusedMeterKey = null;
+        }
+
+        return normalized;
+    };
+
     DWMControl.prototype.setupAutoUpdater = function setupAutoUpdater() {
         const updatePanel = document.getElementById('update-panel');
         const updateButton = document.getElementById('update-button');
@@ -544,7 +719,10 @@
             const output = document.getElementById('output-console');
             if (output) {
                 const timestamp = new Date().toLocaleTimeString();
-                output.textContent += `[${timestamp}] ${message}\n`;
+                const line = document.createElement('div');
+                line.className = 'console-line';
+                line.textContent = `[${timestamp}] ${message}`;
+                output.appendChild(line);
                 output.scrollTop = output.scrollHeight;
             } else {
                 console.warn('Output console element not found');
@@ -567,7 +745,10 @@
             const serialMonitor = document.getElementById('serial-monitor-output');
             if (serialMonitor) {
                 const timestamp = new Date().toLocaleTimeString();
-                serialMonitor.textContent += `[${timestamp}] ${message}\n`;
+                const line = document.createElement('div');
+                line.className = 'console-line';
+                line.textContent = `[${timestamp}] ${message}`;
+                serialMonitor.appendChild(line);
                 serialMonitor.scrollTop = serialMonitor.scrollHeight;
             } else {
                 console.warn('Upload output element not found');
@@ -581,7 +762,7 @@
         try {
             const serialMonitor = document.getElementById('serial-monitor-output');
             if (serialMonitor) {
-                serialMonitor.textContent = '';
+                serialMonitor.replaceChildren();
             }
         } catch (error) {
             console.error('Error clearing upload output:', error);
@@ -687,6 +868,7 @@
             boardCardOrder,
             meterCards,
             swrCards,
+            accessibility: this.normalizeAccessibility(cfg.accessibility),
         };
     };
 
@@ -709,6 +891,7 @@
             deembedPowerUnit: 'W',
             deembedVoltageMode: 'manual',
             deembedPowerRating: null,
+            accessibility: { ...A11Y_DEFAULTS },
         };
 
         try {
@@ -751,8 +934,6 @@
 
         // File menu
         on('menu-sv-save',   () => document.getElementById('sv-save-file-btn')?.click());
-        on('menu-sv-load',   () => document.getElementById('sv-load-file-btn')?.click());
-        on('menu-sv-export', () => document.getElementById('sv-export-btn')?.click());
 
         // Edit menu — schematic undo/redo
         on('menu-sv-undo', () => document.getElementById('sv-undo-btn')?.click());

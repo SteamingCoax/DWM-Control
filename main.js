@@ -419,6 +419,104 @@ function buildAppMenu() {
       ],
     },
 
+    // ── Accessibility ─────────────────────────────────────────────────────
+    {
+      label: 'Accessibility',
+      submenu: [
+        {
+          label: 'Toggle Spoken Readouts',
+          accelerator: 'CmdOrCtrl+Shift+S',
+          click() { sendToFocusedWindow('menu-a11y-speech-toggle'); },
+        },
+        {
+          label: 'Toggle Tuning Tone',
+          accelerator: 'CmdOrCtrl+Shift+T',
+          click() { sendToFocusedWindow('menu-a11y-tone-toggle'); },
+        },
+        {
+          label: 'Speak Reading Now',
+          accelerator: 'CmdOrCtrl+Shift+R',
+          click() { sendToFocusedWindow('menu-a11y-speak-now'); },
+        },
+        {
+          label: 'Describe Focused Meter',
+          accelerator: 'CmdOrCtrl+Shift+D',
+          click() { sendToFocusedWindow('menu-a11y-describe-meter'); },
+        },
+        {
+          label: 'Toggle Peak Hold',
+          accelerator: 'CmdOrCtrl+Shift+P',
+          click() { sendToFocusedWindow('menu-a11y-peak-hold'); },
+        },
+        {
+          label: 'Cycle Range (1x / 2x / 4x)',
+          accelerator: 'CmdOrCtrl+Shift+M',
+          click() { sendToFocusedWindow('menu-a11y-range-cycle'); },
+        },
+        {
+          label: 'Cycle Readout Metric',
+          accelerator: 'CmdOrCtrl+Shift+A',
+          click() { sendToFocusedWindow('menu-a11y-metric-cycle'); },
+        },
+        { type: 'separator' },
+        {
+          label: 'Next Meter',
+          accelerator: 'CmdOrCtrl+Shift+Right',
+          click() { sendToFocusedWindow('menu-a11y-meter-next'); },
+        },
+        {
+          label: 'Previous Meter',
+          accelerator: 'CmdOrCtrl+Shift+Left',
+          click() { sendToFocusedWindow('menu-a11y-meter-prev'); },
+        },
+        {
+          label: 'Select Meter',
+          submenu: [
+            {
+              label: 'Meter 1',
+              accelerator: 'CmdOrCtrl+Shift+1',
+              click() { sendToFocusedWindow('menu-a11y-meter-select', 1); },
+            },
+            {
+              label: 'Meter 2',
+              accelerator: 'CmdOrCtrl+Shift+2',
+              click() { sendToFocusedWindow('menu-a11y-meter-select', 2); },
+            },
+            {
+              label: 'Meter 3',
+              accelerator: 'CmdOrCtrl+Shift+3',
+              click() { sendToFocusedWindow('menu-a11y-meter-select', 3); },
+            },
+            {
+              label: 'Meter 4',
+              accelerator: 'CmdOrCtrl+Shift+4',
+              click() { sendToFocusedWindow('menu-a11y-meter-select', 4); },
+            },
+            {
+              label: 'Meter 5',
+              accelerator: 'CmdOrCtrl+Shift+5',
+              click() { sendToFocusedWindow('menu-a11y-meter-select', 5); },
+            },
+            {
+              label: 'Meter 6',
+              accelerator: 'CmdOrCtrl+Shift+6',
+              click() { sendToFocusedWindow('menu-a11y-meter-select', 6); },
+            },
+            {
+              label: 'Meter 7',
+              accelerator: 'CmdOrCtrl+Shift+7',
+              click() { sendToFocusedWindow('menu-a11y-meter-select', 7); },
+            },
+            {
+              label: 'Meter 8',
+              accelerator: 'CmdOrCtrl+Shift+8',
+              click() { sendToFocusedWindow('menu-a11y-meter-select', 8); },
+            },
+          ],
+        },
+      ],
+    },
+
     // ── Window ────────────────────────────────────────────────────────────
     {
       label: 'Window',
@@ -451,6 +549,12 @@ function buildAppMenu() {
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
+
+app.on('accessibility-support-changed', (_event, enabled) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('accessibility-support-changed', enabled);
+  }
+});
 
 app.whenReady().then(() => {
   loadRecentSiteViews();
@@ -1471,6 +1575,8 @@ ipcMain.handle('install-update', async () => {
     return { success: false, error: error.message || 'Failed to install update' };
   }
 });
+
+ipcMain.handle('get-accessibility-support', () => app.isAccessibilitySupportEnabled());
 
 ipcMain.handle('get-app-version', async () => {
   return app.getVersion();

@@ -137,8 +137,9 @@
 
             if (voltageMode === 'manual') {
                 row.innerHTML = `
-                    <label>Point ${pointIndex}:</label>
+                    <label for="power-${pointIndex}">Point ${pointIndex}:</label>
                     <input type="number"
+                           id="power-${pointIndex}"
                            class="power-input"
                            placeholder="Power level"
                            step="any"
@@ -146,17 +147,20 @@
                            data-index="${pointIndex}">
                     <span class="fs-display invalid" id="fs-${pointIndex}">- %FS</span>
                     <input type="number"
+                           id="voltage-input-${pointIndex}"
                            class="voltage-input"
                            placeholder="Voltage (mV)"
                            step="any"
                            min="0"
-                           data-index="${pointIndex}">
+                           data-index="${pointIndex}"
+                           aria-label="Point ${pointIndex} voltage in millivolts">
                     <span class="voltage-unit">mV</span>
                 `;
             } else {
                 row.innerHTML = `
-                    <label>Point ${pointIndex}:</label>
+                    <label for="power-${pointIndex}">Point ${pointIndex}:</label>
                     <input type="number"
+                           id="power-${pointIndex}"
                            class="power-input"
                            placeholder="Power level"
                            step="any"
@@ -164,7 +168,7 @@
                            data-index="${pointIndex}">
                     <span class="fs-display invalid" id="fs-${pointIndex}">- %FS</span>
                     <span class="voltage-display" id="voltage-${pointIndex}">- mV</span>
-                    <button class="sample-btn" data-index="${pointIndex}">Sample</button>
+                    <button class="sample-btn" data-index="${pointIndex}" aria-label="Sample voltage for point ${pointIndex}">Sample</button>
                 `;
             }
 
@@ -330,11 +334,13 @@
 
             if (additionalValidPoints.length < 2) {
                 this.appendOutput('Error: Need at least 2 complete data points (beyond origin) with valid %FS values for polynomial fit', 'error');
+                this.announce('De-embed fit needs at least 2 complete data points beyond the origin', { assertive: true });
                 return;
             }
 
             if (this.deembedData.powerRating === null || this.deembedData.powerRating <= 0) {
                 this.appendOutput('Error: Please enter a valid power rating (full scale) before computing', 'error');
+                this.announce('De-embed fit needs a valid full-scale power rating', { assertive: true });
                 return;
             }
 
@@ -355,6 +361,7 @@
             }
 
             this.displayResults(result.coefficients, result.rSquared);
+            this._a11yOnFitResult(result.rSquared);
 
             const scaledCoefficients = [
                 (result.coefficients[0] * 1000) / 100,
@@ -378,6 +385,7 @@
         } catch (error) {
             console.error('Polynomial fit error:', error);
             this.appendOutput(`Error computing polynomial fit: ${error.message}`, 'error');
+            this.announce(`De-embed fit failed: ${error.message}`, { assertive: true });
         }
     };
 

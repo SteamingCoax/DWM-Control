@@ -113,6 +113,28 @@ describe('loadConfig / saveConfig round trip', () => {
           historyWindowMs: 1000,
         },
       ],
+      accessibility: {
+        speechEnabled: false,
+        speechMode: 'interval',
+        speechIntervalS: 5,
+        speechChangePct: 10,
+        speechMinGapMs: 1500,
+        speechMetric: 'avg',
+        speechRate: 1.0,
+        speechVolume: 1.0,
+        speechVoice: '',
+        speechIncludeMeterName: true,
+        speechIncludeSwr: true,
+        toneEnabled: false,
+        toneMinHz: 100,
+        toneMaxHz: 1000,
+        toneVolume: 0.3,
+        toneWave: 'sine',
+        toneMuteBelowPct: 1,
+        announcements: 'auto',
+        shortcutsEnabled: true,
+        focusedMeterKey: null,
+      },
     };
 
     ctl.config = full;
@@ -229,5 +251,153 @@ describe('loadConfig normalisation', () => {
     }));
     const cfg = ctl.loadConfig();
     assert.deepEqual(cfg.boardCardOrder, ['meter:usbmodem:A', 'meter:usbmodem:B', 'swr:swr9']);
+  });
+});
+
+describe('accessibility config', () => {
+  it('loadConfig defaults include the accessibility block', () => {
+    const cfg = ctl.loadConfig();
+    assert.ok(cfg.accessibility, 'accessibility block must be present');
+    const defaults = ctl._accessibilityDefaults();
+    assert.deepEqual(cfg.accessibility, defaults);
+    assert.equal(cfg.accessibility.speechEnabled, false);
+    assert.equal(cfg.accessibility.speechMode, 'interval');
+    assert.equal(cfg.accessibility.speechIntervalS, 5);
+    assert.equal(cfg.accessibility.speechChangePct, 10);
+    assert.equal(cfg.accessibility.speechMinGapMs, 1500);
+    assert.equal(cfg.accessibility.speechMetric, 'avg');
+    assert.equal(cfg.accessibility.speechRate, 1.0);
+    assert.equal(cfg.accessibility.speechVolume, 1.0);
+    assert.equal(cfg.accessibility.speechVoice, '');
+    assert.equal(cfg.accessibility.speechIncludeMeterName, true);
+    assert.equal(cfg.accessibility.speechIncludeSwr, true);
+    assert.equal(cfg.accessibility.toneEnabled, false);
+    assert.equal(cfg.accessibility.toneMinHz, 100);
+    assert.equal(cfg.accessibility.toneMaxHz, 1000);
+    assert.equal(cfg.accessibility.toneVolume, 0.3);
+    assert.equal(cfg.accessibility.toneWave, 'sine');
+    assert.equal(cfg.accessibility.toneMuteBelowPct, 1);
+    assert.equal(cfg.accessibility.announcements, 'auto');
+    assert.equal(cfg.accessibility.shortcutsEnabled, true);
+    assert.equal(cfg.accessibility.focusedMeterKey, null);
+  });
+
+  it('normalizeAccessibility returns defaults for non-objects', () => {
+    const defaults = ctl._accessibilityDefaults();
+    assert.deepEqual(ctl.normalizeAccessibility(undefined), defaults);
+    assert.deepEqual(ctl.normalizeAccessibility(null), defaults);
+    assert.deepEqual(ctl.normalizeAccessibility('x'), defaults);
+    assert.deepEqual(ctl.normalizeAccessibility(42), defaults);
+  });
+
+  it('drops unknown keys', () => {
+    const input = {
+      speechEnabled: true,
+      unknownKey: 'should-be-dropped',
+      anotherBadKey: 123,
+    };
+    const normalized = ctl.normalizeAccessibility(input);
+    assert.ok(!('unknownKey' in normalized), 'unknown keys must be dropped');
+    assert.ok(!('anotherBadKey' in normalized), 'unknown keys must be dropped');
+    assert.equal(normalized.speechEnabled, true);
+  });
+
+  it('clamps speechIntervalS 0->1 and 999->60, and speechMinGapMs 1->500 and 99999->10000', () => {
+    // speechIntervalS: clamp to 1..60
+    assert.equal(ctl.normalizeAccessibility({ speechIntervalS: 0 }).speechIntervalS, 1);
+    assert.equal(ctl.normalizeAccessibility({ speechIntervalS: 999 }).speechIntervalS, 60);
+    assert.equal(ctl.normalizeAccessibility({ speechIntervalS: 30 }).speechIntervalS, 30);
+    assert.equal(ctl.normalizeAccessibility({ speechIntervalS: 30.7 }).speechIntervalS, 30, 'must truncate to int');
+
+    // speechMinGapMs: clamp to 500..10000
+    assert.equal(ctl.normalizeAccessibility({ speechMinGapMs: 1 }).speechMinGapMs, 500);
+    assert.equal(ctl.normalizeAccessibility({ speechMinGapMs: 99999 }).speechMinGapMs, 10000);
+    assert.equal(ctl.normalizeAccessibility({ speechMinGapMs: 2000 }).speechMinGapMs, 2000);
+    assert.equal(ctl.normalizeAccessibility({ speechMinGapMs: 2000.7 }).speechMinGapMs, 2000, 'must truncate to int');
+  });
+
+  it('rejects invalid enums and out-of-range numbers back to defaults', () => {
+    // Invalid speechMode -> default
+    assert.equal(ctl.normalizeAccessibility({ speechMode: 'bogus' }).speechMode, 'interval');
+    // Invalid speechMetric -> default
+    assert.equal(ctl.normalizeAccessibility({ speechMetric: 'dev' }).speechMetric, 'avg');
+    // Invalid toneWave -> default
+    assert.equal(ctl.normalizeAccessibility({ toneWave: 'noise' }).toneWave, 'sine');
+    // Invalid announcements -> default
+    assert.equal(ctl.normalizeAccessibility({ announcements: 'loud' }).announcements, 'auto');
+
+    // Out-of-range numbers -> defaults
+    assert.equal(ctl.normalizeAccessibility({ speechRate: 5 }).speechRate, 1.0);
+    assert.equal(ctl.normalizeAccessibility({ toneVolume: -1 }).toneVolume, 0.3);
+    assert.equal(ctl.normalizeAccessibility({ toneMinHz: 10 }).toneMinHz, 100);
+    assert.equal(ctl.normalizeAccessibility({ speechChangePct: 0 }).speechChangePct, 10);
+    assert.equal(ctl.normalizeAccessibility({ speechChangePct: 101 }).speechChangePct, 10);
+  });
+
+  it('forces toneMaxHz above toneMinHz', () => {
+    // If max < min after normalization, set max to max(min + 50, default), capped at 8000
+    // Case 1: toneMinHz is 1000, toneMaxHz is 900 (rejected as < min), becomes 1050
+    const result = ctl.normalizeAccessibility({ toneMinHz: 1000, toneMaxHz: 900 });
+    assert.ok(result.toneMaxHz > result.toneMinHz, 'toneMaxHz must be > toneMinHz');
+    assert.equal(result.toneMaxHz, 1050, 'toneMaxHz should be set to min + 50 when that exceeds default');
+
+    // Case 2: toneMinHz is 1500, toneMaxHz is 1400 (rejected as < min), becomes 1550
+    const result2 = ctl.normalizeAccessibility({ toneMinHz: 1500, toneMaxHz: 1400 });
+    assert.ok(result2.toneMaxHz > result2.toneMinHz);
+    assert.equal(result2.toneMaxHz, 1550, 'toneMaxHz should be set to min + 50 when that exceeds default');
+  });
+
+  it('keeps a non-empty focusedMeterKey string and nulls anything else', () => {
+    assert.equal(ctl.normalizeAccessibility({ focusedMeterKey: 'usbmodem:abc' }).focusedMeterKey, 'usbmodem:abc');
+    assert.equal(ctl.normalizeAccessibility({ focusedMeterKey: 123 }).focusedMeterKey, null);
+    assert.equal(ctl.normalizeAccessibility({ focusedMeterKey: '' }).focusedMeterKey, null);
+    assert.equal(ctl.normalizeAccessibility({ focusedMeterKey: null }).focusedMeterKey, null);
+  });
+
+  it('round trip: a stored valid accessibility object survives loadConfig', () => {
+    const customA11y = {
+      speechEnabled: true,
+      speechMode: 'change',
+      speechIntervalS: 10,
+      speechChangePct: 20,
+      speechMinGapMs: 2000,
+      speechMetric: 'peak',
+      speechRate: 1.5,
+      speechVolume: 0.8,
+      speechVoice: 'com.apple.speech.synthesis.voice.Victoria',
+      speechIncludeMeterName: false,
+      speechIncludeSwr: false,
+      toneEnabled: true,
+      toneMinHz: 200,
+      toneMaxHz: 2000,
+      toneVolume: 0.5,
+      toneWave: 'triangle',
+      toneMuteBelowPct: 5,
+      announcements: 'both',
+      shortcutsEnabled: false,
+      focusedMeterKey: 'usbmodem:xyz',
+    };
+    const fullConfig = {
+      layoutVersion: 2,
+      theme: 'light',
+      accessibility: customA11y,
+    };
+    globalThis.localStorage.setItem(MAIN_KEY, JSON.stringify(fullConfig));
+
+    const loaded = ctl.loadConfig();
+    assert.deepEqual(loaded.accessibility, customA11y);
+    assert.equal(loaded.accessibility.speechEnabled, true);
+    assert.equal(loaded.accessibility.toneMinHz, 200);
+    assert.equal(loaded.accessibility.toneMaxHz, 2000);
+    assert.equal(loaded.accessibility.focusedMeterKey, 'usbmodem:xyz');
+  });
+
+  it('stored config without an accessibility block gets the defaults', () => {
+    globalThis.localStorage.setItem(MAIN_KEY, JSON.stringify({
+      layoutVersion: 2,
+      theme: 'light',
+    }));
+    const loaded = ctl.loadConfig();
+    assert.deepEqual(loaded.accessibility, ctl._accessibilityDefaults());
   });
 });

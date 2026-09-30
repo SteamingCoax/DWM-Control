@@ -1006,7 +1006,8 @@
   border: 1px solid var(--border-color);
 }
 
-.coefficient-item label {
+.coefficient-item label,
+.coefficient-item span:first-child {
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -1029,7 +1030,8 @@
   border: 1px solid var(--border-color);
 }
 
-.fit-quality label {
+.fit-quality label,
+.fit-quality span:first-child {
   font-weight: 600;
   color: var(--text-primary);
   margin-right: 12px;
@@ -1995,6 +1997,8 @@
 }
 
 .meter-elem-inline-label {
+  display: inline;
+  margin-bottom: 0;
   font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
