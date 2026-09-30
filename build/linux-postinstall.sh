@@ -42,10 +42,13 @@ RULES_FILE="/etc/udev/rules.d/49-dwm.rules"
 OLD_RULES_FILE="/etc/udev/rules.d/49-dwm-dfu.rules"   # written by releases <= 1.4.0-beta.1
 
 cat > "$RULES_FILE" << 'EOF_RULES'
-# DWM V2 meter, normal operation: STM32 USB CDC serial port (VID 0483 PID 5740).
+# DWM V2 meter, normal operation: USB CDC serial port. PID 5740 is ST's generic CDC PID
+# (older firmware); PID A59C is the PID ST assigned to the DWM V2.
 # Keep ModemManager from probing it, and let the logged-in user open /dev/ttyACM*.
 SUBSYSTEM=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", ENV{ID_MM_DEVICE_IGNORE}="1"
 SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="5740", MODE="0664", GROUP="dialout", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="a59c", ENV{ID_MM_DEVICE_IGNORE}="1"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="a59c", MODE="0664", GROUP="dialout", TAG+="uaccess"
 # DWM V2 meter in firmware-update (DFU) mode (VID 0483 PID DF11).
 SUBSYSTEM=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="df11", MODE="0664", GROUP="plugdev", TAG+="uaccess"
 EOF_RULES

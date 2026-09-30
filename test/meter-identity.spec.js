@@ -124,3 +124,43 @@ describe('parseUsbModemUid', () => {
     assert.equal(ctl.parseUsbModemUid(null), null);
   });
 });
+
+// Firmware built with the PID ST assigned to the DWM V2 (0483:A59C). Older firmware
+// keeps ST's generic CDC PID 5740; both must be accepted.
+describe('isMeterPort: assigned PID A59C and the product string', () => {
+  it('matches the assigned PID by vendorId/productId on macOS-style descriptors', () => {
+    assert.equal(ctl.isMeterPort({ ...MAC_METER, productId: 'a59c' }), true);
+    assert.equal(ctl.isMeterPort({ ...MAC_METER, productId: 'A59C' }), true);
+    assert.equal(ctl.isMeterPort({ ...MAC_METER, productId: '0xA59C' }), true);
+  });
+
+  it('still matches the legacy PID 5740', () => {
+    assert.equal(ctl.isMeterPort(MAC_METER), true);
+  });
+
+  it('matches the assigned PID from a Windows pnpId when the id fields are empty', () => {
+    assert.equal(ctl.isMeterPort({ path: 'COM3', pnpId: 'USB\\VID_0483&PID_A59C\\207733835442' }), true);
+    assert.equal(ctl.isMeterPort({ path: 'COM3', pnpId: 'usb\\vid_0483&pid_a59c\\207733835442' }), true);
+  });
+
+  it('matches the Linux pnpId product string, independent of PID', () => {
+    // Real Linux listing: manufacturer is the USB vendor string, the product string is in pnpId.
+    assert.equal(ctl.isMeterPort({
+      path: '/dev/ttyACM0', manufacturer: 'STMicroelectronics',
+      pnpId: 'usb-STMicroelectronics_DWM_V2_ComPort_207733835442-if00',
+    }), true);
+    // A future PID with the same product string is recognised without a code change.
+    assert.equal(ctl.isMeterPort({
+      path: '/dev/ttyACM1', manufacturer: 'STMicroelectronics',
+      pnpId: 'usb-STMicroelectronics_DWM_V2_ComPort_207733835442-if00', vendorId: '0483', productId: 'beef',
+    }), true);
+  });
+
+  it('rejects other STM32 devices on either VID/PID form', () => {
+    assert.equal(ctl.isMeterPort({ vendorId: '0483', productId: 'a59d' }), false);
+    assert.equal(ctl.isMeterPort({ vendorId: '1234', productId: 'a59c' }), false);
+    assert.equal(ctl.isMeterPort({ path: 'COM3', pnpId: 'USB\\VID_1234&PID_A59C\\1' }), false);
+    assert.equal(ctl.isMeterPort({ path: 'COM3', pnpId: 'USB\\VID_0483&PID_DF11\\1' }), false);
+    assert.equal(ctl.isMeterPort({ path: '/dev/ttyACM2', pnpId: 'usb-STMicroelectronics_STM32_Virtual_ComPort_123-if00', vendorId: '0483', productId: '5741' }), false);
+  });
+});
