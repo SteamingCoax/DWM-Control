@@ -137,8 +137,9 @@
 
             if (voltageMode === 'manual') {
                 row.innerHTML = `
-                    <label>Point ${pointIndex}:</label>
+                    <label for="power-${pointIndex}">Point ${pointIndex}:</label>
                     <input type="number"
+                           id="power-${pointIndex}"
                            class="power-input"
                            placeholder="Power level"
                            step="any"
@@ -146,17 +147,20 @@
                            data-index="${pointIndex}">
                     <span class="fs-display invalid" id="fs-${pointIndex}">- %FS</span>
                     <input type="number"
+                           id="voltage-input-${pointIndex}"
                            class="voltage-input"
                            placeholder="Voltage (mV)"
                            step="any"
                            min="0"
-                           data-index="${pointIndex}">
+                           data-index="${pointIndex}"
+                           aria-label="Point ${pointIndex} voltage in millivolts">
                     <span class="voltage-unit">mV</span>
                 `;
             } else {
                 row.innerHTML = `
-                    <label>Point ${pointIndex}:</label>
+                    <label for="power-${pointIndex}">Point ${pointIndex}:</label>
                     <input type="number"
+                           id="power-${pointIndex}"
                            class="power-input"
                            placeholder="Power level"
                            step="any"
@@ -164,7 +168,7 @@
                            data-index="${pointIndex}">
                     <span class="fs-display invalid" id="fs-${pointIndex}">- %FS</span>
                     <span class="voltage-display" id="voltage-${pointIndex}">- mV</span>
-                    <button class="sample-btn" data-index="${pointIndex}">Sample</button>
+                    <button class="sample-btn" data-index="${pointIndex}" aria-label="Sample voltage for point ${pointIndex}">Sample</button>
                 `;
             }
 

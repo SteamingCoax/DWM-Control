@@ -13,21 +13,21 @@
 <body>
     <div class="app-container">
         <!-- Title Bar + Navigation -->
-        <nav class="tab-navigation">
+        <nav class="tab-navigation" role="tablist" aria-label="Main sections">
             <span class="titlebar-app-name">DWM Control <span id="app-version" class="app-version-badge"></span></span>
-            <button class="tab-button active" data-tab="control">
+            <button class="tab-button active" data-tab="control" role="tab" id="tab-control" aria-controls="control-panel" aria-selected="true" tabindex="0">
                 <span class="tab-icon"></span>
                 <span class="tab-label">Control</span>
             </button>
-            <button class="tab-button" data-tab="firmware">
+            <button class="tab-button" data-tab="firmware" role="tab" id="tab-firmware" aria-controls="firmware-panel" aria-selected="false" tabindex="-1">
                 <span class="tab-icon"></span>
                 <span class="tab-label">Firmware Upload</span>
             </button>
-            <button class="tab-button" data-tab="deembed">
+            <button class="tab-button" data-tab="deembed" role="tab" id="tab-deembed" aria-controls="deembed-panel" aria-selected="false" tabindex="-1">
                 <span class="tab-icon"></span>
                 <span class="tab-label">De-Embed</span>
             </button>
-            <button class="tab-button" data-tab="siteview">
+            <button class="tab-button" data-tab="siteview" role="tab" id="tab-siteview" aria-controls="siteview-panel" aria-selected="false" tabindex="-1">
                 <span class="tab-icon"></span>
                 <span class="tab-label">Site View</span>
             </button>
@@ -40,7 +40,7 @@
                     </button>
                 </div>
                 <div class="theme-select-wrap">
-                    <select id="theme-select" title="Select Theme">
+                    <select id="theme-select" title="Select Theme" aria-label="Theme">
                         <option value="dark">Dark</option>
                         <option value="light">Light</option>
                         <option value="ocean">Ocean</option>
@@ -54,7 +54,7 @@
         <!-- Main Content Area -->
         <main class="main-content">
             <!-- Firmware Upload Tab -->
-            <section id="firmware-panel" class="tab-panel">
+            <section id="firmware-panel" class="tab-panel" role="tabpanel" aria-labelledby="tab-firmware" hidden>
                 <div class="panel-container">
                     <!-- Device Selection Card -->
                     <div class="card">
@@ -113,7 +113,7 @@
                                             <span class="file-name" id="file-name">filename.hex</span>
                                             <span class="file-size" id="file-size">0 KB</span>
                                         </div>
-                                        <button class="btn btn-text" id="clear-file-btn"></button>
+                                        <button class="btn btn-text" id="clear-file-btn" aria-label="Clear selected file"></button>
                                     </div>
                                 </div>
                             </div>
@@ -132,7 +132,7 @@
                                     <span class="btn-icon"></span>
                                     Upload Firmware
                                 </button>
-                                <div class="upload-progress" id="upload-progress" style="display: none;">
+                                <div class="upload-progress" id="upload-progress" style="display: none;" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="progress-text">
                                     <div class="progress-bar">
                                         <div class="progress-fill" id="progress-fill"></div>
                                     </div>
@@ -156,7 +156,7 @@
                         </div>
                         <div class="card-content">
                             <div class="serial-monitor-container">
-                                <div id="serial-monitor-output" class="serial-monitor-output"></div>
+                                <div id="serial-monitor-output" class="serial-monitor-output" role="log" aria-live="polite" aria-relevant="additions" aria-label="Upload output"></div>
                             </div>
                         </div>
                     </div>
@@ -164,14 +164,14 @@
             </section>
 
             <!-- Device Control Tab -->
-            <section id="control-panel" class="tab-panel active">
+            <section id="control-panel" class="tab-panel active" role="tabpanel" aria-labelledby="tab-control">
                 <div class="panel-container">
                     <!-- Device controls will be dynamically generated here -->
                 </div>
             </section>
 
             <!-- De-Embed Tab -->
-            <section id="deembed-panel" class="tab-panel">
+            <section id="deembed-panel" class="tab-panel" role="tabpanel" aria-labelledby="tab-deembed" hidden>
                 <div class="panel-container">
                     <!-- De-Embed Configuration Card -->
                     <div class="card">
@@ -251,21 +251,21 @@
                                 <h4>De-Embedding Result</h4>
                                 <div class="coefficients-display">
                                     <div class="coefficient-item">
-                                        <label>COEF 1:</label>
-                                        <span id="coef1-value" class="coefficient-value">-</span>
+                                        <span id="coef1-label">COEF 1:</span>
+                                        <span id="coef1-value" class="coefficient-value" aria-labelledby="coef1-label">-</span>
                                     </div>
                                     <div class="coefficient-item">
-                                        <label>COEF 2:</label>
-                                        <span id="coef2-value" class="coefficient-value">-</span>
+                                        <span id="coef2-label">COEF 2:</span>
+                                        <span id="coef2-value" class="coefficient-value" aria-labelledby="coef2-label">-</span>
                                     </div>
                                     <div class="coefficient-item">
-                                        <label>COEF 3:</label>
-                                        <span id="coef3-value" class="coefficient-value">-</span>
+                                        <span id="coef3-label">COEF 3:</span>
+                                        <span id="coef3-value" class="coefficient-value" aria-labelledby="coef3-label">-</span>
                                     </div>
                                 </div>
                                 <div class="fit-quality">
-                                    <label>Quality of Measurement:</label>
-                                    <span id="r-squared-value" class="coefficient-value">-</span>
+                                    <span id="r-squared-label">Quality of Measurement:</span>
+                                    <span id="r-squared-value" class="coefficient-value" aria-labelledby="r-squared-label">-</span>
                                 </div>
                                 
                                 <!-- Upload Section -->
@@ -298,7 +298,7 @@
             </section>
 
             <!-- Site View Tab -->
-            <section id="siteview-panel" class="tab-panel">
+            <section id="siteview-panel" class="tab-panel" role="tabpanel" aria-labelledby="tab-siteview" hidden>
                 <div class="sv-container">
                     <!-- Component Palette Sidebar -->
                     <aside class="sv-sidebar" id="sv-sidebar">
@@ -408,9 +408,12 @@
                     </button>
                 </div>
             </div>
-            <div id="output-console" class="console-content"></div>
+            <div id="output-console" class="console-content" role="log" aria-live="polite" aria-relevant="additions" aria-label="Output console"></div>
         </aside>
     </div>
+
+    <div id="a11y-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+    <div id="a11y-alert" class="sr-only" role="alert" aria-live="assertive" aria-atomic="true"></div>
 
     <script src="./node_modules/xterm/lib/xterm.js"></script>
     <script src="./node_modules/dwm-core/dist/dwm-protocol.browser.js"></script>

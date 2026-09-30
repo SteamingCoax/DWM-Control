@@ -2008,6 +2008,10 @@ label {
   box-shadow: 0 0 0 3px var(--color-primary-light);
 }
 
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+.tab-panel[hidden] { display: none !important; }
+.meter-card.a11y-focused { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
 /* Reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
   *,

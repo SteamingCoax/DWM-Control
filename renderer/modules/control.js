@@ -737,17 +737,17 @@
         ];
 
         return `
-<div class="meter-card" data-meter-key="${record.key}" id="meter-card-${sid}" draggable="true">
+<div class="meter-card" data-meter-key="${record.key}" id="meter-card-${sid}" draggable="true" role="region" aria-label="Meter ${nameLabel}">
   <div class="meter-card-header">
-    <span class="meter-drag-handle" title="Drag to reorder">&#8942;</span>
-    <div class="meter-card-identity">
+    <span class="meter-drag-handle" title="Drag to reorder" aria-hidden="true">&#8942;</span>
+    <div class="meter-card-identity" role="heading" aria-level="3">
       <span class="meter-card-name meter-name-editable" id="meter-${sid}-header-name" title="Click to rename">${nameLabel}</span>
     </div>
     <div class="meter-card-header-right">
       <button id="meter-${sid}-connect-btn" class="btn btn-small meter-connect-btn meter-connect-btn-${connState}" data-meter-action="${isConnected ? 'disconnect' : 'connect'}">${badgeText}</button>
       <button class="btn btn-secondary btn-small" data-meter-action="check-updates" ${!isConnected ? 'disabled' : ''}>Check Updates</button>
       <button class="btn btn-secondary btn-small" data-meter-action="identify-meter" ${!isConnected ? 'disabled' : ''}>Identify</button>
-      <button class="btn btn-secondary btn-small meter-settings-btn" data-meter-action="toggle-cfg" title="Meter settings">⚙</button>
+      <button class="btn btn-secondary btn-small meter-settings-btn" data-meter-action="toggle-cfg" title="Meter settings" aria-label="Meter settings" aria-expanded="false">⚙</button>
     </div>
   </div>
 
@@ -760,7 +760,7 @@
           <button class="meter-view-btn${viewMode === 'meters' ? ' active' : ''}" data-meter-action="view-meters">Meters</button>
           <button class="meter-view-btn${viewMode === 'history' ? ' active' : ''}" data-meter-action="view-history">History</button>
         </div>
-        <select class="form-select form-select-sm meter-layout-select" data-meter-field="cardLayout">
+        <select class="form-select form-select-sm meter-layout-select" data-meter-field="cardLayout" aria-label="Card layout">
           <option value="dual"${cardLayout === 'dual'       ? ' selected' : ''}>Dual Gauges</option>
           <option value="single-L"${cardLayout === 'single-L'   ? ' selected' : ''}>Left Only</option>
           <option value="single-R"${cardLayout === 'single-R'   ? ' selected' : ''}>Right Only</option>
@@ -775,20 +775,20 @@
     </div>
     <div class="meter-elem-info-bar" id="meter-${sid}-elem-info-bar" style="display:none">
             <div class="meter-elem-inline-group meter-elem-profile-group">
-                <span class="meter-elem-inline-label">Element Profile</span>
+                <label class="meter-elem-inline-label" for="meter-${sid}-cfg-elem">Element Profile</label>
                 <select id="meter-${sid}-cfg-elem" class="form-select form-select-sm">${this._renderElementProfileOptions(record, selectedElem)}</select>
             </div>
             <button class="btn btn-secondary btn-small" data-meter-action="refresh-element-profiles" ${!isConnected ? 'disabled' : ''}>Refresh Elements</button>
             <div class="meter-elem-inline-group">
-                <span class="meter-elem-inline-label">Rating</span>
+                <label class="meter-elem-inline-label" for="meter-${sid}-cfg-eval">Rating</label>
                 <select id="meter-${sid}-cfg-eval" class="form-select form-select-sm">${this._renderElementRatingOptions(selectedEval)}</select>
             </div>
             <div class="meter-elem-inline-group">
-                <span class="meter-elem-inline-label">Type</span>
+                <label class="meter-elem-inline-label" for="meter-${sid}-cfg-etype">Type</label>
                 <select id="meter-${sid}-cfg-etype" class="form-select form-select-sm">${this._renderElementTypeOptions(selectedEtype)}</select>
             </div>
             <div class="meter-elem-inline-group">
-                <span class="meter-elem-inline-label">Range</span>
+                <label class="meter-elem-inline-label" for="meter-${sid}-cfg-range">Range</label>
                 <select id="meter-${sid}-cfg-range" class="form-select form-select-sm">
                   <option value="0"${selectedRangeCfg === 0 ? ' selected' : ''}>1x</option>
                   <option value="1"${selectedRangeCfg === 1 ? ' selected' : ''}>2x</option>
@@ -801,7 +801,7 @@
       <div class="meter-gauge-radial-pair">
         <div class="meter-gauge-radial-panel">
                     <div class="meter-gauge-panel-controls">
-                        <select class="gauge-metric-select" id="meter-${sid}-gauge-metric-L">
+                        <select class="gauge-metric-select" id="meter-${sid}-gauge-metric-L" aria-label="Left gauge metric">
                             <option value="avg"${gaugeMetricL === 'avg' ? ' selected' : ''}>AVG — Average Power</option>
                             <option value="peak"${gaugeMetricL === 'peak' ? ' selected' : ''}>PEP — Peak Envelope</option>
                             <option value="inst"${gaugeMetricL === 'inst' ? ' selected' : ''}>INST — Instantaneous</option>
@@ -809,16 +809,17 @@
                             <option value="min"${gaugeMetricL === 'min' ? ' selected' : ''}>MIN — Running Minimum</option>
                             <option value="dev"${gaugeMetricL === 'dev' ? ' selected' : ''}>DEV — Deviation</option>
                         </select>
-                        <select class="gauge-display-select" id="meter-${sid}-gauge-display-L">
+                        <select class="gauge-display-select" id="meter-${sid}-gauge-display-L" aria-label="Left gauge display mode">
                             <option value="gauge"${gaugeDisplayL === 'gauge' ? ' selected' : ''}>Gauge + Readout</option>
                             <option value="numeric"${gaugeDisplayL === 'numeric' ? ' selected' : ''}>Large Numeric</option>
                         </select>
                     </div>
-          <canvas id="meter-${sid}-gauge-canvas-L" class="meter-gauge-radial-canvas"></canvas>
+          <canvas id="meter-${sid}-gauge-canvas-L" class="meter-gauge-radial-canvas" role="img" aria-label="Left gauge"></canvas>
+          <span class="sr-only" id="meter-${sid}-gauge-sr-L"></span>
         </div>
         <div class="meter-gauge-radial-panel">
                     <div class="meter-gauge-panel-controls">
-                        <select class="gauge-metric-select" id="meter-${sid}-gauge-metric-R">
+                        <select class="gauge-metric-select" id="meter-${sid}-gauge-metric-R" aria-label="Right gauge metric">
                             <option value="avg"${gaugeMetricR === 'avg' ? ' selected' : ''}>AVG — Average Power</option>
                             <option value="peak"${gaugeMetricR === 'peak' ? ' selected' : ''}>PEP — Peak Envelope</option>
                             <option value="inst"${gaugeMetricR === 'inst' ? ' selected' : ''}>INST — Instantaneous</option>
@@ -826,12 +827,13 @@
                             <option value="min"${gaugeMetricR === 'min' ? ' selected' : ''}>MIN — Running Minimum</option>
                             <option value="dev"${gaugeMetricR === 'dev' ? ' selected' : ''}>DEV — Deviation</option>
                         </select>
-                        <select class="gauge-display-select" id="meter-${sid}-gauge-display-R">
+                        <select class="gauge-display-select" id="meter-${sid}-gauge-display-R" aria-label="Right gauge display mode">
                             <option value="gauge"${gaugeDisplayR === 'gauge' ? ' selected' : ''}>Gauge + Readout</option>
                             <option value="numeric"${gaugeDisplayR === 'numeric' ? ' selected' : ''}>Large Numeric</option>
                         </select>
                     </div>
-          <canvas id="meter-${sid}-gauge-canvas-R" class="meter-gauge-radial-canvas"></canvas>
+          <canvas id="meter-${sid}-gauge-canvas-R" class="meter-gauge-radial-canvas" role="img" aria-label="Right gauge"></canvas>
+          <span class="sr-only" id="meter-${sid}-gauge-sr-R"></span>
         </div>
       </div>
     </div>
@@ -849,7 +851,7 @@
         </div>
         <div class="meter-range-frame">
           <span class="meter-range-label">Time</span>
-          <select class="meter-history-range-select" id="meter-${sid}-history-range">
+          <select class="meter-history-range-select" id="meter-${sid}-history-range" aria-label="History time window">
           <option value="2000">2 s</option>
           <option value="5000">5 s</option>
           <option value="10000">10 s</option>
@@ -866,7 +868,8 @@
         </select>
         </div>
       </div>
-      <canvas id="meter-${sid}-history-canvas" class="meter-history-canvas"></canvas>
+      <canvas id="meter-${sid}-history-canvas" class="meter-history-canvas" role="img" aria-label="Power history graph"></canvas>
+      <span class="sr-only" id="meter-${sid}-history-sr"></span>
     </div>
     <span id="meter-${sid}-inst" style="display:none"></span>
   </div>
@@ -876,7 +879,7 @@
       <span class="meter-detail-dialog-title">Device Details — ${nameLabel}</span>
       <div class="meter-detail-dialog-header-actions">
         <button id="meter-${sid}-poll-toggle-btn" class="btn btn-small ${isMonitoring ? 'btn-danger' : 'btn-secondary'}" data-meter-action="toggle-poll" ${!isConnected ? 'disabled' : ''}>${isMonitoring ? 'Stop Polling' : 'Start Polling'}</button>
-        <button class="btn btn-text btn-small" data-meter-action="close-more-info" title="Close">✕</button>
+        <button class="btn btn-text btn-small" data-meter-action="close-more-info" title="Close" aria-label="Close details">✕</button>
       </div>
     </div>
     <div class="meter-detail-dialog-body">
@@ -893,7 +896,7 @@
       <h4 class="meter-detail-heading">Device Name</h4>
       <div class="form-group">
         <div class="input-group">
-          <input id="meter-${sid}-name-input" class="form-input" type="text" placeholder="bench_meter_a" maxlength="20" data-meter-name-key="${record.key}" style="width:180px;flex:none;">
+          <input id="meter-${sid}-name-input" class="form-input" type="text" placeholder="bench_meter_a" maxlength="20" data-meter-name-key="${record.key}" style="width:180px;flex:none;" aria-label="Device name">
           <button class="btn btn-secondary btn-small" data-meter-action="load-name" ${!isConnected ? 'disabled' : ''}>Load</button>
           <button class="btn btn-primary btn-small" data-meter-action="save-name" ${!isConnected ? 'disabled' : ''}>Save</button>
         </div>
@@ -924,7 +927,7 @@
       <h4 class="meter-detail-heading">Brightness</h4>
       <div class="control-info-grid compact">
         <div class="control-info-item"><span class="control-info-label">Backlight (0-10)</span></div>
-        <div class="control-info-item"><div class="input-group"><input id="meter-${sid}-cfg-bright" class="form-input" type="number" min="0" max="10" step="1" placeholder="0-10" style="width:64px;flex:none;"><button class="btn btn-secondary btn-small" data-meter-action="cfg-bright" ${!isConnected ? 'disabled' : ''}>Set</button></div></div>
+        <div class="control-info-item"><div class="input-group"><input id="meter-${sid}-cfg-bright" class="form-input" type="number" min="0" max="10" step="1" placeholder="0-10" style="width:64px;flex:none;" aria-label="Backlight level"><button class="btn btn-secondary btn-small" data-meter-action="cfg-bright" ${!isConnected ? 'disabled' : ''}>Set</button></div></div>
       </div>
       <p id="meter-${sid}-bright-status" class="control-helper-text"></p>
     </div>
@@ -933,7 +936,7 @@
       <h4 class="meter-detail-heading">Averaging</h4>
       <div class="control-info-grid compact">
         <div class="control-info-item"><span class="control-info-label">Window (0.5-10 s)</span></div>
-        <div class="control-info-item"><div class="input-group"><input id="meter-${sid}-cfg-avgw" class="form-input" type="number" min="0.5" max="10" step="0.5" placeholder="0.5-10" style="width:74px;flex:none;"><button class="btn btn-secondary btn-small" data-meter-action="cfg-avgw" ${!isConnected ? 'disabled' : ''}>Set</button></div></div>
+        <div class="control-info-item"><div class="input-group"><input id="meter-${sid}-cfg-avgw" class="form-input" type="number" min="0.5" max="10" step="0.5" placeholder="0.5-10" style="width:74px;flex:none;" aria-label="Averaging window"><button class="btn btn-secondary btn-small" data-meter-action="cfg-avgw" ${!isConnected ? 'disabled' : ''}>Set</button></div></div>
       </div>
       <p id="meter-${sid}-cfg-status" class="control-helper-text"></p>
     </div>
@@ -950,7 +953,7 @@
     <div class="meter-detail-section">
       <h4 class="meter-detail-heading">USB Debug Console</h4>
       <div class="meter-raw-debug-toolbar">
-        <textarea id="meter-${sid}-raw-command" class="control-debug-input" spellcheck="false" placeholder="Paste a raw command here, e.g. proto=2 type=cmd cmd=sys.fw\r\n"></textarea>
+        <textarea id="meter-${sid}-raw-command" class="control-debug-input" spellcheck="false" placeholder="Paste a raw command here, e.g. proto=2 type=cmd cmd=sys.fw\r\n" aria-label="Raw USB command input"></textarea>
         <div class="meter-raw-debug-actions">
           <button class="btn btn-secondary btn-small" data-meter-action="send-raw" ${!isConnected ? 'disabled' : ''}>Send Raw</button>
           <span class="control-helper-text">Escapes like \r, \n, \t and \\ are decoded before send. RX appears below.</span>
@@ -1066,11 +1069,11 @@
         ].map(([ms, label]) => `<option value="${ms}"${histWindowMs === ms ? ' selected' : ''}>${label}</option>`).join('');
 
         return `
-<div class="swr-card" data-swr-id="${id}" id="swr-card-${sid}" draggable="true">
+<div class="swr-card" data-swr-id="${id}" id="swr-card-${sid}" draggable="true" role="region" aria-label="SWR / Return Loss card">
   <div class="swr-card-header">
-    <span class="meter-drag-handle" title="Drag to reorder">&#8942;</span>
+    <span class="meter-drag-handle" title="Drag to reorder" aria-hidden="true">&#8942;</span>
     <div class="swr-card-title-area">
-      <span class="swr-card-title">SWR / Return Loss</span>
+      <span class="swr-card-title" role="heading" aria-level="3">SWR / Return Loss</span>
     </div>
     <div class="swr-card-header-right">
       <span class="swr-status-text" id="swr-${sid}-status">Select forward and reflected power sources above.</span>
@@ -1080,7 +1083,7 @@
 
   <div class="swr-source-bar">
     <div class="swr-source-group">
-      <label class="swr-source-label">Forward Power</label>
+      <label class="swr-source-label" for="swr-${sid}-fwd-key">Forward Power</label>
       <div class="swr-source-selects">
         <select id="swr-${sid}-fwd-key" class="form-select form-select-sm" data-swr-id="${id}" data-swr-field="fwdKey">
           ${this._swrMeterOptions(swrRec.fwdKey, swrRec.refKey)}
@@ -1089,7 +1092,7 @@
     </div>
     <div class="swr-source-arrow">&#x2192;</div>
     <div class="swr-source-group">
-      <label class="swr-source-label">Reflected Power</label>
+      <label class="swr-source-label" for="swr-${sid}-ref-key">Reflected Power</label>
       <div class="swr-source-selects">
         <select id="swr-${sid}-ref-key" class="form-select form-select-sm" data-swr-id="${id}" data-swr-field="refKey">
           ${this._swrMeterOptions(swrRec.refKey, swrRec.fwdKey)}
@@ -1098,15 +1101,15 @@
     </div>
   </div>
   <div class="swr-metric-row">
-    <label class="swr-source-label">Power Type</label>
+    <label class="swr-source-label" for="swr-${sid}-metric">Power Type</label>
     <select id="swr-${sid}-metric" class="form-select form-select-sm" data-swr-id="${id}" data-swr-field="metric">
       ${this._swrMetricOptions(swrRec.fwdMetric)}
     </select>
-    <select class="form-select form-select-sm" data-swr-id="${id}" data-swr-field="view">
+    <select class="form-select form-select-sm" data-swr-id="${id}" data-swr-field="view" aria-label="View mode">
       <option value="gauges"${viewMode === 'gauges'  ? ' selected' : ''}>Meters</option>
       <option value="history"${viewMode === 'history' ? ' selected' : ''}>History</option>
     </select>
-    <select class="form-select form-select-sm" data-swr-id="${id}" data-swr-field="cardLayout">
+    <select class="form-select form-select-sm" data-swr-id="${id}" data-swr-field="cardLayout" aria-label="Card layout">
       <option value="both"${cardLayout === 'both'     ? ' selected' : ''}>Both Gauges</option>
       <option value="swr-only"${cardLayout === 'swr-only' ? ' selected' : ''}>SWR Only</option>
       <option value="rl-only"${cardLayout === 'rl-only'  ? ' selected' : ''}>Return Loss Only</option>
@@ -1118,11 +1121,11 @@
     <div class="swr-gauge-pair">
       <div class="swr-gauge-panel" data-swr-panel="swr">
         <div class="swr-gauge-panel-label">SWR</div>
-        <canvas id="swr-${sid}-gauge-swr" class="meter-gauge-radial-canvas"></canvas>
+        <canvas id="swr-${sid}-gauge-swr" class="meter-gauge-radial-canvas" role="img" aria-label="SWR gauge"></canvas>
       </div>
       <div class="swr-gauge-panel" data-swr-panel="rl">
         <div class="swr-gauge-panel-label">Return Loss</div>
-        <canvas id="swr-${sid}-gauge-rl" class="meter-gauge-radial-canvas"></canvas>
+        <canvas id="swr-${sid}-gauge-rl" class="meter-gauge-radial-canvas" role="img" aria-label="Return loss gauge"></canvas>
       </div>
     </div>
     <div class="swr-derived-chips">
@@ -1169,11 +1172,11 @@
   <div class="swr-history-view" id="swr-${sid}-history-view" style="display:none">
     <div class="swr-history-toolbar">
       <span class="meter-range-label">Time</span>
-      <select class="meter-history-range-select" id="swr-${sid}-history-range" data-swr-id="${id}" data-swr-field="historyRange">
+      <select class="meter-history-range-select" id="swr-${sid}-history-range" data-swr-id="${id}" data-swr-field="historyRange" aria-label="History time window">
         ${histRangeOptions}
       </select>
     </div>
-    <canvas id="swr-${sid}-history-canvas" class="meter-history-canvas"></canvas>
+    <canvas id="swr-${sid}-history-canvas" class="meter-history-canvas" role="img" aria-label="SWR history graph"></canvas>
   </div>
 </div>`;
     };
