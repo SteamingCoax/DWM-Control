@@ -928,8 +928,6 @@
 
         // File menu
         on('menu-sv-save',   () => document.getElementById('sv-save-file-btn')?.click());
-        on('menu-sv-load',   () => document.getElementById('sv-load-file-btn')?.click());
-        on('menu-sv-export', () => document.getElementById('sv-export-btn')?.click());
 
         // Edit menu — schematic undo/redo
         on('menu-sv-undo', () => document.getElementById('sv-undo-btn')?.click());

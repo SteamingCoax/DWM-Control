@@ -109,24 +109,64 @@ class DWMControl {
         this.configureUIComponentVisibility();
         
         const tabButtons = document.querySelectorAll('.tab-button');
-        const tabPanels = document.querySelectorAll('.tab-panel');
 
         tabButtons.forEach(button => {
             button.addEventListener('click', () => {
-                const targetTab = button.getAttribute('data-tab');
-                
-                // Remove active class from all buttons and panels
-                tabButtons.forEach(btn => btn.classList.remove('active'));
-                tabPanels.forEach(panel => panel.classList.remove('active'));
-                
-                // Add active class to clicked button and corresponding panel
-                button.classList.add('active');
-                document.getElementById(`${targetTab}-panel`).classList.add('active');
+                this.activateTab(button.getAttribute('data-tab'));
             });
         });
-        
+
+        const tabNav = document.querySelector('.tab-navigation');
+        if (tabNav) {
+            tabNav.addEventListener('keydown', (event) => this._onTabListKeydown(event));
+        }
+
         // Set first visible tab as active if none are active
         this.ensureActiveTab();
+    }
+
+    // Select a tab: button state (class, aria-selected, roving tabindex) and panel visibility.
+    activateTab(tabKey) {
+        const buttons = Array.from(document.querySelectorAll('.tab-button'));
+        const panels = Array.from(document.querySelectorAll('.tab-panel'));
+        const target = buttons.find(btn => btn.getAttribute('data-tab') === tabKey);
+        if (!target) return null;
+
+        buttons.forEach(btn => {
+            const on = btn === target;
+            btn.classList.toggle('active', on);
+            btn.setAttribute('aria-selected', on ? 'true' : 'false');
+            btn.setAttribute('tabindex', on ? '0' : '-1');
+        });
+        panels.forEach(panel => {
+            const on = panel.id === `${tabKey}-panel`;
+            panel.classList.toggle('active', on);
+            panel.hidden = !on;
+            if (on) panel.removeAttribute('hidden');
+            else panel.setAttribute('hidden', '');
+        });
+        return target;
+    }
+
+    _onTabListKeydown(event) {
+        const current = event.target;
+        if (!current || !current.classList || !current.classList.contains('tab-button')) return;
+        const visible = Array.from(document.querySelectorAll('.tab-button'))
+            .filter(btn => btn.style.display !== 'none');
+        const index = visible.indexOf(current);
+        if (index === -1 || visible.length === 0) return;
+
+        let next;
+        switch (event.key) {
+            case 'ArrowRight': next = visible[(index + 1) % visible.length]; break;
+            case 'ArrowLeft': next = visible[(index - 1 + visible.length) % visible.length]; break;
+            case 'Home': next = visible[0]; break;
+            case 'End': next = visible[visible.length - 1]; break;
+            default: return;
+        }
+        event.preventDefault();
+        const activated = this.activateTab(next.getAttribute('data-tab'));
+        if (activated) activated.focus();
     }
 
     configureTabVisibility() {
@@ -141,6 +181,8 @@ class DWMControl {
                 } else {
                     tabButton.style.display = 'none';
                     tabPanel.classList.remove('active');
+                    tabPanel.hidden = true;
+                    tabPanel.setAttribute('hidden', '');
                 }
             }
         });
@@ -176,18 +218,7 @@ class DWMControl {
             );
             
             if (firstEnabledTabKey) {
-                // Remove all active states
-                document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-                document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
-                
-                // Activate first enabled tab
-                const tabButton = document.querySelector(`[data-tab="${firstEnabledTabKey}"]`);
-                const tabPanel = document.getElementById(`${firstEnabledTabKey}-panel`);
-                
-                if (tabButton && tabPanel) {
-                    tabButton.classList.add('active');
-                    tabPanel.classList.add('active');
-                }
+                this.activateTab(firstEnabledTabKey);
             }
         }
     }
@@ -580,7 +611,7 @@ class DWMControl {
             clearConsoleBtn.addEventListener('click', () => {
                 const output = document.getElementById('output-console');
                 if (output) {
-                    output.textContent = '';
+                    output.replaceChildren();
                 }
             });
         }

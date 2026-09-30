@@ -70,6 +70,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   svLogRow:    (opts)   => ipcRenderer.invoke('sv-log-row', opts),
   svLogClose:  ()       => ipcRenderer.invoke('sv-log-close'),
 
+  // Accessibility support state
+  getAccessibilitySupport: () => ipcRenderer.invoke('get-accessibility-support'),
+  onAccessibilitySupportChanged: (callback) => {
+    const l = (_e, enabled) => callback(Boolean(enabled));
+    ipcRenderer.on('accessibility-support-changed', l);
+    return () => ipcRenderer.removeListener('accessibility-support-changed', l);
+  },
+
   // Native menu action relay
   onMenuAction: (channel, callback) => {
     const MENU_CHANNELS = [
@@ -80,9 +88,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'menu-sv-delete', 'menu-sv-clear', 'menu-sv-lock',
       'menu-sv-log-toggle', 'menu-sv-log-folder',
       'menu-check-updates',
+      'menu-a11y-speech-toggle', 'menu-a11y-tone-toggle', 'menu-a11y-speak-now', 'menu-a11y-describe-meter', 'menu-a11y-peak-hold',
+      'menu-a11y-range-cycle', 'menu-a11y-metric-cycle', 'menu-a11y-meter-next', 'menu-a11y-meter-prev', 'menu-a11y-meter-select',
     ];
     if (!MENU_CHANNELS.includes(channel)) return;
-    const listener = () => callback();
+    const listener = (_event, ...args) => callback(...args);
     ipcRenderer.on(channel, listener);
     return () => ipcRenderer.removeListener(channel, listener);
   },
@@ -99,6 +109,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'menu-sv-delete', 'menu-sv-clear', 'menu-sv-lock',
       'menu-sv-log-toggle', 'menu-sv-log-folder',
       'menu-check-updates',
+      'menu-a11y-speech-toggle', 'menu-a11y-tone-toggle', 'menu-a11y-speak-now', 'menu-a11y-describe-meter', 'menu-a11y-peak-hold',
+      'menu-a11y-range-cycle', 'menu-a11y-metric-cycle', 'menu-a11y-meter-next', 'menu-a11y-meter-prev', 'menu-a11y-meter-select',
+      'accessibility-support-changed',
     ];
     if (ALLOWED_CHANNELS.includes(channel)) {
       ipcRenderer.removeAllListeners(channel);
