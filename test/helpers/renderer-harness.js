@@ -207,6 +207,7 @@ const RENDERER_SCRIPTS = [
   'renderer/modules/control-monitor.js',
   'renderer/modules/accessibility.js',
   'renderer/modules/settings.js',
+  'renderer/modules/demo.js',
   'renderer/modules/firmware.js',
   'renderer/modules/site-view-components.js',
   'renderer/modules/site-view.js',

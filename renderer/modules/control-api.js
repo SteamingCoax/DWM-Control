@@ -89,6 +89,9 @@
             throw new Error('Device is not connected');
         }
 
+        // Simulated meters (demo.js) answer in-process: no serial write, pacing or proto fallback.
+        if (record.isDemo) return this._demoHandleCommand(record, command, fields);
+
         const state = record.state;
         const allowLegacyFallback = options.allowLegacyFallback !== false;
 
