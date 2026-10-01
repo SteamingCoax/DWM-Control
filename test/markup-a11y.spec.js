@@ -79,10 +79,11 @@ test('index.html accessibility', async (t) => {
     assert.strictEqual(alert.attrs['aria-atomic'], 'true', 'a11y-alert has aria-atomic="true"');
   });
 
-  await t.test('theme-select and clear-file-btn have aria-label', () => {
-    const themeSelect = findById(html, 'theme-select');
-    assert.ok(themeSelect, '#theme-select exists');
-    assert.strictEqual(themeSelect.attrs['aria-label'], 'Theme', 'theme-select has aria-label="Theme"');
+  await t.test('settings-button and clear-file-btn have aria-label', () => {
+    // #theme-select moved into the Settings dialog (rendered by settings.js, labelled by <label for>).
+    const settingsBtn = findById(html, 'settings-button');
+    assert.ok(settingsBtn, '#settings-button exists');
+    assert.strictEqual(settingsBtn.attrs['aria-label'], 'Settings', 'settings-button has aria-label="Settings"');
 
     const clearBtn = findById(html, 'clear-file-btn');
     assert.ok(clearBtn, '#clear-file-btn exists');

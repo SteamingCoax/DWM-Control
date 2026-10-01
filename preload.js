@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   polynomialRegression: (data) => ipcRenderer.invoke('polynomial-regression', data),
   
   // Auto-updater APIs
+  setUpdateChannel: (channel) => ipcRenderer.invoke('set-update-channel', channel),
+  getUpdateChannel: () => ipcRenderer.invoke('get-update-channel'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   downloadUpdate: () => ipcRenderer.invoke('download-update'),
   installUpdate: () => ipcRenderer.invoke('install-update'),
@@ -87,7 +89,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'menu-sv-zoom-in', 'menu-sv-zoom-out',
       'menu-sv-delete', 'menu-sv-clear', 'menu-sv-lock',
       'menu-sv-log-toggle', 'menu-sv-log-folder',
-      'menu-check-updates',
+      'menu-check-updates', 'menu-settings-open',
       'menu-a11y-speech-toggle', 'menu-a11y-tone-toggle', 'menu-a11y-speak-now', 'menu-a11y-describe-meter', 'menu-a11y-peak-hold',
       'menu-a11y-range-cycle', 'menu-a11y-metric-cycle', 'menu-a11y-meter-next', 'menu-a11y-meter-prev', 'menu-a11y-meter-select',
     ];
@@ -108,7 +110,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       'menu-sv-zoom-in', 'menu-sv-zoom-out',
       'menu-sv-delete', 'menu-sv-clear', 'menu-sv-lock',
       'menu-sv-log-toggle', 'menu-sv-log-folder',
-      'menu-check-updates',
+      'menu-check-updates', 'menu-settings-open',
       'menu-a11y-speech-toggle', 'menu-a11y-tone-toggle', 'menu-a11y-speak-now', 'menu-a11y-describe-meter', 'menu-a11y-peak-hold',
       'menu-a11y-range-cycle', 'menu-a11y-metric-cycle', 'menu-a11y-meter-next', 'menu-a11y-meter-prev', 'menu-a11y-meter-select',
       'accessibility-support-changed',

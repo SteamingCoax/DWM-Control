@@ -54,7 +54,8 @@ CI: `.github/workflows/ci.yml` runs on every PR and push to `main` (GitHub-hoste
 Module responsibilities:
 
 - `extensions.js`: auto-updater UI, `loadConfig`/`saveConfig` (persisted in `localStorage` under `dwm-control-config`), output log, native menu wiring.
-- `accessibility.js`: live-region announcer, spoken readouts (Web Speech), tuning tone (Web Audio), focused-meter shortcuts and the Accessibility settings group.
+- `settings.js`: Settings dialog (four tabs: General/Control/Accessibility/Updates), open/close logic, rendering and binding of all settings panels; `openSettings(tab)`.
+- `accessibility.js`: live-region announcer, spoken readouts (Web Speech), tuning tone (Web Audio), focused-meter shortcuts and the Accessibility settings group (rendered inside the Settings dialog).
 - `control.js`: per-meter state factory (`createMeterState`) and meter card rendering/layouts.
 - `control-api.js`: serial line parsing, request/response correlation, `sendApiCommand`.
 - `control-monitor.js`: polling loop, snapshot refresh, watchdog reconnect.
@@ -85,7 +86,7 @@ Reference docs live in `USB API Versions/USB_API_Reference v2.md` (current) and 
 
 ### Auto-update
 
-Update checks are skipped only when `NODE_ENV=development` AND the app is not packaged. Release assets come from the `publish` block in `package.json` (GitHub, `SteamingCoax/DWM-Control`). macOS builds must be signed and notarized for the updater to work; CI imports the cert from `MAC_CERT_P12` / `MAC_CERT_PASSWORD` secrets. Windows and Linux are cross-built on a self-hosted Linux runner (Windows via Wine + NSIS).
+Update checks are skipped only when `NODE_ENV=development` AND the app is not packaged. Release assets come from the `publish` block in `package.json` (GitHub, `SteamingCoax/DWM-Control`). macOS builds must be signed and notarized for the updater to work; CI imports the cert from `MAC_CERT_P12` / `MAC_CERT_PASSWORD` secrets. Windows and Linux are cross-built on a self-hosted Linux runner (Windows via Wine + NSIS). The renderer stores `updateChannel` (`'beta'`, `'stable'`, or `null` for automatic) in localStorage and sends it to the main process on startup via `set-update-channel` before the 3-second update check, and again whenever it changes. The main-process helper `lib/update-channel.js` exports `normalizeUpdateChannel`, `isPrereleaseVersion`, and `resolveAllowPrerelease` to compute `allowPrerelease` explicitly from the user's choice in the Updates settings tab.
 
 ## Workflow
 
@@ -102,5 +103,5 @@ Update checks are skipped only when `NODE_ENV=development` AND the app is not pa
 - Electron 42's npm package has no install script. The binary downloads lazily on the first `npx electron` run (or `npx install-electron`), and the package requires Node >= 22.12 (`engines` in `package.json`). On Node 26 that download's unzip step exits silently after one file, leaving `node_modules/electron/dist` half-extracted, so use Node 22. Both workflows read the Node version from `.nvmrc`.
 - `Programs/` is in `build.files` and `dfu-util` is `asarUnpack`ed on every platform. The `mac` and `win` blocks also copy `Programs/` as `extraResources`; the `linux` block does not, so on Linux the binary exists only under `app.asar.unpacked`, which is where `getDfuUtilPath` looks first. If you add a binary, update both `getDfuUtilPath` and the packaging config.
 - `deb.afterInstall` / `deb.afterRemove` in `package.json` point at `build/linux-postinstall.sh` and `build/linux-postremove.sh`, and electron-builder uses them **instead of** its default after-install/after-remove templates (it does not append). Those scripts therefore carry the default steps too: the `/usr/bin/dwm-control` launcher link (via `update-alternatives`), `chrome-sandbox` permissions, desktop/mime database refresh, and then the DWM udev rules. electron-builder substitutes `${executable}` and `${sanitizedProductName}` in them and errors on any other `${name}`, so shell variables in those scripts must be written without braces. `ci.yml` builds the deb and checks the generated `postinst`/`postrm`.
-- User settings live in renderer `localStorage` (`dwm-control-config`, `dwm-siteview-*`), while Site View workspaces, recent files, and stream logs are written by the main process under the app's userData directory.
+- User settings live in renderer `localStorage` (`dwm-control-config` with `updateChannel` and other UI state, `dwm-siteview-*` for Site View), while Site View workspaces, recent files, and stream logs are written by the main process under the app's userData directory.
 - `PROJECT_CHECKLIST.md` tracks feature status and open hardware-validation items; `AUTO_UPDATE_GUIDE.md` and `build/CODE_SIGNING_GUIDE.md` cover updater and signing setup.

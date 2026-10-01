@@ -63,6 +63,8 @@ from source, and `getDfuUtilPath` uses the PATH binary instead of the bundled on
       as up to date, element rating, range and brightness are unchanged.
 - [ ] The meter's stored name resets to `DWM_V2` after a flash. Rename it from the
       card header and confirm the name persists across a reconnect.
+- [ ] Settings dialog opens from the gear button in the title bar, from Ctrl+, (Windows/Linux) or Cmd+, (macOS), and from the "Settings…" button above the meter board; Escape closes it and focus returns to the app.
+- [ ] Updates tab: with "Accept beta updates" off, a stable install ignores a newer beta; with it on, the beta is offered and installs.
 
 Reference run, 2026-09-26, v1.3.6 + dwm-core, x64 build: all boxes passed;
 flash v2.6.3 -> v2.6.5 wrote 399,536 bytes; dfu-util reported "Error during

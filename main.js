@@ -21,6 +21,7 @@ const {
   gaussianElimination,
 } = require('./lib/regression');
 const { resolveDfuUtilPath } = require('./lib/dfu-path');
+const { normalizeUpdateChannel, resolveAllowPrerelease } = require('./lib/update-channel');
 
 // Disable GPU acceleration IMMEDIATELY when requested.
 // This must be done before app.whenReady().
@@ -107,6 +108,17 @@ if (app.isPackaged && process.env.NODE_ENV !== 'development') {
 }
 
 // Auto-updater event handlers
+// Update channel preference (null = automatic, follows the installed version).
+let updateChannel = null;
+function applyUpdateChannel(channel) {
+  updateChannel = normalizeUpdateChannel(channel);
+  try {
+    autoUpdater.allowPrerelease = resolveAllowPrerelease(updateChannel, app.getVersion());
+  } catch (err) {
+    console.warn('Could not apply update channel:', err?.message || err);
+  }
+}
+
 autoUpdater.on('checking-for-update', () => {
   console.log('Checking for update...');
 });
@@ -222,6 +234,7 @@ function createWindow() {
     // Check for updates once after startup (skip in development)
     if (!updateCheckStarted) {
       updateCheckStarted = true;
+      // The renderer sends its update channel preference during init, well inside this 3 s.
       setTimeout(() => {
         if (process.env.NODE_ENV !== 'development' && app.isPackaged) {
           autoUpdater.checkForUpdates().catch((err) => {
@@ -305,6 +318,12 @@ function buildAppMenu() {
       submenu: [
         { role: 'about' },
         { type: 'separator' },
+        {
+          label: 'Settings…',
+          accelerator: 'CmdOrCtrl+,',
+          click() { sendToFocusedWindow('menu-settings-open'); },
+        },
+        { type: 'separator' },
         { role: 'services' },
         { type: 'separator' },
         { role: 'hide' },
@@ -319,6 +338,11 @@ function buildAppMenu() {
     {
       label: 'File',
       submenu: [
+        ...(!isMac ? [{
+          label: 'Settings…',
+          accelerator: 'CmdOrCtrl+,',
+          click() { sendToFocusedWindow('menu-settings-open'); },
+        }, { type: 'separator' }] : []),
         {
           label: 'New Workspace',
           accelerator: 'CmdOrCtrl+N',
@@ -1442,6 +1466,17 @@ function getDfuUtilPath() {
 }
 
 // IPC handlers for manual update checking
+ipcMain.handle('set-update-channel', (_e, channel) => {
+  applyUpdateChannel(channel);
+  return { channel: updateChannel, allowPrerelease: autoUpdater.allowPrerelease };
+});
+
+ipcMain.handle('get-update-channel', () => ({
+  channel: updateChannel,
+  allowPrerelease: resolveAllowPrerelease(updateChannel, app.getVersion()),
+  version: app.getVersion(),
+}));
+
 ipcMain.handle('check-for-updates', async () => {
   try {
     updateDownloadedReady = false;

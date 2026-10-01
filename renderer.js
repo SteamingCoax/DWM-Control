@@ -77,6 +77,9 @@ class DWMControl {
             this.setupSiteView();
             console.log('DWM Control: Site View setup complete');
             
+            this.setupSettingsDialog();
+            console.log('DWM Control: Settings dialog setup complete');
+
             this.setupThemeToggle();
             console.log('DWM Control: Theme toggle setup complete');
             

@@ -39,15 +39,7 @@
                         <span class="update-text">Check Updates</span>
                     </button>
                 </div>
-                <div class="theme-select-wrap">
-                    <select id="theme-select" title="Select Theme" aria-label="Theme">
-                        <option value="dark">Dark</option>
-                        <option value="light">Light</option>
-                        <option value="ocean">Ocean</option>
-                        <option value="carbon" selected>Carbon</option>
-                        <option value="amber">Amber</option>
-                    </select>
-                </div>
+                <button id="settings-button" class="update-btn settings-btn" aria-label="Settings" title="Settings (Ctrl+,)">⚙</button>
             </div>
         </nav>
 
@@ -412,6 +404,26 @@
         </aside>
     </div>
 
+    <!-- App Settings dialog (panels rendered by renderer/modules/settings.js) -->
+    <dialog id="app-settings-dialog" class="app-settings-dialog" aria-labelledby="app-settings-title">
+        <div class="app-settings-header">
+            <h2 id="app-settings-title">Settings</h2>
+            <button id="app-settings-close" class="btn btn-text btn-small" aria-label="Close settings">✕</button>
+        </div>
+        <div class="settings-tabs" role="tablist" aria-label="Settings sections">
+            <button class="settings-tab active" role="tab" id="settings-tab-general" data-settings-tab="general" aria-controls="settings-panel-general" aria-selected="true" tabindex="0">General</button>
+            <button class="settings-tab" role="tab" id="settings-tab-control" data-settings-tab="control" aria-controls="settings-panel-control" aria-selected="false" tabindex="-1">Control</button>
+            <button class="settings-tab" role="tab" id="settings-tab-accessibility" data-settings-tab="accessibility" aria-controls="settings-panel-accessibility" aria-selected="false" tabindex="-1">Accessibility</button>
+            <button class="settings-tab" role="tab" id="settings-tab-updates" data-settings-tab="updates" aria-controls="settings-panel-updates" aria-selected="false" tabindex="-1">Updates</button>
+        </div>
+        <div class="app-settings-body">
+            <section id="settings-panel-general" class="settings-panel active" role="tabpanel" aria-labelledby="settings-tab-general"></section>
+            <section id="settings-panel-control" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-control" hidden></section>
+            <section id="settings-panel-accessibility" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-accessibility" hidden></section>
+            <section id="settings-panel-updates" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-updates" hidden></section>
+        </div>
+    </dialog>
+
     <div id="a11y-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
     <div id="a11y-alert" class="sr-only" role="alert" aria-live="assertive" aria-atomic="true"></div>
 
@@ -427,6 +439,7 @@
     <script src="renderer/modules/control-history.js"></script>
     <script src="renderer/modules/control-monitor.js"></script>
     <script src="renderer/modules/accessibility.js"></script>
+    <script src="renderer/modules/settings.js"></script>
     <script src="renderer/modules/firmware.js"></script>
     <script src="renderer/modules/site-view-components.js"></script>
     <script src="renderer/modules/site-view.js"></script>

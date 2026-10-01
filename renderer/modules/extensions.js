@@ -7,6 +7,15 @@
         return;
     }
 
+    // Keep identical to lib/update-channel.js (renderer cannot require).
+    const normalizeUpdateChannel = (v) => {
+        if (typeof v !== 'string') return null;
+        const s = v.trim().toLowerCase();
+        return s === 'beta' || s === 'stable' ? s : null;
+    };
+    const isPrereleaseVersion = (version) =>
+        typeof version === 'string' && /^v?\d+\.\d+\.\d+-[0-9A-Za-z]/.test(version.trim());
+
     const A11Y_DEFAULTS = Object.freeze({
         speechEnabled: false,
         speechMode: 'interval',
@@ -869,7 +878,30 @@
             meterCards,
             swrCards,
             accessibility: this.normalizeAccessibility(cfg.accessibility),
+            updateChannel: normalizeUpdateChannel(cfg.updateChannel),
         };
+    };
+
+    DWMControl.prototype.applyUpdateChannel = function applyUpdateChannel() {
+        try {
+            const p = window.electronAPI?.setUpdateChannel?.(this.config?.updateChannel ?? null);
+            if (p && typeof p.catch === 'function') p.catch(() => {});
+        } catch (_) { /* main process unavailable */ }
+    };
+
+    DWMControl.prototype.setUpdateChannel = function setUpdateChannel(channel) {
+        const normalized = normalizeUpdateChannel(channel);
+        this.config.updateChannel = normalized;
+        this.saveConfig();
+        this.applyUpdateChannel();
+        return normalized;
+    };
+
+    DWMControl.prototype.isBetaUpdatesEnabled = function isBetaUpdatesEnabled(currentVersion) {
+        const channel = normalizeUpdateChannel(this.config?.updateChannel);
+        if (channel === 'beta') return true;
+        if (channel === 'stable') return false;
+        return isPrereleaseVersion(currentVersion);
     };
 
     DWMControl.prototype.loadConfig = function loadConfig() {
@@ -892,6 +924,7 @@
             deembedVoltageMode: 'manual',
             deembedPowerRating: null,
             accessibility: { ...A11Y_DEFAULTS },
+            updateChannel: null,
         };
 
         try {
