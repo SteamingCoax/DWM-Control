@@ -239,26 +239,32 @@
         this._a11yOnDfuProgress(safePercent, message);
     };
 
-    DWMControl.prototype.parseProgressFromDfuOutput = function(line) {
-        if (!line) { return null; }
-
-        if (/opening dfu/i.test(line)) { return 10; }
-        if (/matching dfu/i.test(line)) { return 20; }
-        if (/claiming usb/i.test(line)) { return 30; }
-        if (/determining device/i.test(line)) { return 40; }
-        if (/downloading.*element/i.test(line)) { return 50; }
-
-        const downloadMatch = line.match(/Download\s+\[([= >]+)\]\s+(\d+)%/i);
-        if (downloadMatch) {
-            const pct = Number.parseInt(downloadMatch[2], 10);
-            return 50 + Math.round(pct * 0.45);
+    // Maps dfu-util output to a monotonic 0..100 progress value. dfu-util prints a
+    // few setup lines, then an Erase progress bar, then a Download progress bar, so
+    // setup stays under 5 %, Erase spans 5..30 % and Download spans 30..100 %. A
+    // chunk may hold several lines (and \r-separated redraws); the furthest value wins.
+    DWMControl.prototype.parseProgressFromDfuOutput = function(text) {
+        if (!text) { return null; }
+        const lines = String(text).split(/[\r\n]+/).map(l => l.trim()).filter(Boolean);
+        let best = null;
+        const consider = (v) => { if (v !== null && (best === null || v > best)) best = v; };
+        for (const line of lines) {
+            const bar = line.match(/^(Erase|Download)\s*\[[^\]]*\]\s*(\d+)%/i);
+            if (bar) {
+                const pct = Math.max(0, Math.min(100, Number.parseInt(bar[2], 10)));
+                consider(bar[1].toLowerCase() === 'erase'
+                    ? 5 + Math.round(pct * 0.25)
+                    : 30 + Math.round(pct * 0.70));
+                continue;
+            }
+            if (/downloaded successfully|^done!?$/i.test(line)) { consider(100); continue; }
+            if (/^error|dfu-util: error|error during/i.test(line)) { continue; }
+            if (/opening dfu/i.test(line)) { consider(1); continue; }
+            if (/claiming usb/i.test(line)) { consider(2); continue; }
+            if (/determining device/i.test(line)) { consider(3); continue; }
+            if (/downloading element/i.test(line)) { consider(5); continue; }
         }
-
-        if (/done!/.test(line)) { return 100; }
-        if (/successfully/i.test(line)) { return 100; }
-        if (/error/i.test(line)) { return null; }
-
-        return null;
+        return best;
     };
 
     DWMControl.prototype.updateUploadButton = function() {

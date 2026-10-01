@@ -624,8 +624,9 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Quit when all windows are closed
 app.on('window-all-closed', () => {
-  // On macOS, apps typically stay active until explicitly quit
-  if (process.platform !== 'darwin') app.quit();
+  // Single-window app: closing the window quits on every platform, including macOS,
+  // so serial ports are released and the dock icon does not linger.
+  app.quit();
 });
 
 // Security: Prevent new window creation
@@ -720,6 +721,8 @@ ipcMain.handle('upload-firmware', async (event, { hexFilePath, deviceInfo }) => 
 
   try {
     const result = await updater.upload(resolvedHex, {
+      // Target the chosen DFU device (dfu-util -S); dwm-core ignores empty/unknown serials.
+      serial: deviceInfo && typeof deviceInfo.serial === 'string' ? deviceInfo.serial : undefined,
       log: (line) => {
         if (!event.sender.isDestroyed()) {
           event.sender.send('upload-progress', line);

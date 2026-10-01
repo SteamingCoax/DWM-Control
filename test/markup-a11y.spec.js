@@ -395,3 +395,12 @@ test('styles.css accessibility classes exist', async (t) => {
     assert.ok(css.includes('.meter-card.a11y-focused'), 'meter-card.a11y-focused rule exists');
   });
 });
+
+test.describe('meter card Config button sizing', () => {
+  test.it('inherits .btn-small sizing (no font-size or padding override on .meter-settings-btn)', () => {
+    const css = fs.readFileSync(path.resolve(__dirname, '..', 'styles-control.css'), 'utf8');
+    const rule = css.match(/\.meter-settings-btn\s*\{([^}]*)\}/);
+    assert.ok(rule, '.meter-settings-btn rule exists');
+    assert.doesNotMatch(rule[1], /font-size|padding/);
+  });
+});

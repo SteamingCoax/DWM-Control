@@ -1962,9 +1962,7 @@
 }
 
 .meter-settings-btn {
-    padding: 3px 8px !important;
-    font-size: 15px !important;
-    line-height: 1 !important;
+    /* Reads "Config" now; inherit .btn-small sizing so it matches its neighbours. */
     min-width: 0;
 }
 

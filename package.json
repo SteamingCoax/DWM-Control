@@ -260,7 +260,7 @@
     "electron-rebuild": "^3.2.9"
   },
   "dependencies": {
-    "dwm-core": "git+https://github.com/SteamingCoax/dwm-core.git#4fdfc64ffed9efed2c66d371d1765d4528a22f1f",
+    "dwm-core": "github:SteamingCoax/dwm-core#4806bc5bcd3d914574051b6d51ad1075c716e9a8",
     "electron-squirrel-startup": "^1.0.1",
     "electron-updater": "^6.6.2",
     "serialport": "^12.0.0",
