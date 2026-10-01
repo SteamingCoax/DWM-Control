@@ -55,6 +55,7 @@ Module responsibilities:
 
 - `extensions.js`: auto-updater UI, `loadConfig`/`saveConfig` (persisted in `localStorage` under `dwm-control-config`), output log, native menu wiring.
 - `settings.js`: Settings dialog (four tabs: General/Control/Accessibility/Updates), open/close logic, rendering and binding of all settings panels; `openSettings(tab)`.
+- `demo.js`: demo mode (`config.demoMode`): two simulated meters (`demo:steady`, `demo:voice`) that live in `meterRegistry` with `isDemo: true`, answer the v2 command set in-process from `sendApiCommand`, and are skipped by discovery removal; `connectMeter`/`disconnectMeter` are wrapped here.
 - `accessibility.js`: live-region announcer, spoken readouts (Web Speech), tuning tone (Web Audio), focused-meter shortcuts and the Accessibility settings group (rendered inside the Settings dialog).
 - `control.js`: per-meter state factory (`createMeterState`) and meter card rendering/layouts.
 - `control-api.js`: serial line parsing, request/response correlation, `sendApiCommand`.
