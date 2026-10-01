@@ -215,6 +215,14 @@ test('renderMeterCard accessibility', async (t) => {
     assert.ok(srHist, `#meter-${sid}-history-sr exists`);
   });
 
+  await t.test('meter configuration toggle reads "Config" with a descriptive name', () => {
+    const btn = extractTags(html, 'button').find(b => b.attrs['data-meter-action'] === 'toggle-cfg');
+    assert.ok(btn, 'toggle-cfg button exists');
+    assert.strictEqual(stripTags(btn.inner).trim(), 'Config');
+    assert.strictEqual(btn.attrs['aria-label'], 'Meter configuration');
+    assert.strictEqual(btn.attrs['aria-expanded'], 'false');
+  });
+
   await t.test('all buttons have visible text or aria-label', () => {
     const buttons = extractTags(html, 'button');
     buttons.forEach(btn => {

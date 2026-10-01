@@ -108,7 +108,7 @@ if (app.isPackaged && process.env.NODE_ENV !== 'development') {
 }
 
 // Auto-updater event handlers
-// Update channel preference (null = automatic, follows the installed version).
+// Update channel preference (null = stable only; betas require an explicit opt-in).
 let updateChannel = null;
 function applyUpdateChannel(channel) {
   updateChannel = normalizeUpdateChannel(channel);
@@ -118,6 +118,10 @@ function applyUpdateChannel(channel) {
     console.warn('Could not apply update channel:', err?.message || err);
   }
 }
+// electron-updater defaults allowPrerelease to true on a pre-release install; apply the
+// stable-only default now so a check that runs before the renderer pushes its saved
+// preference never offers a beta.
+applyUpdateChannel(null);
 
 autoUpdater.on('checking-for-update', () => {
   console.log('Checking for update...');
@@ -396,6 +400,12 @@ function buildAppMenu() {
         {
           label: 'Lock Workspace',
           click() { sendToFocusedWindow('menu-sv-lock'); },
+        },
+        { type: 'separator' },
+        {
+          label: 'Add SWR / Return Loss Card',
+          accelerator: 'CmdOrCtrl+Shift+W',
+          click() { sendToFocusedWindow('menu-add-swr-card'); },
         },
       ],
     },

@@ -40,12 +40,12 @@ describe('resolveAllowPrerelease', () => {
     assert.equal(resolveAllowPrerelease('stable', '1.4.0-beta.3'), false);
     assert.equal(resolveAllowPrerelease('stable', '1.4.0'), false);
   });
-  it('auto follows the current version', () => {
-    assert.equal(resolveAllowPrerelease(null, '1.4.0-beta.3'), true);
+  it('unset means stable only, even on a pre-release install', () => {
+    assert.equal(resolveAllowPrerelease(null, '1.4.0-beta.3'), false);
     assert.equal(resolveAllowPrerelease(null, '1.4.0'), false);
     assert.equal(resolveAllowPrerelease(undefined, undefined), false);
   });
-  it('unknown channel is treated as auto', () => {
-    assert.equal(resolveAllowPrerelease('nightly', '1.4.0-beta.1'), true);
+  it('unknown channel is treated as unset (stable only)', () => {
+    assert.equal(resolveAllowPrerelease('nightly', '1.4.0-beta.1'), false);
   });
 });

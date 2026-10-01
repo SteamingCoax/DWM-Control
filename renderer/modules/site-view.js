@@ -57,6 +57,9 @@
         this._svSetupEvents();
         this._svStartPowerUpdates();
         this._svUpdateWsNameDisplay();
+        // Nothing is selected yet, so this fills the pane with Workspace Settings; it is
+        // otherwise only rendered on selection changes and would start out empty.
+        this._svRenderProperties();
     };
 
     // ─── Sidebar palette ─────────────────────────────────────────────────────
@@ -1838,7 +1841,7 @@
 <div class="sv-props-title">Data Logging</div>
 <div class="sv-props-field">
     <label class="sv-props-label">Logging Rate</label>
-    <div class="sv-props-info">${this.config?.globalSampleIntervalMs || 80} ms <span class="sv-props-hint-inline">(set in Control tab)</span></div>
+    <div class="sv-props-info">${this.config?.globalSampleIntervalMs || 80} ms <span class="sv-props-hint-inline">(set in Settings › Control)</span></div>
 </div>
 <div class="sv-props-field sv-log-dir-field">
     <label class="sv-props-label">Save Folder</label>

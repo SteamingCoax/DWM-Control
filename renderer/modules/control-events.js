@@ -665,20 +665,12 @@
             const result = await window.electronAPI.openSerialPort(record.portPath, 115200);
             if (result.success) {
                 if (!record.state) {
-                    record.state = this.createMeterState();
-                    const prefs = this.config?.meterCards?.[key] || {};
-                    if (prefs.viewMode === 'meters' || prefs.viewMode === 'history') {
-                        record.state.viewMode = prefs.viewMode;
-                    }
-                    if (typeof prefs.cardLayout === 'string' && prefs.cardLayout) {
-                        record.state.cardLayout = prefs.cardLayout;
-                    }
-                    if (Number.isFinite(prefs.historyWindowMs) && prefs.historyWindowMs > 0) {
-                        record.state.historyWindowMs = prefs.historyWindowMs;
-                    }
-                    if (Array.isArray(prefs.historyLines) && prefs.historyLines.length > 0) {
-                        record.state.historyLines = [...prefs.historyLines];
-                    }
+                    record.state = this._seedMeterStateFromPrefs(key, this.createMeterState());
+                    // The card may have been rendered before this record had state, when
+                    // _setMeterCardLayout could not run; apply the layout now.
+                    const layout = this._resolveMeterCardLayout(record);
+                    record.state.cardLayout = layout;
+                    if (layout !== 'dual') this._setMeterCardLayout(key, layout);
                 }
                 record.connectionState = 'connected';
                 record.lastSeenAt = Date.now();

@@ -37,15 +37,17 @@ Supported platforms:
 
 ### Settings
 The Settings dialog provides centralized configuration across four tabs:
-- **General**: Theme (Dark, Light, Ocean, Carbon, Amber)
-- **Control**: Refresh rate, board layout, serial debug logging, auto-start polling on connect
+- **General**: Theme (Dark, Light, Ocean, Carbon, Amber), demo mode (two simulated meters, off by default)
+- **Control**: Refresh rate, board layout, serial debug logging, auto-start polling on connect, and an "Add SWR / Return Loss Card" button
 - **Accessibility**: Spoken readouts, tuning tone, announcements, keyboard shortcuts
 - **Updates**: Version info, "Accept beta (pre-release) updates" checkbox, manual update check
 
-Open Settings from: the gear button in the title bar, the keyboard shortcut (Ctrl+, on Windows/Linux; Cmd+, on macOS), or the "Settings…" button above the meter board. Press Escape to close and return focus.
+Open Settings from the gear button in the title bar or the keyboard shortcut (Ctrl+, on Windows/Linux; Cmd+, on macOS). Press Escape to close and return focus.
+
+An SWR / Return Loss card can also be added from **Edit > Add SWR / Return Loss Card** (Ctrl+Shift+W on Windows/Linux; Cmd+Shift+W on macOS).
 
 ### Beta Updates
-The Updates tab includes a checkbox to control whether the app offers beta (pre-release) versions. With "Accept beta updates" checked, the app offers pre-release versions as they are published. Unchecked, it ignores any newer beta and only installs stable releases. Until you adjust this setting, the checkbox reflects automatic behaviour: checked if the running version carries a pre-release suffix, otherwise unchecked.
+The Updates tab includes a checkbox to control whether the app offers beta (pre-release) versions. With "Accept beta updates" checked, the app offers pre-release versions as they are published. Unchecked, it ignores any newer beta and only installs stable releases. The box is off by default, so the app offers only stable releases until you tick it; this applies even when the installed version is itself a beta.
 
 ### Accessibility
 - **Screen readers**: NVDA on Windows, VoiceOver on macOS, and Orca on Linux all work without any configuration. The tab strip is a real tab list (use arrow keys to move between tabs). Each meter card is a named region, so NVDA users can press `D` to jump between meters. Each gauge exposes its current reading as text, the output console and upload log are live regions, and connection, range, firmware-upload and De-Embed results are announced automatically.

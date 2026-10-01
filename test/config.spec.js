@@ -84,6 +84,7 @@ describe('loadConfig / saveConfig round trip', () => {
       usbApiAcceptLegacyV1: false,
       globalDebugLoggingEnabled: true,
       updateChannel: 'beta',
+      demoMode: true,
       deembedPowerUnit: 'dBm',
       deembedVoltageMode: 'auto',
       deembedPowerRating: 100,
@@ -404,7 +405,7 @@ describe('accessibility config', () => {
 });
 
 describe('updateChannel preference', () => {
-  it('defaults to null (automatic)', () => {
+  it('defaults to null (stable only)', () => {
     assert.equal(ctl.loadConfig().updateChannel, null);
   });
 
@@ -435,11 +436,25 @@ describe('updateChannel preference', () => {
 
   it('isBetaUpdatesEnabled resolves effective state', () => {
     ctl.config = { updateChannel: null };
-    assert.equal(ctl.isBetaUpdatesEnabled('1.4.0-beta.3'), true);
+    assert.equal(ctl.isBetaUpdatesEnabled('1.4.0-beta.3'), false);
     assert.equal(ctl.isBetaUpdatesEnabled('1.4.0'), false);
     ctl.config = { updateChannel: 'beta' };
     assert.equal(ctl.isBetaUpdatesEnabled('1.4.0'), true);
     ctl.config = { updateChannel: 'stable' };
     assert.equal(ctl.isBetaUpdatesEnabled('1.4.0-beta.3'), false);
+  });
+});
+
+describe('demoMode preference', () => {
+  it('defaults to false', () => {
+    assert.equal(ctl.loadConfig().demoMode, false);
+  });
+
+  it('normalizes stored values to a boolean', () => {
+    const cases = [[true, true], [false, false], ['yes', false], [1, false], [null, false], [undefined, false]];
+    for (const [stored, expected] of cases) {
+      globalThis.localStorage.setItem(MAIN_KEY, JSON.stringify({ layoutVersion: 2, demoMode: stored }));
+      assert.equal(ctl.loadConfig().demoMode, expected, String(stored));
+    }
   });
 });

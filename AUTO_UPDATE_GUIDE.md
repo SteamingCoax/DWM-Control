@@ -77,7 +77,7 @@ Once the release is published:
 Users can manually check for updates by clicking the 🔍 button in the header, next to the theme toggle.
 
 ## Pre-release Updates
-The Updates tab in the Settings dialog includes a checkbox to control whether the app accepts pre-release (beta) versions. By default, the checkbox reflects automatic behaviour: checked when the running version has a pre-release suffix, otherwise unchecked. Users can explicitly toggle "Accept beta updates" to enable or disable pre-release updates independent of the version they are running. When unchecked, the app will ignore any newer beta release and only install stable versions. This maps internally to the `allowPrerelease` setting used by electron-updater.
+The Updates tab in the Settings dialog includes a checkbox to control whether the app accepts pre-release (beta) versions. The checkbox is off by default, so the app accepts only stable releases until the user ticks "Accept beta updates"; this holds even when the installed version is itself a beta, so a beta tester must tick the box to keep receiving betas. When unchecked, the app will ignore any newer beta release and only install stable versions. This maps internally to the `allowPrerelease` setting used by electron-updater.
 
 ## Troubleshooting
 
