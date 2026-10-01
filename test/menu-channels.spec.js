@@ -34,7 +34,7 @@ const rendererFiles = [path.join(root, 'renderer.js'), ...walk(path.join(root, '
 const RENDERER_LISTENED = new Set();
 for (const f of rendererFiles) {
   const src = fs.readFileSync(f, 'utf8');
-  for (const m of src.matchAll(/\b(?:onMenuAction|on)\(\s*'(menu-[a-z0-9-]+)'/g)) RENDERER_LISTENED.add(m[1]);
+  for (const m of src.matchAll(/\b(?:onMenuAction|on)(?:\?\.)?\(\s*'(menu-[a-z0-9-]+)'/g)) RENDERER_LISTENED.add(m[1]);
 }
 
 const A11Y = [
@@ -77,4 +77,22 @@ test('Accessibility submenu has every accelerator', () => {
   for (const acc of ACCELERATORS) {
     assert.ok(block.includes(acc), `accelerator ${acc} missing`);
   }
+});
+
+test('Edit menu has "Add SWR / Return Loss Card" on CmdOrCtrl+Shift+W', () => {
+  const start = mainSrc.indexOf("label: 'Edit'");
+  assert.ok(start >= 0, 'Edit menu not found');
+  const end = mainSrc.indexOf("label: 'View'", start);
+  const block = mainSrc.slice(start, end);
+  assert.ok(block.includes("label: 'Add SWR / Return Loss Card'"));
+  assert.ok(block.includes("accelerator: 'CmdOrCtrl+Shift+W'"));
+  assert.ok(block.includes("'menu-add-swr-card'"));
+  assert.ok(MENU_CHANNELS.includes('menu-add-swr-card'));
+  assert.ok(ALLOWED_CHANNELS.includes('menu-add-swr-card'));
+  assert.ok(RENDERER_LISTENED.has('menu-add-swr-card'), 'renderer registers the channel');
+});
+
+test('CmdOrCtrl+Shift+W is not used by any other menu item', () => {
+  const n = (mainSrc.match(/accelerator: 'CmdOrCtrl\+Shift\+W'/g) || []).length;
+  assert.equal(n, 1);
 });

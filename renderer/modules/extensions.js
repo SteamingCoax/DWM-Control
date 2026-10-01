@@ -13,8 +13,6 @@
         const s = v.trim().toLowerCase();
         return s === 'beta' || s === 'stable' ? s : null;
     };
-    const isPrereleaseVersion = (version) =>
-        typeof version === 'string' && /^v?\d+\.\d+\.\d+-[0-9A-Za-z]/.test(version.trim());
 
     const A11Y_DEFAULTS = Object.freeze({
         speechEnabled: false,
@@ -879,6 +877,7 @@
             swrCards,
             accessibility: this.normalizeAccessibility(cfg.accessibility),
             updateChannel: normalizeUpdateChannel(cfg.updateChannel),
+            demoMode: cfg.demoMode === true,
         };
     };
 
@@ -898,10 +897,10 @@
     };
 
     DWMControl.prototype.isBetaUpdatesEnabled = function isBetaUpdatesEnabled(currentVersion) {
-        const channel = normalizeUpdateChannel(this.config?.updateChannel);
-        if (channel === 'beta') return true;
-        if (channel === 'stable') return false;
-        return isPrereleaseVersion(currentVersion);
+        // Opt-in only: unset means stable, even on a pre-release install.
+        // currentVersion is kept for call-site compatibility.
+        void currentVersion;
+        return normalizeUpdateChannel(this.config?.updateChannel) === 'beta';
     };
 
     DWMControl.prototype.loadConfig = function loadConfig() {
@@ -925,6 +924,7 @@
             deembedPowerRating: null,
             accessibility: { ...A11Y_DEFAULTS },
             updateChannel: null,
+            demoMode: false,
         };
 
         try {

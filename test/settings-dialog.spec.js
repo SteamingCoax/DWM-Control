@@ -95,6 +95,11 @@ describe('_renderSettingsPanel', () => {
       assert.ok(fors.includes(id), `label for #${id}`);
     }
     assert.equal(findById(out, 'global-auto-start-polling').attrs.checked, undefined);
+    const swrBtn = findById(out, 'add-swr-card-btn');
+    assert.ok(swrBtn, '#add-swr-card-btn in the Control panel');
+    assert.equal(swrBtn.tag.toLowerCase(), 'button');
+    assert.match(out, /Cards/);
+    assert.ok(out.indexOf('add-swr-card-btn') > out.indexOf('global-debug-logging'), 'Cards section is at the bottom');
     const on = makeControlStub({ config: {} })._renderSettingsPanel('control');
     assert.ok('checked' in findById(on, 'global-auto-start-polling').attrs, 'auto-start defaults on');
   });
@@ -109,6 +114,21 @@ describe('_renderSettingsPanel', () => {
     assert.deepEqual(opts.filter(o => 'selected' in o.attrs).map(o => o.attrs.value), ['ocean']);
     const def = extractTags(makeControlStub({ config: {} })._renderSettingsPanel('general'), 'option');
     assert.deepEqual(def.filter(o => 'selected' in o.attrs).map(o => o.attrs.value), ['carbon']);
+  });
+
+  it('general panel has the demo mode checkbox, off by default, with help text', () => {
+    const out = makeControlStub({ config: {} })._renderSettingsPanel('general');
+    const box = findById(out, 'general-demo-mode');
+    assert.ok(box);
+    assert.equal(box.attrs.type, 'checkbox');
+    assert.equal(box.attrs.checked, undefined);
+    assert.ok(labelFors(out).includes('general-demo-mode'));
+    assert.match(out, /Demo mode \(two simulated meters\)/);
+    assert.match(out, /Shows a steady meter and a voice-like meter without hardware\. Off by default\./);
+    const help = findById(out, box.attrs['aria-describedby']);
+    assert.ok(help, 'aria-describedby resolves to the help text');
+    const on = makeControlStub({ config: { demoMode: true } })._renderSettingsPanel('general');
+    assert.ok('checked' in findById(on, 'general-demo-mode').attrs);
   });
 
   it('accessibility panel reuses the a11y settings group', () => {
@@ -336,6 +356,48 @@ describe('_bindSettingsPanel', () => {
     assert.equal(saves, 2);
   });
 
+  it('control: add SWR card button adds a card and closes the dialog', () => {
+    const btn = inputWithHandlers('button');
+    globalThis.document.getElementById = (id) => (id === 'add-swr-card-btn' ? btn : null);
+    const calls = [];
+    const ctl = makeControlStub({ config: {} });
+    ctl.addSwrCard = () => calls.push('add');
+    ctl.closeSettings = () => calls.push('close');
+    ctl._bindSettingsPanel('control');
+    btn.handlers.click();
+    assert.deepEqual(calls, ['add', 'close']);
+  });
+
+  it('general: demo mode checkbox persists and calls setDemoMode', () => {
+    const box = inputWithHandlers();
+    globalThis.document.getElementById = (id) => (id === 'general-demo-mode' ? box : null);
+    let saves = 0;
+    const demo = [];
+    const ctl = makeControlStub({ config: {} });
+    ctl.saveConfig = () => { saves += 1; };
+    ctl.setDemoMode = (on) => demo.push(on);
+    ctl._bindSettingsPanel('general');
+    box.checked = true;
+    box.handlers.change();
+    assert.equal(ctl.config.demoMode, true);
+    box.checked = false;
+    box.handlers.change();
+    assert.equal(ctl.config.demoMode, false);
+    assert.equal(saves, 2);
+    assert.deepEqual(demo, [true, false]);
+  });
+
+  it('general: demo mode checkbox tolerates a missing setDemoMode', () => {
+    const box = inputWithHandlers();
+    globalThis.document.getElementById = (id) => (id === 'general-demo-mode' ? box : null);
+    const ctl = makeControlStub({ config: {} });
+    ctl.setDemoMode = undefined;
+    ctl._bindSettingsPanel('general');
+    box.checked = true;
+    assert.doesNotThrow(() => box.handlers.change());
+    assert.equal(ctl.config.demoMode, true);
+  });
+
   it('control: debug logging and board layout still bind', () => {
     const dbg = inputWithHandlers();
     const layout = inputWithHandlers('select');
@@ -374,6 +436,11 @@ describe('setupSettingsDialog', () => {
     assert.ok(findById(els['settings-panel-accessibility'].innerHTML, 'a11y-settings'));
     assert.ok(findById(els['settings-panel-updates'].innerHTML, 'update-channel-beta'));
     assert.equal(typeof menu['menu-settings-open'], 'function');
+    assert.equal(typeof menu['menu-add-swr-card'], 'function');
+    let added = 0;
+    ctl.addSwrCard = () => { added += 1; };
+    menu['menu-add-swr-card']();
+    assert.equal(added, 1);
     menu['menu-settings-open']();
     assert.deepEqual(dialog.calls, ['showModal']);
     close.handlers.click();
@@ -390,7 +457,7 @@ describe('setupSettingsDialog', () => {
 });
 
 describe('renderDeviceControlUI', () => {
-  it('renders the board with a toolbar and no side panel', () => {
+  it('renders the board with no toolbar, no settings button and no side panel', () => {
     const panel = makeElement('section');
     globalThis.document.getElementById = (id) => (id === 'control-panel' ? panel : null);
     const ctl = makeControlStub({ config: {} });
@@ -399,9 +466,12 @@ describe('renderDeviceControlUI', () => {
     ctl._repaintAllCanvases = () => {};
     ctl.renderDeviceControlUI();
     const out = panel.innerHTML;
-    assert.ok(findById(out, 'add-swr-card-btn'));
-    assert.ok(findById(out, 'open-settings-btn'));
+    assert.equal(findById(out, 'add-swr-card-btn'), null, 'SWR button moved to Settings and the Edit menu');
+    assert.equal(findById(out, 'open-settings-btn'), null);
+    assert.equal(/meter-board-toolbar/.test(out), false);
     assert.ok(findById(out, 'meter-board'));
+    assert.match(out, /Edit menu/);
+    assert.match(out, /Settings/);
     assert.equal(/meter-settings-panel|meter-settings-rail|global-timing-ms/.test(out), false);
   });
 });

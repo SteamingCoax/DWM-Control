@@ -529,13 +529,9 @@
             case 'sys-rst':  this.systemReset(key); break;
             case 'sys-dfu':  this.systemDfu(key); break;
             case 'check-updates': this.checkFirmwareUpdate(key); break;
+            case 'run-fw-update': this.runInlineFirmwareUpdate(key); break;
             case 'enter-dfu-from-update': this.enterDfuForUpdate(key); break;
-            case 'dismiss-fw-notice': {
-                const sid = this.meterSafeId(key);
-                const noticeEl = document.getElementById(`meter-${sid}-fw-update-notice`);
-                if (noticeEl) noticeEl.style.display = 'none';
-                break;
-            }
+            case 'dismiss-fw-notice': this.dismissFirmwareNotice(key); break;
             case 'debug-clear': this.clearMeterDebug(key); break;
             case 'cfg-bright': this.setCfgValue(key, 'bright', `meter-${this.meterSafeId(key)}-cfg-bright`); break;
             case 'cfg-elem':  this.setCfgValue(key, 'elem',  `meter-${this.meterSafeId(key)}-cfg-elem`);  break;
@@ -657,6 +653,10 @@
     DWMControl.prototype.connectMeter = async function(key, options = {}) {
         const record = this.meterRegistry.get(key);
         if (!record) return;
+        if (record.connectionState === 'updating') {
+            if (!options.autoConnect) this.setMeterStatus(key, 'Firmware update in progress. The meter reconnects after it is power-cycled.', 'warning');
+            return;
+        }
 
         // Don't auto-connect a device that failed the API probe — require manual retry
         if (options.autoConnect && record.connectionState === 'not-configured') return;
@@ -665,20 +665,12 @@
             const result = await window.electronAPI.openSerialPort(record.portPath, 115200);
             if (result.success) {
                 if (!record.state) {
-                    record.state = this.createMeterState();
-                    const prefs = this.config?.meterCards?.[key] || {};
-                    if (prefs.viewMode === 'meters' || prefs.viewMode === 'history') {
-                        record.state.viewMode = prefs.viewMode;
-                    }
-                    if (typeof prefs.cardLayout === 'string' && prefs.cardLayout) {
-                        record.state.cardLayout = prefs.cardLayout;
-                    }
-                    if (Number.isFinite(prefs.historyWindowMs) && prefs.historyWindowMs > 0) {
-                        record.state.historyWindowMs = prefs.historyWindowMs;
-                    }
-                    if (Array.isArray(prefs.historyLines) && prefs.historyLines.length > 0) {
-                        record.state.historyLines = [...prefs.historyLines];
-                    }
+                    record.state = this._seedMeterStateFromPrefs(key, this.createMeterState());
+                    // The card may have been rendered before this record had state, when
+                    // _setMeterCardLayout could not run; apply the layout now.
+                    const layout = this._resolveMeterCardLayout(record);
+                    record.state.cardLayout = layout;
+                    if (layout !== 'dual') this._setMeterCardLayout(key, layout);
                 }
                 record.connectionState = 'connected';
                 record.lastSeenAt = Date.now();
@@ -716,6 +708,7 @@
                 this.appendOutput(`Connected to ${record.portPath}`);
                 this.announce(`Connected to ${record.friendlyName || 'DWM V2'}`);
                 this.updateMeterCardUI(key);
+                if (typeof this._fwOnReconnected === 'function') this._fwOnReconnected(key);
                 this._autoQueryMeterOnConnect(key);
                 // Start live polling immediately after connect unless globally disabled.
                 if (this.config.globalAutoStartPolling !== false) {
@@ -736,6 +729,10 @@
     DWMControl.prototype.disconnectMeter = async function(key) {
         const record = this.meterRegistry.get(key);
         if (!record) return;
+        if (record.connectionState === 'updating') {
+            this.setMeterStatus(key, 'Firmware update in progress. Wait for it to finish.', 'warning');
+            return;
+        }
 
         this.stopMeterMonitoring(key, true);
 
@@ -772,11 +769,17 @@
         // Combined connect/disconnect button
         const connectBtn = document.getElementById(`meter-${sid}-connect-btn`);
         const connState = record.connectionState || 'available';
-        const connBtnText = isConn ? 'Connected' : (connState === 'disconnected' ? 'Disconnected' : (connState === 'not-configured' ? 'Not Configured' : 'Available'));
+        const isUpdating = connState === 'updating';
+        const connBtnText = isConn ? 'Connected'
+            : connState === 'disconnected' ? 'Disconnected'
+            : connState === 'not-configured' ? 'Not Configured'
+            : isUpdating ? 'Updating…'
+            : 'Available';
         if (connectBtn) {
             connectBtn.className = `btn btn-small meter-connect-btn meter-connect-btn-${connState}`;
             connectBtn.dataset.meterAction = isConn ? 'disconnect' : 'connect';
             connectBtn.textContent = connBtnText;
+            connectBtn.disabled = isUpdating;
         }
 
         // Badge
@@ -819,8 +822,9 @@
                 'refresh-power-info','read-metric','refresh-snapshot',
                 'start-monitor','send-raw',
                 'cfg-bright','cfg-elem','cfg-eval','cfg-etype','cfg-range','cfg-avgw',
-                'sys-save','sys-rst','sys-dfu','identify-meter','check-updates','enter-dfu-from-update',
+                'sys-save','sys-rst','sys-dfu','identify-meter','enter-dfu-from-update',
             ];
+            // check-updates / run-fw-update share one button; _fwSyncButton (below) owns its state.
             detailDependent.forEach(action => {
                 cardEl.querySelectorAll(`[data-meter-action="${action}"]`).forEach(b => { b.disabled = !isConn; });
             });
@@ -830,8 +834,12 @@
                 .forEach(b => { b.disabled = !isConn || isIdentifying; });
         }
 
+        if (typeof this._fwSyncButton === 'function') this._fwSyncButton(key);
+
         // Status banner
-        if (!isConn) {
+        if (isUpdating) {
+            this.setMeterStatus(key, 'Firmware update in progress. Do not unplug the meter.', 'active');
+        } else if (!isConn) {
             if (record.connectionState === 'not-configured') {
                 this.setMeterStatus(key, 'Device is connected via USB but did not respond to the API. Enable API mode on the device, then click Not Configured to retry.', 'warning');
             } else {

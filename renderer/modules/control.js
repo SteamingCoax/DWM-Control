@@ -44,8 +44,33 @@
             cfgDraftEval: null,
             cfgDraftEtype: null,
             gaugeAnim: null,
-            cardLayout: 'dual',
+            // null = not chosen this session; _resolveMeterCardLayout falls back to the
+            // saved pref, then 'dual'. A 'dual' default here used to mask a saved layout.
+            cardLayout: null,
         };
+    };
+
+    const METER_CARD_LAYOUTS = new Set(['dual', 'single-L', 'single-R', 'wide-left', 'wide-right', 'stacked']);
+
+    // Effective card layout: this session's choice (state) -> saved pref -> 'dual'.
+    DWMControl.prototype._resolveMeterCardLayout = function(record) {
+        if (!record) return 'dual';
+        const fromState = record.state?.cardLayout;
+        if (METER_CARD_LAYOUTS.has(fromState)) return fromState;
+        const fromPrefs = this.config?.meterCards?.[record.key]?.cardLayout;
+        if (METER_CARD_LAYOUTS.has(fromPrefs)) return fromPrefs;
+        return 'dual';
+    };
+
+    // Copy saved per-card view prefs onto a (new) meter state object.
+    DWMControl.prototype._seedMeterStateFromPrefs = function(key, state) {
+        if (!state) return state;
+        const prefs = this.config?.meterCards?.[key] || {};
+        if (prefs.viewMode === 'meters' || prefs.viewMode === 'history') state.viewMode = prefs.viewMode;
+        if (METER_CARD_LAYOUTS.has(prefs.cardLayout)) state.cardLayout = prefs.cardLayout;
+        if (Number.isFinite(prefs.historyWindowMs) && prefs.historyWindowMs > 0) state.historyWindowMs = prefs.historyWindowMs;
+        if (Array.isArray(prefs.historyLines) && prefs.historyLines.length > 0) state.historyLines = [...prefs.historyLines];
+        return state;
     };
 
     DWMControl.prototype._renderPollIntervalOptions = function(selectedValue) {
@@ -288,32 +313,21 @@
         const timingMs = this._getGlobalTimingMs();
         const boardLayout = this._getBoardLayout();
         // App-wide settings (refresh rate, layout, logging, accessibility) live in the
-        // Settings dialog (renderer/modules/settings.js).
+        // Settings dialog (renderer/modules/settings.js). "Add SWR / Return Loss Card" is in
+        // the Edit menu (menu-add-swr-card) and in Settings > Control > Cards.
         panel.innerHTML = `
             <div class="meter-page-shell" id="meter-page-shell">
                 <div class="meter-page-main">
-                    <div class="meter-board-toolbar">
-                        <button class="btn btn-secondary btn-small" id="add-swr-card-btn">+ Add SWR / Return Loss Card</button>
-                        <button class="btn btn-secondary btn-small" id="open-settings-btn">Settings…</button>
-                    </div>
                     <div class="meter-board" id="meter-board">
                         <div class="meter-board-empty" id="meter-board-empty">
                             <p>No DWM meters detected.</p>
                             <p class="muted">Connect a DWM V2 via USB — the board will populate automatically.</p>
+                            <p class="muted">To add an SWR / Return Loss card, use the Edit menu or Settings › Control.</p>
                         </div>
                     </div>
                 </div>
             </div>
         `;
-
-        const addSwrBtn = document.getElementById('add-swr-card-btn');
-        if (addSwrBtn) {
-            addSwrBtn.addEventListener('click', () => this.addSwrCard());
-        }
-        const openSettingsBtn = document.getElementById('open-settings-btn');
-        if (openSettingsBtn) {
-            openSettingsBtn.addEventListener('click', () => this.openSettings('control'));
-        }
 
         this._applyGlobalTimingMs(timingMs, { persist: false, restartTimers: false });
         this._applyBoardLayout(boardLayout, false);
@@ -527,8 +541,13 @@
 
             board.insertBefore(cardEl, board.children[index] || null);
 
-            if (created && record.state?.cardLayout && record.state.cardLayout !== 'dual') {
-              this._setMeterCardLayout(record.key, record.state.cardLayout);
+            // Apply the effective layout (state -> saved pref -> dual) once the new card is
+            // in the board. The markup already carries data-layout, and the CSS hides the
+            // unused panel from it, so this also covers a record that has no state yet.
+            if (created) {
+              const layout = this._resolveMeterCardLayout(record);
+              if (record.state && !record.state.cardLayout) record.state.cardLayout = layout;
+              if (layout !== 'dual') this._setMeterCardLayout(record.key, layout);
             }
             return;
           }
@@ -623,7 +642,7 @@
         const histLines = Array.isArray(record.state?.historyLines)
           ? record.state.historyLines
           : (Array.isArray(meterPrefs.historyLines) && meterPrefs.historyLines.length ? meterPrefs.historyLines : ['avg', 'peak']);
-        const cardLayout = record.state?.cardLayout || meterPrefs.cardLayout || 'dual';
+        const cardLayout = this._resolveMeterCardLayout(record);
         const viewMode = record.state?.viewMode || meterPrefs.viewMode || 'meters';
         const HIST_META = [
             { key: 'inst', label: 'INST' },
@@ -643,13 +662,17 @@
     </div>
     <div class="meter-card-header-right">
       <button id="meter-${sid}-connect-btn" class="btn btn-small meter-connect-btn meter-connect-btn-${connState}" data-meter-action="${isConnected ? 'disconnect' : 'connect'}">${badgeText}</button>
-      <button class="btn btn-secondary btn-small" data-meter-action="check-updates" ${!isConnected ? 'disabled' : ''}>Check Updates</button>
+      <button id="meter-${sid}-fw-btn" class="btn btn-secondary btn-small meter-fw-btn" data-meter-action="check-updates" ${!isConnected ? 'disabled' : ''}>Check Updates</button>
       <button class="btn btn-secondary btn-small" data-meter-action="identify-meter" ${!isConnected ? 'disabled' : ''}>Identify</button>
-      <button class="btn btn-secondary btn-small meter-settings-btn" data-meter-action="toggle-cfg" title="Meter settings" aria-label="Meter settings" aria-expanded="false">⚙</button>
+      <button class="btn btn-secondary btn-small meter-settings-btn" data-meter-action="toggle-cfg" title="Meter configuration" aria-label="Meter configuration" aria-expanded="false">Config</button>
     </div>
   </div>
 
   <div id="meter-${sid}-fw-update-notice" class="meter-fw-update-notice" style="display:none"></div>
+  <div class="meter-fw-update-progress-area">
+    <div id="meter-${sid}-fw-progress" class="meter-fw-progress" role="progressbar" aria-label="Firmware update progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><div id="meter-${sid}-fw-progress-fill" class="meter-fw-progress-fill"></div></div>
+    <p id="meter-${sid}-fw-status" class="meter-fw-status" role="status" aria-live="polite" hidden></p>
+  </div>
 
   <div class="meter-live-section" id="meter-${sid}-readings-bar" style="${isConnected ? '' : 'display:none'}">
     <div class="meter-live-toolbar">

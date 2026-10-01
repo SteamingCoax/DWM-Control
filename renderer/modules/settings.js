@@ -1,4 +1,4 @@
-// App-wide Settings dialog: General (theme), Control (polling/board), Accessibility, Updates.
+// App-wide Settings dialog: General (theme, demo mode), Control (polling/board/cards), Accessibility, Updates.
 // The dialog shell and tab strip live in index.html; the panel bodies are rendered here.
 (function() {
   'use strict';
@@ -48,6 +48,7 @@
     }
 
     window.electronAPI?.onMenuAction?.('menu-settings-open', () => this.openSettings());
+    window.electronAPI?.onMenuAction?.('menu-add-swr-card', () => { this.activateTab?.('control'); this.addSwrCard(); });
     if (typeof this.applyUpdateChannel === 'function') this.applyUpdateChannel();
   };
 
@@ -149,6 +150,13 @@
                                 ${THEMES.map(([v, t]) => option(v, t, theme)).join('')}
                             </select>
                         </div>
+                    </div>
+                    <div class="sv-props-section">
+                        <div class="sv-props-title">Demo</div>
+                        <div class="sv-props-field">
+                            <label class="sv-props-label" for="general-demo-mode"><input type="checkbox" id="general-demo-mode" aria-describedby="general-demo-mode-help"${this.config?.demoMode === true ? ' checked' : ''}> Demo mode (two simulated meters)</label>
+                            <p class="settings-help" id="general-demo-mode-help">Shows a steady meter and a voice-like meter without hardware. Off by default.</p>
+                        </div>
                     </div>`;
   };
 
@@ -182,6 +190,12 @@
                         <div class="sv-props-field">
                             <label class="sv-props-label" for="global-debug-logging"><input type="checkbox" id="global-debug-logging"${debugLoggingEnabled ? ' checked' : ''}> Serial debug logging</label>
                         </div>
+                    </div>
+                    <div class="sv-props-section">
+                        <div class="sv-props-title">Cards</div>
+                        <div class="sv-props-field sv-props-field--action">
+                            <button type="button" class="btn btn-secondary btn-small" id="add-swr-card-btn">Add SWR / Return Loss Card</button>
+                        </div>
                     </div>`;
   };
 
@@ -203,11 +217,23 @@
 
   P._bindSettingsPanel = function(key) {
     switch (key) {
-      case 'general': return undefined; // theme select is wired by setupThemeToggle (renderer.js)
+      case 'general': return this._bindSettingsGeneral(); // theme select is wired by setupThemeToggle (renderer.js)
       case 'control': return this._bindSettingsControl();
       case 'accessibility': return this._a11yBindSettingsEvents();
       case 'updates': return this._bindSettingsUpdates();
       default: return undefined;
+    }
+  };
+
+  P._bindSettingsGeneral = function() {
+    const demoBox = document.getElementById('general-demo-mode');
+    if (demoBox) {
+      demoBox.addEventListener('change', () => {
+        const on = Boolean(demoBox.checked);
+        this.config.demoMode = on;
+        this.saveConfig();
+        if (typeof this.setDemoMode === 'function') this.setDemoMode(on);
+      });
     }
   };
 
@@ -259,6 +285,12 @@
         this._applyBoardLayout(boardLayoutSelect.value, true);
       });
     }
+
+    document.getElementById('add-swr-card-btn')?.addEventListener('click', () => {
+      this.activateTab?.('control');
+      this.addSwrCard();
+      this.closeSettings();
+    });
   };
 
   P._bindSettingsUpdates = function() {
@@ -276,8 +308,8 @@
     return this._refreshSettingsUpdates();
   };
 
-  // Version label + beta checkbox. The default channel depends on the running version
-  // (a pre-release build defaults to beta), so this waits for getAppVersion.
+  // Version label + beta checkbox. Betas are opt-in: the box is unchecked unless the
+  // user ticked it, whatever the running version.
   P._refreshSettingsUpdates = async function() {
     let version = '';
     try {

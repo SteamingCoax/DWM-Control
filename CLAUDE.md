@@ -55,6 +55,7 @@ Module responsibilities:
 
 - `extensions.js`: auto-updater UI, `loadConfig`/`saveConfig` (persisted in `localStorage` under `dwm-control-config`), output log, native menu wiring.
 - `settings.js`: Settings dialog (four tabs: General/Control/Accessibility/Updates), open/close logic, rendering and binding of all settings panels; `openSettings(tab)`.
+- `demo.js`: demo mode (`config.demoMode`): two simulated meters (`demo:steady`, `demo:voice`) that live in `meterRegistry` with `isDemo: true`, answer the v2 command set in-process from `sendApiCommand`, and are skipped by discovery removal; `connectMeter`/`disconnectMeter` are wrapped here.
 - `accessibility.js`: live-region announcer, spoken readouts (Web Speech), tuning tone (Web Audio), focused-meter shortcuts and the Accessibility settings group (rendered inside the Settings dialog).
 - `control.js`: per-meter state factory (`createMeterState`) and meter card rendering/layouts.
 - `control-api.js`: serial line parsing, request/response correlation, `sendApiCommand`.
@@ -93,7 +94,7 @@ Update checks are skipped only when `NODE_ENV=development` AND the app is not pa
 - Never commit directly to `main`. Branch per change (`fix/...`, `feat/...`, `chore/...`, `ci/...`), open a PR with `gh pr create`, squash-merge.
 - Commit messages use `type(scope): summary` (`fix:`, `feat:`, `refactor:`, `docs:`, `ci:`, `chore:`). Release notes are generated from them.
 - Test tiers: `npm test` for pure logic; `npm run dev` against a real meter for UI and serial; `npm run build:mac:unsigned` and run the `.app` from `/tmp/dwm-dist` before merging anything that touches packaging, native modules, or DFU.
-- Releases are deliberate: `npm run release:publish -- X.Y.Z` from a clean `main`. Ship a pre-release first (`X.Y.Z-beta.N`), install it, verify it updates to the next beta, then publish the final. electron-updater decides by the version string: apps on a pre-release version accept pre-release updates, apps on a stable version skip any version with a pre-release suffix. Tags with a hyphen are additionally created as GitHub pre-releases so they never become the repo's "Latest" release. There is no rollback, so a bad stable release is fixed by publishing a higher version.
+- Releases are deliberate: `npm run release:publish -- X.Y.Z` from a clean `main`. Ship a pre-release first (`X.Y.Z-beta.N`), install it, verify it updates to the next beta, then publish the final. Pre-releases are only offered to installs that have ticked "Accept beta updates" in Settings › Updates (`updateChannel: 'beta'`, which sets `autoUpdater.allowPrerelease`); every other install, including one running a beta, skips any version with a pre-release suffix. Tags with a hyphen are additionally created as GitHub pre-releases so they never become the repo's "Latest" release. There is no rollback, so a bad stable release is fixed by publishing a higher version.
 - The self-hosted Linux runner only builds Windows and Linux release artifacts and must never be targeted by a workflow that runs on `pull_request`, because a workflow triggered by a fork's pull request would execute that contributor's code on the build machine (`ci.yml` is GitHub-hosted only). Operational details for it live outside the repo in `CLAUDE.local.md`.
 
 ## Things to know before editing

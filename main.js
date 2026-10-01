@@ -108,7 +108,7 @@ if (app.isPackaged && process.env.NODE_ENV !== 'development') {
 }
 
 // Auto-updater event handlers
-// Update channel preference (null = automatic, follows the installed version).
+// Update channel preference (null = stable only; betas require an explicit opt-in).
 let updateChannel = null;
 function applyUpdateChannel(channel) {
   updateChannel = normalizeUpdateChannel(channel);
@@ -118,6 +118,10 @@ function applyUpdateChannel(channel) {
     console.warn('Could not apply update channel:', err?.message || err);
   }
 }
+// electron-updater defaults allowPrerelease to true on a pre-release install; apply the
+// stable-only default now so a check that runs before the renderer pushes its saved
+// preference never offers a beta.
+applyUpdateChannel(null);
 
 autoUpdater.on('checking-for-update', () => {
   console.log('Checking for update...');
@@ -397,6 +401,12 @@ function buildAppMenu() {
           label: 'Lock Workspace',
           click() { sendToFocusedWindow('menu-sv-lock'); },
         },
+        { type: 'separator' },
+        {
+          label: 'Add SWR / Return Loss Card',
+          accelerator: 'CmdOrCtrl+Shift+W',
+          click() { sendToFocusedWindow('menu-add-swr-card'); },
+        },
       ],
     },
 
@@ -614,8 +624,9 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Quit when all windows are closed
 app.on('window-all-closed', () => {
-  // On macOS, apps typically stay active until explicitly quit
-  if (process.platform !== 'darwin') app.quit();
+  // Single-window app: closing the window quits on every platform, including macOS,
+  // so serial ports are released and the dock icon does not linger.
+  app.quit();
 });
 
 // Security: Prevent new window creation
@@ -710,6 +721,8 @@ ipcMain.handle('upload-firmware', async (event, { hexFilePath, deviceInfo }) => 
 
   try {
     const result = await updater.upload(resolvedHex, {
+      // Target the chosen DFU device (dfu-util -S); dwm-core ignores empty/unknown serials.
+      serial: deviceInfo && typeof deviceInfo.serial === 'string' ? deviceInfo.serial : undefined,
       log: (line) => {
         if (!event.sender.isDestroyed()) {
           event.sender.send('upload-progress', line);

@@ -215,6 +215,14 @@ test('renderMeterCard accessibility', async (t) => {
     assert.ok(srHist, `#meter-${sid}-history-sr exists`);
   });
 
+  await t.test('meter configuration toggle reads "Config" with a descriptive name', () => {
+    const btn = extractTags(html, 'button').find(b => b.attrs['data-meter-action'] === 'toggle-cfg');
+    assert.ok(btn, 'toggle-cfg button exists');
+    assert.strictEqual(stripTags(btn.inner).trim(), 'Config');
+    assert.strictEqual(btn.attrs['aria-label'], 'Meter configuration');
+    assert.strictEqual(btn.attrs['aria-expanded'], 'false');
+  });
+
   await t.test('all buttons have visible text or aria-label', () => {
     const buttons = extractTags(html, 'button');
     buttons.forEach(btn => {
@@ -385,5 +393,14 @@ test('styles.css accessibility classes exist', async (t) => {
 
   await t.test('.meter-card.a11y-focused rule is defined', () => {
     assert.ok(css.includes('.meter-card.a11y-focused'), 'meter-card.a11y-focused rule exists');
+  });
+});
+
+test.describe('meter card Config button sizing', () => {
+  test.it('inherits .btn-small sizing (no font-size or padding override on .meter-settings-btn)', () => {
+    const css = fs.readFileSync(path.resolve(__dirname, '..', 'styles-control.css'), 'utf8');
+    const rule = css.match(/\.meter-settings-btn\s*\{([^}]*)\}/);
+    assert.ok(rule, '.meter-settings-btn rule exists');
+    assert.doesNotMatch(rule[1], /font-size|padding/);
   });
 });
