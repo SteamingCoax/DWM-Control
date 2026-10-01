@@ -42,6 +42,19 @@ describe('isMeterPort: positive matches', () => {
     assert.equal(ctl.isMeterPort({ vendorId: '0x0483', productId: '5740' }), true);
   });
 
+  it('matches the ST-assigned PID A59C as well as 5740', () => {
+    assert.equal(ctl.isMeterPort({ vendorId: '0483', productId: 'A59C' }), true);
+    assert.equal(ctl.isMeterPort({ vendorId: '0x0483', productId: '0xa59c' }), true);
+    assert.equal(ctl.isMeterPort({ path: 'COM3', pnpId: 'USB\\VID_0483&PID_A59C\\207733835442' }), true);
+    assert.equal(ctl.isMeterPort({ vendorId: '0483', productId: 'a59d' }), false);
+    assert.equal(ctl.isMeterPort({ vendorId: '1234', productId: 'a59c' }), false);
+  });
+
+  it('matches the Linux pnpId of the COAXON-branded firmware by product string', () => {
+    assert.equal(ctl.isMeterPort({ manufacturer: 'COAXON Systems Inc.', pnpId: 'usb-COAXON_Systems_Inc._DWM_V2_ComPort_207733835442-if00' }), true);
+    assert.equal(ctl.isMeterPort({ manufacturer: 'COAXON Systems Inc.', pnpId: 'usb-COAXON_Systems_Inc._Other_Device_1-if00' }), false);
+  });
+
   it('matches a Windows pnpId carrying VID_0483 and PID_5740 when vendorId/productId are empty', () => {
     assert.equal(ctl.isMeterPort({ path: 'COM3', pnpId: 'USB\\VID_0483&PID_5740\\207733835442' }), true);
     assert.equal(ctl.isMeterPort({ path: 'COM3', pnpId: 'usb\\vid_0483&pid_5740\\207733835442' }), true);

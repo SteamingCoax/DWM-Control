@@ -58,7 +58,9 @@ from source, and `getDfuUtilPath` uses the PATH binary instead of the bundled on
       serial port disappears, Refresh lists it as a DFU device with its serial
       number, "Download Latest Firmware" fetches the `.hex`, Upload reaches 100%
       and ends with "Firmware upload successful."
-- [ ] Power-cycle the meter by hand (required; it does not restart itself).
+- [ ] Do NOT power-cycle: the meter restarts into the new firmware by itself, the
+      card shows "Update complete, waiting for meter to restart…" then "Reconnected"
+      within ~20 s (the power-cycle hint appears only if it times out).
       It reconnects on the same device key, "Check Updates" shows the new version
       as up to date, element rating, range and brightness are unchanged.
 - [ ] The meter's stored name resets to `DWM_V2` after a flash. Rename it from the

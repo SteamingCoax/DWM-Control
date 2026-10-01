@@ -31,7 +31,7 @@ Supported platforms:
   - Select a local HEX file
 - Shows upload progress and output logs
 
-A connected meter can also update itself from its card on the Control tab: **Check Updates** compares the meter's firmware with the latest release, and when a newer one exists the button becomes **Update to vX.Y.Z**. Clicking it downloads the firmware, reboots the meter into DFU mode, waits for the DFU device, uploads, and shows progress in the card. Power-cycle the meter when it finishes; it reconnects on its own. On Windows the DFU device needs the WinUSB driver first (Firmware tab). The Firmware tab remains available for manual control.
+A connected meter can also update itself from its card on the Control tab: **Check Updates** compares the meter's firmware with the latest release, and when a newer one exists the button becomes **Update to vX.Y.Z**. Clicking it downloads the firmware, reboots the meter into DFU mode, waits for the DFU device, uploads, and shows progress in the card. The meter restarts by itself when the upload finishes and the app reconnects to it automatically (if it does not come back within 20 seconds, the app suggests power-cycling it). On Windows the DFU device needs the WinUSB driver first (Firmware tab). The Firmware tab remains available for manual control.
 
 ### Control Tab
 - Device controls are generated dynamically for supported hardware

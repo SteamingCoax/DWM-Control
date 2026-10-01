@@ -207,6 +207,11 @@
                 this.updateProgressBar(100, 'Upload complete!');
                 this._a11yOnDfuResult(true, 'Upload complete!');
                 this.appendSerialMonitor('Firmware upload successful.');
+                // Success includes dfu-util exit code 74 (dwm-core maps it). The meter restarts
+                // by itself; wait for it to re-enumerate and reconnect.
+                const identity = this._dfuMeterIdentity || {};
+                this._dfuMeterIdentity = null;
+                this._fwTabRestartWait = this._fwTabAwaitRestart(identity).catch(() => null);
             } else {
                 this.updateProgressBar(0, 'Upload failed');
                 this._a11yOnDfuResult(false, result && result.error ? result.error : 'Unknown error');

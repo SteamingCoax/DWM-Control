@@ -278,6 +278,11 @@
     const FW_RUNNING_STAGES = new Set(['downloading', 'entering-dfu', 'waiting-dfu', 'uploading']);
     // How long a done/error record is kept after its serial port vanished (meter in DFU mode).
     const FW_HOLD_MS = 10 * 60 * 1000;
+    // How long to wait for the meter to restart by itself and re-enumerate after a flash.
+    const FW_RESTART_TIMEOUT_MS = 20000;
+    const FW_RESTART_POLL_MS = 1000;
+    const FW_RESTARTING_MESSAGE = 'Update complete, waiting for meter to restart…';
+    const FW_RESTART_TIMEOUT_MESSAGE = 'The meter did not come back within 20 seconds. If it does not reappear, power-cycle it (unplug and reconnect, or switch it off and on).';
     const FW_NO_DFU_MESSAGE = 'No DFU device found. Check the USB cable, or install the WinUSB driver on Windows (Firmware tab).';
 
     DWMControl.prototype._fwCompareVersions = function(deviceFver, latestTag) {
@@ -386,7 +391,7 @@
     <span class="meter-fw-update-text">Firmware update available &mdash; <strong>Latest: v${fw.version}</strong> &nbsp;(installed: v${fw.deviceVersion || '?'})</span>
     <button class="btn btn-icon meter-fw-dismiss-btn" data-meter-action="dismiss-fw-notice" title="Dismiss" aria-label="Dismiss firmware update notice">&times;</button>
   </div>
-  <p class="meter-fw-update-note">&#x26A0; After the update, power-cycle the meter (unplug and reconnect, or switch it off and on). Click <strong>Update to v${fw.version}</strong> above to start.</p>
+  <p class="meter-fw-update-note">Click <strong>Update to v${fw.version}</strong> above to start. The meter restarts by itself when the update finishes and reconnects automatically.</p>
   <div class="meter-fw-update-actions">
     <button class="btn btn-link btn-small meter-fw-manual-link" data-meter-action="enter-dfu-from-update">Use the Firmware tab instead</button>
   </div>
@@ -668,7 +673,11 @@
                 this._fwFinish(key, false, `Firmware upload failed: ${(result && result.error) || 'dfu-util reported an error'}`);
                 return;
             }
-            this._fwFinish(key, true, `Firmware v${version} uploaded. Power-cycle the meter now (unplug and reconnect, or switch it off and on); it will reconnect automatically.`);
+            // dwm-core already maps dfu-util exit code 74 (device detached at the :leave step) to
+            // success, so result.success is true here for that case too.
+            this._fwFinish(key, true, FW_RESTARTING_MESSAGE);
+            // Deliberately not awaited: the card shows progress while the meter restarts.
+            fw.restartWait = this._fwAwaitRestart(key);
         } catch (err) {
             this._fwFinish(key, false, `Firmware update failed: ${err.message}`);
         }
@@ -689,9 +698,109 @@
         fw.stage = 'done';
         fw.pct = 100;
         this._fwProgress(key, 100);
-        this._fwStatus(key, `Firmware v${fw.version} uploaded (demo, simulated). A real meter would now need a power cycle.`, 'success');
+        this._fwStatus(key, `Firmware v${fw.version} uploaded (demo, simulated).`, 'success');
         if (typeof this._a11yOnDfuResult === 'function') this._a11yOnDfuResult(true, '');
         this._fwSyncButton(key);
+    };
+
+    // Looks for the meter that was just flashed. Returns its (connected) record, or null.
+    // Identity: the USB serial number it had before the update, then its device key, then,
+    // when neither is known to differ, the only unclaimed DWM port present. Reuses the
+    // normal discovery path (scanAndSyncMeters) to create/refresh the record and connect.
+    DWMControl.prototype._fwFindReturnedMeter = async function(identity = {}) {
+        const sameSerial = (a, b) => Boolean(a && b) && String(a).toLowerCase() === String(b).toLowerCase();
+        const matches = (rec) => Boolean(rec) && !rec.isDemo && (
+            (identity.key && rec.key === identity.key) || sameSerial(identity.serialNumber, rec.serialNumber));
+        const connectedMatch = () => {
+            for (const rec of this.meterRegistry.values()) {
+                if (rec.connectionState === 'connected' && matches(rec)) return rec;
+            }
+            return null;
+        };
+
+        const already = connectedMatch();
+        if (already) return already;
+
+        let ports = [];
+        try {
+            const result = await window.electronAPI.getSerialPorts();
+            if (result && result.success) ports = (result.ports || []).filter((p) => this.isMeterPort(p));
+        } catch (_) { return null; }
+        if (ports.length === 0) return null;
+
+        const claimed = new Set();
+        for (const rec of this.meterRegistry.values()) {
+            if (rec.connectionState === 'connected' && !matches(rec)) claimed.add(rec.portPath);
+        }
+        const candidates = ports.filter((p) => !claimed.has(p.path));
+        let port = candidates.find((p) => sameSerial(identity.serialNumber, p.serialNumber)) || null;
+        if (!port && identity.key) port = candidates.find((p) => this.buildMeterKey(p) === identity.key) || null;
+        if (!port && candidates.length === 1) {
+            const only = candidates[0];
+            const differs = identity.serialNumber && only.serialNumber && !sameSerial(identity.serialNumber, only.serialNumber);
+            if (!differs) port = only;
+        }
+        if (!port) return null;
+
+        await this.scanAndSyncMeters();
+        return connectedMatch()
+            || [...this.meterRegistry.values()].find((rec) => rec.connectionState === 'connected' && rec.portPath === port.path)
+            || null;
+    };
+
+    DWMControl.prototype._fwWaitForMeterReturn = async function(identity, timeoutMs = FW_RESTART_TIMEOUT_MS, intervalMs = FW_RESTART_POLL_MS) {
+        for (let elapsed = 0; ; elapsed += intervalMs) {
+            const found = await this._fwFindReturnedMeter(identity);
+            if (found) return found;
+            if (elapsed + intervalMs > timeoutMs) return null;
+            await this._fwSleep(intervalMs);
+        }
+    };
+
+    // In-card flow: after a successful flash, wait for the meter to restart on its own and
+    // reconnect. connectMeter -> _fwOnReconnected shows "Reconnected"; this method handles
+    // the timeout and a changed device key (Linux paths can change across re-enumeration).
+    DWMControl.prototype._fwAwaitRestart = async function(key) {
+        const record = this.meterRegistry.get(key);
+        if (!record) return null;
+        const identity = { key, serialNumber: record.serialNumber || null };
+        const found = await this._fwWaitForMeterReturn(identity);
+        const current = this.meterRegistry.get(key);
+        if (found) {
+            if (found.key !== key && current && current.connectionState !== 'connected') {
+                // Same meter under a new key: drop the stale card, the new one is live.
+                this.meterRegistry.delete(key);
+                if (typeof this.refreshMeterBoard === 'function') this.refreshMeterBoard();
+                this.appendOutput(`${found.friendlyName || 'DWM V2'} reconnected after the firmware update.`);
+                if (typeof this.announce === 'function') this.announce('Meter reconnected after the firmware update');
+            }
+            return found;
+        }
+        if (current && current.state?.fwUpdate?.stage === 'done') {
+            this._fwStatus(key, FW_RESTART_TIMEOUT_MESSAGE, 'warning');
+            this.appendOutput(FW_RESTART_TIMEOUT_MESSAGE);
+            if (typeof this.announce === 'function') this.announce(FW_RESTART_TIMEOUT_MESSAGE, { assertive: true });
+        }
+        return null;
+    };
+
+    // Firmware-tab flow (no meter card involved): same wait, reported in the upload log.
+    DWMControl.prototype._fwTabAwaitRestart = async function(identity) {
+        this.updateProgressBar(100, FW_RESTARTING_MESSAGE);
+        this.appendSerialMonitor(FW_RESTARTING_MESSAGE);
+        const found = await this._fwWaitForMeterReturn(identity || {});
+        if (found) {
+            this.updateProgressBar(100, 'Reconnected');
+            this.appendSerialMonitor('Reconnected');
+            this.appendOutput(`${found.friendlyName || 'DWM V2'} reconnected after the firmware update.`);
+            if (typeof this.announce === 'function') this.announce('Meter reconnected after the firmware update');
+        } else {
+            this.updateProgressBar(100, FW_RESTART_TIMEOUT_MESSAGE);
+            this.appendSerialMonitor(FW_RESTART_TIMEOUT_MESSAGE);
+            this.appendOutput(FW_RESTART_TIMEOUT_MESSAGE);
+            if (typeof this.announce === 'function') this.announce(FW_RESTART_TIMEOUT_MESSAGE, { assertive: true });
+        }
+        return found;
     };
 
     // Called by connectMeter once the meter answers again after a successful update.
@@ -702,6 +811,11 @@
         if (fw.stage === 'done') {
             record.state.fwUpdate = { stage: 'idle' };
             this._fwHideNotice(key);
+            this._fwStatus(key, 'Reconnected', 'success');
+            this._fwSleep(8000).then(() => {
+                const r = this.meterRegistry.get(key);
+                if (r?.state?.fwUpdate?.stage === 'idle') this._fwStatus(key, '');
+            });
             this.appendOutput(`${record.friendlyName || 'DWM V2'} reconnected after the firmware update.`);
             if (typeof this.announce === 'function') this.announce(`${record.friendlyName || 'DWM V2'} reconnected after the firmware update`);
         }
@@ -711,8 +825,10 @@
     DWMControl.prototype.enterDfuForUpdate = async function(key) {
         const record = this.meterRegistry.get(key);
         if (!record) return;
-        if (!window.confirm(`Enter DFU mode on ${record.friendlyName || record.portPath} for firmware update?\n\nThe device will reboot into firmware update mode. You will then be taken to the Firmware Upload tab.\n\nRemember: a manual power cycle is required after the update completes.`)) return;
+        if (!window.confirm(`Enter DFU mode on ${record.friendlyName || record.portPath} for firmware update?\n\nThe device will reboot into firmware update mode. You will then be taken to the Firmware Upload tab.\n\nThe meter restarts by itself when the update finishes and the app reconnects automatically.`)) return;
 
+        // Remember which meter this was so the Firmware tab can find it again after the flash.
+        this._dfuMeterIdentity = { key, serialNumber: record.serialNumber || null };
         const sid = this.meterSafeId(key);
         const statusEl = document.getElementById(`meter-${sid}-sys-status`);
         try {

@@ -654,7 +654,7 @@
         const record = this.meterRegistry.get(key);
         if (!record) return;
         if (record.connectionState === 'updating') {
-            if (!options.autoConnect) this.setMeterStatus(key, 'Firmware update in progress. The meter reconnects after it is power-cycled.', 'warning');
+            if (!options.autoConnect) this.setMeterStatus(key, 'Firmware update in progress. The meter reconnects automatically when it finishes.', 'warning');
             return;
         }
 

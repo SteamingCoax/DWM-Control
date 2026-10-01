@@ -7,7 +7,7 @@ const { loadRenderer, makeControlStub, makeElement } = require('./helpers/render
 
 const KEY = 'usbmodem:fw1';
 const SID = 'usbmodem_fw1';
-const POWER_CYCLE = /Power-cycle the meter now/;
+const RESTARTING = /Update complete, waiting for meter to restart/;
 
 let els;
 let api;
@@ -73,6 +73,7 @@ beforeEach(() => {
     },
     onUploadProgress: (cb) => { progressCb = cb; return () => { progressCb = null; }; },
     closeSerialPort: async () => { calls.close++; return { success: true }; },
+    getSerialPorts: async () => ({ success: true, ports: [] }),
   };
   window.electronAPI = api;
   mock.timers.enable({ apis: ['setTimeout'] });
@@ -156,7 +157,8 @@ describe('runInlineFirmwareUpdate', () => {
     assert.deepEqual(calls.upload[0].deviceInfo, { serial: 'ABC', path: '1-1' });
     assert.ok(calls.a11yProgress.some((p) => p > 0 && p < 100), 'intermediate progress was reported');
     assert.equal(progress(), '100');
-    assert.match(status(), POWER_CYCLE);
+    assert.match(status(), RESTARTING);
+    assert.doesNotMatch(status(), /power.?cycle/i);
     assert.equal(record.state.fwUpdate.stage, 'done');
     assert.deepEqual(calls.a11yResult.at(-1)[0], true);
     assert.equal(progressCb, null, 'upload-progress listener removed after the upload');

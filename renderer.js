@@ -430,6 +430,9 @@ class DWMControl {
             portPath: port.path,
             friendlyName: existing.friendlyName || port.friendlyName || 'DWM V2',
             fallbackUid: this.parseUsbModemUid(port.path),
+            // USB serial number (stable across the PID change and DFU cycles); used to find the
+            // same meter again after a firmware update.
+            serialNumber: port.serialNumber || existing.serialNumber || null,
             apiUid: existing.apiUid || null,
             connectionState: existing.connectionState || 'available',
             state: existingState,
