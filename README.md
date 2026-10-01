@@ -31,6 +31,8 @@ Supported platforms:
   - Select a local HEX file
 - Shows upload progress and output logs
 
+A connected meter can also update itself from its card on the Control tab: **Check Updates** compares the meter's firmware with the latest release, and when a newer one exists the button becomes **Update to vX.Y.Z**. Clicking it downloads the firmware, reboots the meter into DFU mode, waits for the DFU device, uploads, and shows progress in the card. Power-cycle the meter when it finishes; it reconnects on its own. On Windows the DFU device needs the WinUSB driver first (Firmware tab). The Firmware tab remains available for manual control.
+
 ### Control Tab
 - Device controls are generated dynamically for supported hardware
 - Includes live device discovery and interaction workflow
@@ -45,6 +47,9 @@ The Settings dialog provides centralized configuration across four tabs:
 Open Settings from the gear button in the title bar or the keyboard shortcut (Ctrl+, on Windows/Linux; Cmd+, on macOS). Press Escape to close and return focus.
 
 An SWR / Return Loss card can also be added from **Edit > Add SWR / Return Loss Card** (Ctrl+Shift+W on Windows/Linux; Cmd+Shift+W on macOS).
+
+### Demo Mode
+Settings › General › "Demo mode" adds two simulated meters to the Control tab without any hardware: **Demo Steady** holds a constant carrier around 50 W, and **Demo Voice** produces an SSB-style voice envelope so PEP hold, history graphs and SWR cards can be demonstrated. Demo meters answer the full USB API in-app, so Config, range changes and even the in-card firmware update (simulated) work on them. Off by default.
 
 ### Beta Updates
 The Updates tab includes a checkbox to control whether the app offers beta (pre-release) versions. With "Accept beta updates" checked, the app offers pre-release versions as they are published. Unchecked, it ignores any newer beta and only installs stable releases. The box is off by default, so the app offers only stable releases until you tick it; this applies even when the installed version is itself a beta.

@@ -491,6 +491,8 @@ class DWMControl {
         for (const [key, record] of this.meterRegistry.entries()) {
             // Demo meters (demo.js) have no serial port and are never in the port list.
             if (record.isDemo) continue;
+            // Keep the card while the meter is in DFU mode for an in-card firmware update.
+            if (this.isMeterHeldForFirmwareUpdate?.(record)) continue;
             if (!activeKeys.has(key)) {
                 if (record.connectionState === 'connected') {
                     this.stopMeterMonitoring(key, true);
@@ -535,7 +537,7 @@ class DWMControl {
                 const record = this.upsertMeterRecordFromPort(port);
                 activeKeys.add(record.key);
                 // Only reset to 'available' if not currently connected, manually disconnected, or flagged as not-configured
-                if (record.connectionState !== 'connected' && record.connectionState !== 'disconnected' && record.connectionState !== 'not-configured') {
+                if (record.connectionState !== 'connected' && record.connectionState !== 'disconnected' && record.connectionState !== 'not-configured' && record.connectionState !== 'updating') {
                     record.connectionState = 'available';
                 }
             });

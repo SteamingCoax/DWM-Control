@@ -662,13 +662,17 @@
     </div>
     <div class="meter-card-header-right">
       <button id="meter-${sid}-connect-btn" class="btn btn-small meter-connect-btn meter-connect-btn-${connState}" data-meter-action="${isConnected ? 'disconnect' : 'connect'}">${badgeText}</button>
-      <button class="btn btn-secondary btn-small" data-meter-action="check-updates" ${!isConnected ? 'disabled' : ''}>Check Updates</button>
+      <button id="meter-${sid}-fw-btn" class="btn btn-secondary btn-small meter-fw-btn" data-meter-action="check-updates" ${!isConnected ? 'disabled' : ''}>Check Updates</button>
       <button class="btn btn-secondary btn-small" data-meter-action="identify-meter" ${!isConnected ? 'disabled' : ''}>Identify</button>
       <button class="btn btn-secondary btn-small meter-settings-btn" data-meter-action="toggle-cfg" title="Meter configuration" aria-label="Meter configuration" aria-expanded="false">Config</button>
     </div>
   </div>
 
   <div id="meter-${sid}-fw-update-notice" class="meter-fw-update-notice" style="display:none"></div>
+  <div class="meter-fw-update-progress-area">
+    <div id="meter-${sid}-fw-progress" class="meter-fw-progress" role="progressbar" aria-label="Firmware update progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><div id="meter-${sid}-fw-progress-fill" class="meter-fw-progress-fill"></div></div>
+    <p id="meter-${sid}-fw-status" class="meter-fw-status" role="status" aria-live="polite" hidden></p>
+  </div>
 
   <div class="meter-live-section" id="meter-${sid}-readings-bar" style="${isConnected ? '' : 'display:none'}">
     <div class="meter-live-toolbar">

@@ -267,88 +267,445 @@
         return false;
     };
 
+    // ─── In-card firmware update ──────────────────────────────────────────────
+    //
+    // record.state.fwUpdate = { stage, version, deviceVersion, hexPath, pct, dfuSent, error, doneAt }
+    // stage: idle → checking → available | uptodate
+    //        available → downloading → entering-dfu → waiting-dfu → uploading → done | error
+    //        error → (retry) → [downloading] → [entering-dfu] → waiting-dfu → …
+    // While stage is entering-dfu/waiting-dfu/uploading, record.connectionState is 'updating'.
+
+    const FW_RUNNING_STAGES = new Set(['downloading', 'entering-dfu', 'waiting-dfu', 'uploading']);
+    // How long a done/error record is kept after its serial port vanished (meter in DFU mode).
+    const FW_HOLD_MS = 10 * 60 * 1000;
+    const FW_NO_DFU_MESSAGE = 'No DFU device found. Check the USB cable, or install the WinUSB driver on Windows (Firmware tab).';
+
+    DWMControl.prototype._fwCompareVersions = function(deviceFver, latestTag) {
+        const device = this._parseSemver(deviceFver);
+        const latest = this._parseSemver(latestTag);
+        if (!device || !latest) return null;
+        return {
+            deviceVerStr: device.join('.'),
+            latestVerStr: latest.join('.'),
+            updateAvailable: this._semverIsNewer(latest, device),
+        };
+    };
+
+    DWMControl.prototype._fwIsRunning = function(record) {
+        return FW_RUNNING_STAGES.has(record?.state?.fwUpdate?.stage);
+    };
+
+    // Discovery (renderer.js removeMissingMeterRecords) must keep a record whose serial
+    // port disappeared because the meter is in DFU mode for an in-card update.
+    DWMControl.prototype.isMeterHeldForFirmwareUpdate = function(record) {
+        if (!record) return false;
+        if (record.connectionState === 'updating') return true;
+        const fw = record.state?.fwUpdate;
+        if (!fw) return false;
+        if (FW_RUNNING_STAGES.has(fw.stage)) return true;
+        if ((fw.stage === 'done' || fw.stage === 'error') && fw.doneAt) {
+            return Date.now() - fw.doneAt < FW_HOLD_MS;
+        }
+        return false;
+    };
+
+    DWMControl.prototype._fwSleep = function(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    };
+
+    DWMControl.prototype._fwStatus = function(key, text, kind = 'info') {
+        const el = document.getElementById(`meter-${this.meterSafeId(key)}-fw-status`);
+        if (!el) return;
+        el.textContent = text || '';
+        el.hidden = !text;
+        el.className = `meter-fw-status meter-fw-status-${kind}`;
+    };
+
+    DWMControl.prototype._fwProgress = function(key, pct) {
+        const sid = this.meterSafeId(key);
+        const bar = document.getElementById(`meter-${sid}-fw-progress`);
+        if (!bar) return;
+        if (pct === null || pct === undefined) { bar.hidden = true; return; }
+        const safe = Math.max(0, Math.min(100, Math.round(pct)));
+        bar.hidden = false;
+        bar.setAttribute('aria-valuenow', String(safe));
+        const fill = document.getElementById(`meter-${sid}-fw-progress-fill`);
+        if (fill) fill.style.width = `${safe}%`;
+    };
+
+    // The header button is either "Check Updates" or "Update to vX.Y.Z", depending on fwUpdate.
+    DWMControl.prototype._fwSyncButton = function(key) {
+        const btn = document.getElementById(`meter-${this.meterSafeId(key)}-fw-btn`);
+        const record = this.meterRegistry.get(key);
+        if (!btn || !record) return;
+        const fw = record.state?.fwUpdate;
+        const stage = fw?.stage || 'idle';
+        const isConn = record.connectionState === 'connected';
+
+        let action = 'check-updates';
+        let text = 'Check Updates';
+        let warn = false;
+        let disabled = !isConn;
+        if (stage === 'checking') {
+            text = 'Checking…';
+            disabled = true;
+        } else if (stage === 'uptodate') {
+            text = 'Up to date';
+        } else if (stage === 'available' || stage === 'error') {
+            action = 'run-fw-update';
+            text = `Update to v${fw.version}`;
+            warn = true;
+            // A meter left in DFU mode by a failed attempt has no serial port; retry still works.
+            disabled = !(isConn || (stage === 'error' && fw.dfuSent));
+        } else if (FW_RUNNING_STAGES.has(stage)) {
+            action = 'run-fw-update';
+            text = 'Updating…';
+            warn = true;
+            disabled = true;
+        }
+
+        btn.dataset.meterAction = action;
+        btn.setAttribute('data-meter-action', action);
+        btn.textContent = text;
+        btn.disabled = disabled;
+        btn.className = `btn ${warn ? 'btn-warning' : 'btn-secondary'} btn-small meter-fw-btn`;
+        if (FW_RUNNING_STAGES.has(stage)) btn.setAttribute('aria-busy', 'true');
+        else btn.removeAttribute('aria-busy');
+    };
+
+    DWMControl.prototype._fwRenderAvailableNotice = function(key) {
+        const record = this.meterRegistry.get(key);
+        const fw = record?.state?.fwUpdate;
+        const noticeEl = document.getElementById(`meter-${this.meterSafeId(key)}-fw-update-notice`);
+        if (!noticeEl || !fw) return;
+        noticeEl.classList.remove('meter-fw-done');
+        noticeEl.innerHTML = `
+<div class="meter-fw-update-available">
+  <div class="meter-fw-update-info">
+    <span class="meter-fw-update-icon" aria-hidden="true">&#x2B06;</span>
+    <span class="meter-fw-update-text">Firmware update available &mdash; <strong>Latest: v${fw.version}</strong> &nbsp;(installed: v${fw.deviceVersion || '?'})</span>
+    <button class="btn btn-icon meter-fw-dismiss-btn" data-meter-action="dismiss-fw-notice" title="Dismiss" aria-label="Dismiss firmware update notice">&times;</button>
+  </div>
+  <p class="meter-fw-update-note">&#x26A0; After the update, power-cycle the meter (unplug and reconnect, or switch it off and on). Click <strong>Update to v${fw.version}</strong> above to start.</p>
+  <div class="meter-fw-update-actions">
+    <button class="btn btn-link btn-small meter-fw-manual-link" data-meter-action="enter-dfu-from-update">Use the Firmware tab instead</button>
+  </div>
+</div>`;
+        noticeEl.style.display = '';
+    };
+
+    DWMControl.prototype._fwHideNotice = function(key) {
+        const sid = this.meterSafeId(key);
+        const noticeEl = document.getElementById(`meter-${sid}-fw-update-notice`);
+        if (noticeEl) {
+            noticeEl.style.display = 'none';
+            noticeEl.classList.remove('meter-fw-done');
+        }
+        this._fwStatus(key, '');
+        this._fwProgress(key, null);
+    };
+
+    DWMControl.prototype.dismissFirmwareNotice = function(key) {
+        const record = this.meterRegistry.get(key);
+        if (!record) return;
+        if (this._fwIsRunning(record)) return;
+        if (record.state) record.state.fwUpdate = { stage: 'idle' };
+        this._fwHideNotice(key);
+        this._fwSyncButton(key);
+    };
+
     DWMControl.prototype.checkFirmwareUpdate = async function(key) {
         const record = this.meterRegistry.get(key);
-        if (!record || record.connectionState !== 'connected') {
+        if (!record || record.connectionState !== 'connected' || !record.state) {
             this.setMeterStatus(key, 'Connect to this meter before checking for updates.', 'warning');
             return;
         }
+        if (this._fwIsRunning(record)) return;
 
         const sid = this.meterSafeId(key);
         const noticeEl = document.getElementById(`meter-${sid}-fw-update-notice`);
-        const cardEl = document.getElementById(`meter-card-${sid}`);
-        const checkBtn = cardEl ? cardEl.querySelector('[data-meter-action="check-updates"]') : null;
+        const prev = record.state.fwUpdate || {};
+        const setStage = (stage, extra = {}) => {
+            record.state.fwUpdate = { ...extra, stage };
+            this._fwSyncButton(key);
+        };
 
-        if (checkBtn) { checkBtn.disabled = true; checkBtn.textContent = 'Checking…'; }
+        setStage('checking');
         this.setMeterStatus(key, 'Checking for firmware update…', 'active');
 
         try {
-            // Step 1: get device firmware version via sys.fw
+            // Step 1: device firmware version via sys.fw
             const fwResponse = await this.sendApiCommand(key, 'sys.fw', {}, { timeoutMs: 3000 });
             const fver = fwResponse.fver || '';
-            const deviceVersion = this._parseSemver(fver);
-
-            if (!deviceVersion) {
+            if (!this._parseSemver(fver)) {
                 this.setMeterStatus(key, `Could not parse device firmware version: "${fver}"`, 'error');
-                if (noticeEl) noticeEl.style.display = 'none';
+                this._fwHideNotice(key);
+                setStage('idle');
                 return;
             }
 
-            // Step 2: fetch latest release tag from GitHub
+            // Step 2: latest release tag from GitHub
             let latestTag = null;
-            let latestVersion = null;
             try {
                 const releaseInfo = await window.electronAPI.getLatestFirmwareVersion();
-                if (releaseInfo && releaseInfo.tag_name) {
-                    latestTag = releaseInfo.tag_name;
-                    latestVersion = this._parseSemver(latestTag);
-                }
+                if (releaseInfo && releaseInfo.tag_name) latestTag = releaseInfo.tag_name;
             } catch (netErr) {
                 this.setMeterStatus(key, `Update check failed (network): ${netErr.message}`, 'error');
-                if (noticeEl) noticeEl.style.display = 'none';
+                this._fwHideNotice(key);
+                setStage('idle');
                 return;
             }
 
-            if (!latestVersion) {
+            const cmp = this._fwCompareVersions(fver, latestTag);
+            if (!cmp) {
                 this.setMeterStatus(key, `Could not parse latest release version: "${latestTag}"`, 'error');
-                if (noticeEl) noticeEl.style.display = 'none';
+                this._fwHideNotice(key);
+                setStage('idle');
                 return;
             }
 
-            const deviceVerStr = deviceVersion.join('.');
-            const latestVerStr = latestVersion.join('.');
-
-            if (this._semverIsNewer(latestVersion, deviceVersion)) {
-                if (noticeEl) {
-                    noticeEl.innerHTML = `
-<div class="meter-fw-update-available">
-  <div class="meter-fw-update-info">
-    <span class="meter-fw-update-icon">&#x2B06;</span>
-    <span class="meter-fw-update-text">Firmware update available &mdash; <strong>Latest: v${latestVerStr}</strong> &nbsp;(installed: v${deviceVerStr})</span>
-    <button class="btn btn-icon meter-fw-dismiss-btn" data-meter-action="dismiss-fw-notice" title="Dismiss">&times;</button>
-  </div>
-  <div class="meter-fw-update-actions">
-    <button class="btn btn-warning btn-small" data-meter-action="enter-dfu-from-update">Enter DFU Mode &amp; Update Firmware</button>
-  </div>
-  <p class="meter-fw-update-note">&#x26A0; A manual power cycle (turn the meter off and on) is required after the firmware update completes.</p>
-</div>`;
-                    noticeEl.style.display = '';
-                }
-                this.setMeterStatus(key, `Firmware update available: v${deviceVerStr} \u2192 v${latestVerStr}`, 'warning');
+            if (cmp.updateAvailable) {
+                // Keep an already-downloaded hex for the same version.
+                const hexPath = prev.version === cmp.latestVerStr ? prev.hexPath : undefined;
+                setStage('available', { version: cmp.latestVerStr, deviceVersion: cmp.deviceVerStr, hexPath });
+                this._fwStatus(key, '');
+                this._fwProgress(key, null);
+                this._fwRenderAvailableNotice(key);
+                this.setMeterStatus(key, `Firmware update available: v${cmp.deviceVerStr} → v${cmp.latestVerStr}`, 'warning');
             } else {
+                setStage('uptodate', { version: cmp.latestVerStr, deviceVersion: cmp.deviceVerStr });
                 if (noticeEl) {
-                    noticeEl.innerHTML = `<div class="meter-fw-up-to-date"><span>&#x2713; Firmware is up to date (v${deviceVerStr})</span></div>`;
+                    noticeEl.classList.remove('meter-fw-done');
+                    noticeEl.innerHTML = `<div class="meter-fw-up-to-date"><span>&#x2713; Firmware is up to date (v${cmp.deviceVerStr})</span></div>`;
                     noticeEl.style.display = '';
-                    setTimeout(() => { if (noticeEl) noticeEl.style.display = 'none'; }, 5000);
                 }
-                this.setMeterStatus(key, `Firmware is up to date (v${deviceVerStr}).`, 'ready');
+                this._fwStatus(key, '');
+                this._fwProgress(key, null);
+                this.setMeterStatus(key, `Firmware is up to date (v${cmp.deviceVerStr}).`, 'ready');
+                setTimeout(() => {
+                    if (record.state?.fwUpdate?.stage !== 'uptodate') return;
+                    record.state.fwUpdate = { stage: 'idle' };
+                    if (noticeEl) noticeEl.style.display = 'none';
+                    this._fwSyncButton(key);
+                }, 5000);
             }
         } catch (err) {
             this.setMeterStatus(key, `Firmware check failed: ${err.message}`, 'error');
-            if (noticeEl) noticeEl.style.display = 'none';
-        } finally {
-            if (checkBtn) { checkBtn.disabled = false; checkBtn.textContent = 'Check Updates'; }
+            this._fwHideNotice(key);
+            setStage('idle');
         }
+    };
+
+    // ── Steps (each unit-testable with a stubbed window.electronAPI) ──
+
+    DWMControl.prototype._fwDownload = async function() {
+        const result = await window.electronAPI.downloadLatestFirmware();
+        if (!result || !result.filePath) throw new Error('no file path was returned');
+        return result.filePath;
+    };
+
+    // Fire-and-forget sys.dfu, exactly like enterDfuForUpdate, then release the port.
+    DWMControl.prototype._fwEnterDfu = async function(key) {
+        const record = this.meterRegistry.get(key);
+        if (!record) return;
+        this.stopMeterMonitoring(key, true);
+        this.sendApiCommand(key, 'sys.dfu', {}, { timeoutMs: 1000 }).catch(() => {});
+        if (record.state?.fwUpdate) record.state.fwUpdate.dfuSent = true;
+        // From here on discovery must neither auto-connect nor drop this record.
+        record.connectionState = 'updating';
+        if (this.activeMeterKey === key) {
+            this.activeMeterKey = null;
+            for (const [k, r] of this.meterRegistry) {
+                if (r.connectionState === 'connected') { this.activeMeterKey = k; break; }
+            }
+        }
+        this.isConnected = [...this.meterRegistry.values()].some(r => r.connectionState === 'connected');
+        this.updateMeterCardUI(key);
+        await this._fwSleep(1200);
+        try { await window.electronAPI.closeSerialPort(record.portPath); } catch (_) { /* port already gone */ }
+    };
+
+    // Resolves { device, count } for the first DFU device, or null after timeoutMs.
+    DWMControl.prototype._fwWaitForDfuDevice = async function(timeoutMs = 30000, intervalMs = 1000) {
+        let lastError = null;
+        for (let elapsed = 0; ; elapsed += intervalMs) {
+            try {
+                const result = await window.electronAPI.getDfuDevices();
+                const devices = (result && result.success && Array.isArray(result.devices)) ? result.devices : [];
+                if (devices.length > 0) return { device: devices[0], count: devices.length };
+                if (result && !result.success && result.error) lastError = result.error;
+            } catch (err) {
+                lastError = err.message;
+            }
+            if (elapsed + intervalMs > timeoutMs) break;
+            await this._fwSleep(intervalMs);
+        }
+        if (lastError) this.appendOutput(`DFU device search: ${lastError}`);
+        return null;
+    };
+
+    // Listens on upload-progress only for the duration of this upload.
+    DWMControl.prototype._fwUpload = async function(key, hexFilePath, deviceInfo, note = '') {
+        const record = this.meterRegistry.get(key);
+        const api = window.electronAPI;
+        const onLine = (_event, data) => {
+            const fw = record?.state?.fwUpdate;
+            if (!fw || fw.stage !== 'uploading') return;
+            const line = typeof data === 'string' ? data.trim() : String(data?.message || '').trim();
+            const pct = typeof this.parseProgressFromDfuOutput === 'function' ? this.parseProgressFromDfuOutput(line) : null;
+            if (pct === null || pct === undefined || pct <= (fw.pct || 0)) return;
+            fw.pct = pct;
+            this._fwProgress(key, pct);
+            this._fwStatus(key, `Uploading firmware… ${pct}%${note}`, 'active');
+            if (typeof this._a11yOnDfuProgress === 'function') this._a11yOnDfuProgress(pct);
+        };
+        const off = typeof api.onUploadProgress === 'function' ? api.onUploadProgress(onLine) : null;
+        try {
+            return await api.uploadFirmware({ hexFilePath, deviceInfo });
+        } finally {
+            if (typeof off === 'function') off();
+        }
+    };
+
+    DWMControl.prototype._fwFinish = function(key, ok, message) {
+        const record = this.meterRegistry.get(key);
+        const fw = record?.state?.fwUpdate;
+        if (!fw) return;
+        fw.stage = ok ? 'done' : 'error';
+        fw.doneAt = Date.now();
+        if (ok) {
+            fw.hexPath = undefined;
+            fw.pct = 100;
+            this._fwProgress(key, 100);
+        } else {
+            fw.error = message;
+            this._fwProgress(key, null);
+        }
+        if (record.connectionState === 'updating') record.connectionState = 'available';
+        this._fwStatus(key, message, ok ? 'success' : 'error');
+        const noticeEl = document.getElementById(`meter-${this.meterSafeId(key)}-fw-update-notice`);
+        if (noticeEl) {
+            noticeEl.classList.toggle('meter-fw-done', ok);
+            noticeEl.style.display = '';
+        }
+        if (typeof this._a11yOnDfuResult === 'function') this._a11yOnDfuResult(ok, message);
+        this.appendOutput(message);
+        this.updateMeterCardUI(key);
+        this._fwSyncButton(key);
+    };
+
+    DWMControl.prototype.runInlineFirmwareUpdate = async function(key) {
+        const record = this.meterRegistry.get(key);
+        const fw = record?.state?.fwUpdate;
+        if (!record || !fw || !fw.version) return;
+        if (fw.stage !== 'available' && fw.stage !== 'error') return; // running or not checked: ignore
+
+        // dfu-util flashes whichever DFU device it finds, so only one update app-wide.
+        for (const [k, r] of this.meterRegistry) {
+            if (k !== key && this._fwIsRunning(r)) {
+                this._fwStatus(key, 'Another meter is being updated. Wait for it to finish.', 'warning');
+                return;
+            }
+        }
+        if (this.isUploading) {
+            this._fwStatus(key, 'A firmware upload is running on the Firmware tab. Wait for it to finish.', 'warning');
+            return;
+        }
+        const isConn = record.connectionState === 'connected';
+        if (!isConn && !fw.dfuSent) {
+            this._fwStatus(key, 'Connect to this meter before updating.', 'warning');
+            return;
+        }
+
+        const version = fw.version;
+        const setStage = (stage, text) => {
+            fw.stage = stage;
+            this._fwStatus(key, text, 'active');
+            this._fwSyncButton(key);
+        };
+        fw.error = undefined;
+        fw.doneAt = undefined;
+        fw.pct = 0;
+
+        if (record.isDemo) return this._fwRunDemo(key);
+
+        // Step 1: download
+        if (!fw.hexPath) {
+            setStage('downloading', `Downloading firmware v${version}…`);
+            this._fwProgress(key, null);
+            try {
+                fw.hexPath = await this._fwDownload();
+            } catch (err) {
+                this._fwFinish(key, false, `Firmware download failed: ${err.message}`);
+                return;
+            }
+        }
+
+        try {
+            // Step 2: reboot into DFU (skipped on a retry while the meter already sits in DFU mode)
+            if (record.connectionState === 'connected') {
+                setStage('entering-dfu', 'Rebooting meter into DFU mode…');
+                await this._fwEnterDfu(key);
+            } else {
+                record.connectionState = 'updating';
+                this.updateMeterCardUI(key);
+            }
+
+            // Step 3: wait for the DFU device
+            setStage('waiting-dfu', 'Waiting for DFU device…');
+            const found = await this._fwWaitForDfuDevice(30000, 1000);
+            if (!found) {
+                this._fwFinish(key, false, FW_NO_DFU_MESSAGE);
+                return;
+            }
+
+            // Step 4: upload
+            const note = found.count > 1 ? ` (${found.count} DFU devices found; using the first)` : '';
+            setStage('uploading', `Uploading firmware… 0%${note}`);
+            this._fwProgress(key, 0);
+            const result = await this._fwUpload(key, fw.hexPath, found.device, note);
+            if (!result || !result.success) {
+                this._fwFinish(key, false, `Firmware upload failed: ${(result && result.error) || 'dfu-util reported an error'}`);
+                return;
+            }
+            this._fwFinish(key, true, `Firmware v${version} uploaded. Power-cycle the meter now (unplug and reconnect, or switch it off and on); it will reconnect automatically.`);
+        } catch (err) {
+            this._fwFinish(key, false, `Firmware update failed: ${err.message}`);
+        }
+    };
+
+    // Demo meters: no DFU device exists, so fake the upload over ~3 s.
+    DWMControl.prototype._fwRunDemo = async function(key) {
+        const record = this.meterRegistry.get(key);
+        const fw = record.state.fwUpdate;
+        fw.stage = 'uploading';
+        this._fwSyncButton(key);
+        this.sendApiCommand(key, 'sys.dfu', {}, { timeoutMs: 1000 }).catch(() => {});
+        for (let pct = 0; pct < 100; pct += 10) {
+            this._fwProgress(key, pct);
+            this._fwStatus(key, `Uploading firmware… ${pct}% (demo)`, 'active');
+            await this._fwSleep(300);
+        }
+        fw.stage = 'done';
+        fw.pct = 100;
+        this._fwProgress(key, 100);
+        this._fwStatus(key, `Firmware v${fw.version} uploaded (demo, simulated). A real meter would now need a power cycle.`, 'success');
+        if (typeof this._a11yOnDfuResult === 'function') this._a11yOnDfuResult(true, '');
+        this._fwSyncButton(key);
+    };
+
+    // Called by connectMeter once the meter answers again after a successful update.
+    DWMControl.prototype._fwOnReconnected = function(key) {
+        const record = this.meterRegistry.get(key);
+        const fw = record?.state?.fwUpdate;
+        if (!fw) return;
+        if (fw.stage === 'done') {
+            record.state.fwUpdate = { stage: 'idle' };
+            this._fwHideNotice(key);
+            this.appendOutput(`${record.friendlyName || 'DWM V2'} reconnected after the firmware update.`);
+            if (typeof this.announce === 'function') this.announce(`${record.friendlyName || 'DWM V2'} reconnected after the firmware update`);
+        }
+        this._fwSyncButton(key);
     };
 
     DWMControl.prototype.enterDfuForUpdate = async function(key) {
