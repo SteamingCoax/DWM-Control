@@ -112,10 +112,12 @@ if ! gh release view "$tag" >/dev/null 2>&1; then
   else
     echo "Creating GitHub release $tag"
   fi
+  # ${arr[@]+"${arr[@]}"} expands to nothing for an empty array without tripping
+  # `set -u` on macOS bash 3.2 (a plain "${arr[@]}" aborts stable releases).
   gh release create "$tag" \
     --title "DWM Control $tag" \
     --generate-notes \
-    "${prerelease_args[@]}"
+    ${prerelease_args[@]+"${prerelease_args[@]}"}
 fi
 
 echo "Release process started for $tag"
